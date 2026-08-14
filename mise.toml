@@ -1,0 +1,51 @@
+[tasks.help]
+description = "Show common CJS web tasks"
+run = """
+echo "CJS frontend tasks"
+echo ""
+echo "  mise run dev             Start frontend attached"
+echo "  mise run dev:detached    Start frontend in background"
+echo "  mise run stop            Stop running containers"
+echo "  mise run down            Stop and remove containers and network"
+echo "  mise run logs            Follow frontend logs"
+echo "  mise run status          Show compose container status"
+echo "  mise run build           Build Docker images"
+echo "  mise run verify          Run frontend production build"
+echo ""
+echo "Frontend: http://localhost:5173"
+echo "Stats API: ${VITE_API_BASE_URL:-https://api.jump4life.org}"
+"""
+
+[tasks.dev]
+description = "Start frontend attached"
+run = "docker compose up --build"
+
+[tasks."dev:detached"]
+description = "Start frontend in background"
+run = "docker compose up --build -d"
+
+[tasks.stop]
+description = "Stop running containers without removing volumes"
+run = "docker compose stop"
+
+[tasks.down]
+description = "Stop and remove containers and network"
+run = "docker compose down"
+
+[tasks.logs]
+description = "Follow frontend logs"
+run = "docker compose logs -f frontend"
+
+[tasks.status]
+description = "Show compose container status"
+run = "docker compose ps"
+
+[tasks.build]
+description = "Build Docker images"
+run = "docker compose build"
+
+[tasks.verify]
+description = "Run frontend production build"
+run = """
+docker compose run --rm frontend npm run build
+"""

@@ -1,0 +1,29 @@
+{
+  "name": "cjs-web-frontend",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "packageManager": "npm@11.16.0",
+  "engines": {
+    "node": ">=26 <27",
+    "npm": ">=11 <12"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0"
+  },
+  "dependencies": {
+    "lucide-react": "^1.27.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "@types/react": "^19.0.1",
+    "@types/react-dom": "^19.0.2",
+    "@vitejs/plugin-react": "^6.0.4",
+    "typescript": "^5.7.2",
+    "vite": "^8.1.5"
+  }
+}

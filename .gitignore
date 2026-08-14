@@ -1,0 +1,14 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+.DS_Store
+*.log
+.env
+.env.*
+!.env.example
+
+# Local agent and code-index metadata.
+.agents/
+.codex/
+.codebase-memory/
