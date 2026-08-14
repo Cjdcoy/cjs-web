@@ -1,0 +1,5 @@
+# Build-only metadata must not become a public static asset.
+.vite/
+
+# Source maps are intentionally excluded even if a future build emits one by mistake.
+*.map

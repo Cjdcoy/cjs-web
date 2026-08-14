@@ -1,0 +1,55 @@
+body {
+  background:
+    radial-gradient(circle at 12% -8%, var(--cjs-color-accent-surface), transparent 32rem),
+    radial-gradient(circle at 88% 6%, var(--cjs-color-panel-hover), transparent 28rem),
+    linear-gradient(180deg, var(--cjs-color-elevated) 0, var(--cjs-color-page) 32rem);
+  color: var(--cjs-color-text);
+}
+
+::selection {
+  background: var(--cjs-color-selection);
+  color: var(--cjs-color-text);
+}
+
+a {
+  color: inherit;
+}
+
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+  outline: 0;
+  box-shadow: var(--cjs-focus-ring);
+}
+
+.cjs-page {
+  width: min(var(--cjs-content-width), calc(100% - (var(--cjs-space-4) * 2)));
+  margin-inline: auto;
+}
+
+.cjs-reading-width {
+  max-width: var(--cjs-reading-width);
+}
+
+.cjs-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cjs-stack-space, var(--cjs-space-4));
+}
+
+.cjs-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--cjs-cluster-space, var(--cjs-space-3));
+}
+
+.cjs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--cjs-grid-min, 16rem)), 1fr));
+  gap: var(--cjs-grid-space, var(--cjs-space-4));
+}
+
+@media (min-width: 48rem) {
+  .cjs-page {
+    width: min(var(--cjs-content-width), calc(100% - (var(--cjs-space-8) * 2)));
+  }
+}

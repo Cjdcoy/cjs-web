@@ -1,0 +1,109 @@
+:root {
+  color-scheme: dark;
+
+  /* Color */
+  --cjs-color-page: #080b09;
+  --cjs-color-elevated: #0c110e;
+  --cjs-color-panel: #111713;
+  --cjs-color-panel-strong: #17201b;
+  --cjs-color-panel-warm: #1c1b16;
+  --cjs-color-panel-soft: rgb(255 255 255 / 0.04);
+  --cjs-color-panel-hover: rgb(255 255 255 / 0.07);
+  --cjs-color-border: rgb(216 231 222 / 0.38);
+  --cjs-color-border-strong: rgb(216 231 222 / 0.52);
+  --cjs-color-text: #eef4f0;
+  --cjs-color-text-muted: #9ca9a1;
+  --cjs-color-text-subtle: #8f9d95;
+  --cjs-color-accent: #61d69d;
+  --cjs-color-accent-strong: #98edc3;
+  --cjs-color-accent-secondary: #d4b267;
+  --cjs-color-danger: #ef8178;
+  --cjs-color-information: #8fb8e8;
+  --cjs-color-on-accent: #07130d;
+  --cjs-color-on-danger: #210706;
+  --cjs-color-accent-surface: rgb(97 214 157 / 0.13);
+  --cjs-color-accent-surface-strong: rgb(97 214 157 / 0.2);
+  --cjs-color-warning-surface: rgb(212 178 103 / 0.14);
+  --cjs-color-danger-surface: rgb(239 129 120 / 0.13);
+  --cjs-color-information-surface: rgb(143 184 232 / 0.13);
+  --cjs-color-selection: rgb(97 214 157 / 0.28);
+  --cjs-color-backdrop: rgb(0 0 0 / 0.68);
+
+  /* Type */
+  --cjs-font-sans:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --cjs-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --cjs-font-size-xs: 0.75rem;
+  --cjs-font-size-sm: 0.875rem;
+  --cjs-font-size-md: 1rem;
+  --cjs-font-size-lg: 1.125rem;
+  --cjs-font-size-xl: clamp(1.35rem, 1.1rem + 1vw, 1.8rem);
+  --cjs-font-size-2xl: clamp(1.75rem, 1.35rem + 1.8vw, 2.6rem);
+  --cjs-line-height-tight: 1.2;
+  --cjs-line-height-normal: 1.5;
+  --cjs-line-height-relaxed: 1.7;
+  --cjs-font-weight-regular: 400;
+  --cjs-font-weight-medium: 550;
+  --cjs-font-weight-semibold: 650;
+  --cjs-font-weight-bold: 750;
+
+  /* Space */
+  --cjs-space-0: 0;
+  --cjs-space-1: 0.25rem;
+  --cjs-space-2: 0.5rem;
+  --cjs-space-3: 0.75rem;
+  --cjs-space-4: 1rem;
+  --cjs-space-5: 1.25rem;
+  --cjs-space-6: 1.5rem;
+  --cjs-space-8: 2rem;
+  --cjs-space-10: 2.5rem;
+  --cjs-space-12: 3rem;
+  --cjs-space-16: 4rem;
+
+  /* Shape, borders, and elevation */
+  --cjs-radius-sm: 9px;
+  --cjs-radius-md: 14px;
+  --cjs-radius-lg: 18px;
+  --cjs-radius-pill: 999px;
+  --cjs-border-width: 1px;
+  --cjs-shadow-card: 0 18px 46px rgb(0 0 0 / 0.26);
+  --cjs-shadow-elevated: 0 26px 70px rgb(0 0 0 / 0.42);
+  --cjs-shadow-accent: 0 10px 28px rgb(97 214 157 / 0.18);
+  --cjs-focus-ring: 0 0 0 3px rgb(8 11 9 / 0.92), 0 0 0 5px var(--cjs-color-accent-strong);
+
+  /* Motion */
+  --cjs-duration-instant: 1ms;
+  --cjs-duration-fast: 120ms;
+  --cjs-duration-standard: 180ms;
+  --cjs-duration-slow: 280ms;
+  --cjs-duration-skeleton: 1400ms;
+  --cjs-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --cjs-ease-emphasized: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Layers */
+  --cjs-layer-base: 0;
+  --cjs-layer-raised: 10;
+  --cjs-layer-sticky: 20;
+  --cjs-layer-overlay: 100;
+  --cjs-layer-toast: 1000;
+
+  /* Layout and breakpoint references. Media queries mirror these values. */
+  --cjs-breakpoint-compact: 22.5rem;
+  --cjs-breakpoint-medium: 48rem;
+  --cjs-breakpoint-wide: 90rem;
+  --cjs-content-width: 78rem;
+  --cjs-reading-width: 46rem;
+  --cjs-control-height-sm: 2.25rem;
+  --cjs-control-height-md: 2.75rem;
+  --cjs-control-height-lg: 3rem;
+  --cjs-touch-target: 2.75rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --cjs-duration-fast: var(--cjs-duration-instant);
+    --cjs-duration-standard: var(--cjs-duration-instant);
+    --cjs-duration-slow: var(--cjs-duration-instant);
+    --cjs-duration-skeleton: var(--cjs-duration-instant);
+  }
+}

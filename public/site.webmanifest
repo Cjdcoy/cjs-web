@@ -1,0 +1,17 @@
+{
+  "name": "CodJumper Stats",
+  "short_name": "CJS",
+  "description": "Public JumpersHeaven and Jump4Life statistics frontend.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#080b09",
+  "theme_color": "#080b09",
+  "icons": [
+    {
+      "src": "/logo.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

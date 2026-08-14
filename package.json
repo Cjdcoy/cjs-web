@@ -10,8 +10,23 @@
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "build": "npm run typecheck && vite build && npm run test:performance && npm run test:release-artifacts",
+    "deploy:dry-run": "npx --yes wrangler@4.114.0 deploy --strict --dry-run --config wrangler.jsonc",
+    "preview": "vite preview --host 0.0.0.0",
+    "format": "prettier --write . --ignore-unknown",
+    "format:check": "prettier --check . --ignore-unknown",
+    "lint": "eslint . --max-warnings 0",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:performance": "node scripts/check-performance.mjs",
+    "test:release-artifacts": "node scripts/check-release-artifacts.mjs",
+    "typecheck": "tsc -b --pretty false",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "verify": "npm run format:check && npm run lint && npm run test:coverage && npm run build",
+    "release:check": "npm run verify && npm run deploy:dry-run",
+    "smoke:production": "node scripts/smoke-production.mjs"
   },
   "dependencies": {
     "lucide-react": "^1.27.0",
@@ -19,11 +34,31 @@
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.62.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.4",
     "@types/node": "^26.1.1",
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^6.0.4",
+    "@vitest/coverage-v8": "^4.1.10",
+    "axe-core": "^4.10.3",
+    "eslint": "^9.39.5",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.4",
+    "globals": "^17.11.0",
+    "jsdom": "^30.0.1",
+    "msw": "^2.15.0",
+    "prettier": "^3.9.6",
     "typescript": "^5.7.2",
-    "vite": "^8.1.5"
+    "typescript-eslint": "^8.67.0",
+    "vite": "^8.1.5",
+    "vitest": "^4.1.10"
   }
 }
