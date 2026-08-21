@@ -42,7 +42,7 @@ const responses: Readonly<Record<string, unknown>> = {
 };
 
 const expectedQueries: Readonly<Record<string, readonly Readonly<Record<string, string>>[]>> = {
-  "/api/v1/tracker/servers": [{ source: "jh" }],
+  "/api/v1/tracker/servers": [{ source: "jh" }, { source: "j4l" }],
   "/api/v1/leaderboard/speed-skill": [{ source: "jh", fps: "125" }],
   "/api/v1/leaderboard/jump-skill": [{ source: "jh", fps: "125" }],
   "/api/v1/leaderboard/defrag-skill": [{ source: "jh", fps: "125" }],

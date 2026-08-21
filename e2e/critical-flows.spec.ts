@@ -7,11 +7,12 @@ test("live servers and leaderboards render stable public data", async ({ page })
 
   await page.goto("/");
   await expect(page.getByRole("heading", { level: 1, name: "Live servers" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "cod2.example.invalid" })).toBeVisible();
-  await expect(page.getByRole("link", { name: "mp_cjs_training" })).toHaveAttribute(
-    "href",
-    "/maps/101?source=jh",
-  );
+  await expect(
+    page.getByLabel(/JumpersHeaven:/).getByRole("heading", { name: "cod2.example.invalid" }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel(/JumpersHeaven:/).getByRole("link", { name: "mp_cjs_training" }),
+  ).toHaveAttribute("href", "/maps/101?source=jh");
   await page.getByRole("checkbox", { name: "Auto-refresh" }).uncheck();
 
   await page.goto("/leaderboards");
@@ -79,7 +80,9 @@ test("slow and failed network states remain understandable and recoverable", asy
   await page.goto("/");
 
   await expect(page.getByText("Loading live server data.")).toBeVisible();
-  await expect(page.getByRole("heading", { name: "cod2.example.invalid" })).toBeVisible();
+  await expect(
+    page.getByLabel(/JumpersHeaven:/).getByRole("heading", { name: "cod2.example.invalid" }),
+  ).toBeVisible();
 
   await page.unrouteAll({ behavior: "wait" });
   await mockApi(page, {
@@ -95,7 +98,9 @@ test("slow and failed network states remain understandable and recoverable", asy
   await page.unrouteAll({ behavior: "wait" });
   await mockApi(page);
   await retry.click();
-  await expect(page.getByRole("heading", { name: "cod2.example.invalid" })).toBeVisible();
+  await expect(
+    page.getByLabel(/JumpersHeaven:/).getByRole("heading", { name: "cod2.example.invalid" }),
+  ).toBeVisible();
 });
 
 test("direct nested routes survive refresh and critical views pass WCAG axe rules", async ({

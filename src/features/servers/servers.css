@@ -297,10 +297,11 @@
 }
 
 .server-card__address-copy code {
-  overflow: auto hidden;
+  overflow: hidden;
   color: var(--cjs-color-text);
   font-family: var(--cjs-font-mono);
   font-size: var(--cjs-font-size-sm);
+  text-overflow: ellipsis;
   user-select: text;
   white-space: nowrap;
 }
