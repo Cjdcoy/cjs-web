@@ -9,17 +9,18 @@ updates:
       time: "04:00"
       timezone: Asia/Hong_Kong
     open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - javascript
+    commit-message:
+      prefix: deps
     groups:
-      react:
+      production-dependencies:
+        dependency-type: production
+      test-and-build-tooling:
+        dependency-type: development
         patterns:
-          - react
-          - react-dom
-          - "@types/react"
-          - "@types/react-dom"
-      vite:
-        patterns:
-          - vite
-          - "@vitejs/plugin-react"
+          - "*"
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -28,3 +29,7 @@ updates:
       time: "04:30"
       timezone: Asia/Hong_Kong
     open-pull-requests-limit: 5
+    labels:
+      - dependencies
+    commit-message:
+      prefix: ci

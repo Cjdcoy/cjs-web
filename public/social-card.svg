@@ -1,0 +1,17 @@
+<svg width="1200" height="630" viewBox="0 0 1200 630" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <title>CodJumper Stats</title>
+  <desc>CodJumper Stats wordmark on a dark green background.</desc>
+  <rect width="1200" height="630" fill="#080B09"/>
+  <circle cx="104" cy="68" r="360" fill="#61D69D" fill-opacity=".09"/>
+  <circle cx="1106" cy="588" r="330" fill="#D4B267" fill-opacity=".08"/>
+  <rect x="88" y="88" width="1024" height="454" rx="36" fill="#111713" stroke="#D8E7DE" stroke-opacity=".18" stroke-width="2"/>
+  <g transform="translate(140 156) scale(2.25)">
+    <path d="M36 4l5 8 10-3-2 10 10 3-8 7 6 9-11 1-2 11-8-6-8 6-2-11-11-1 6-9-8-7 10-3-2-10 10 3 5-8z" fill="#D4B267"/>
+    <path d="M24 22h24v15c0 10-7 18-12 21-5-3-12-11-12-21V22z" fill="#111713" stroke="#D4B267" stroke-width="2"/>
+    <path d="M29 30h14v5H29zm2 8h10v4H31z" fill="#D4B267"/>
+    <path d="M36 12l1.5 3 3.5.5-2.5 2.5.6 3.5-3.1-1.6-3.1 1.6.6-3.5-2.5-2.5 3.5-.5L36 12z" fill="#111713"/>
+  </g>
+  <text x="360" y="260" fill="#EEF4F0" font-family="Inter, system-ui, sans-serif" font-size="76" font-weight="750">CodJumper</text>
+  <text x="360" y="344" fill="#98EDC3" font-family="Inter, system-ui, sans-serif" font-size="76" font-weight="750">Stats</text>
+  <text x="144" y="465" fill="#9CA9A1" font-family="Inter, system-ui, sans-serif" font-size="29" font-weight="550">Public JumpersHeaven and Jump4Life statistics</text>
+</svg>

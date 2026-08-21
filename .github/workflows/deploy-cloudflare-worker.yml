@@ -1,9 +1,11 @@
 name: Deploy Cloudflare Worker
 
 on:
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows:
+      - CI
+    types:
+      - completed
   workflow_dispatch:
 
 permissions:
@@ -16,11 +18,17 @@ concurrency:
 jobs:
   deploy:
     name: Deploy production
-    if: github.ref == 'refs/heads/main' && vars.CLOUDFLARE_DEPLOY_ENABLED == 'true'
+    if: >-
+      vars.CLOUDFLARE_DEPLOY_ENABLED == 'true' &&
+      ((github.event_name == 'workflow_run' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment:
       name: production
+      url: ${{ vars.CJS_PRODUCTION_URL }}
     permissions:
       contents: read
       deployments: write
@@ -28,6 +36,8 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -38,8 +48,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate release configuration
+        env:
+          CJS_PRODUCTION_URL: ${{ vars.CJS_PRODUCTION_URL }}
+          CLOUDFLARE_ACCOUNT_ID_PRESENT: ${{ secrets.CLOUDFLARE_ACCOUNT_ID != '' }}
+          CLOUDFLARE_API_TOKEN_PRESENT: ${{ secrets.CLOUDFLARE_API_TOKEN != '' }}
+          RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: node scripts/check-release-config.mjs
+
       - name: Build production site
         run: npm run build
+
+      - name: Validate Cloudflare package without deploying
+        run: npm run deploy:dry-run
 
       - name: Deploy to Cloudflare Workers
         id: deploy
@@ -48,5 +69,12 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           wranglerVersion: "4.114.0"
-          command: deploy --config wrangler.jsonc
+          command: >-
+            deploy --strict --config wrangler.jsonc
+            --message "GitHub ${{ github.event.workflow_run.head_sha || github.sha }}"
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Verify production routes and headers
+        env:
+          CJS_PRODUCTION_URL: ${{ vars.CJS_PRODUCTION_URL }}
+        run: npm run smoke:production

@@ -1,1 +1,12 @@
 * @Cjdcoy
+
+# Release and repository-security boundaries always require owner review.
+/.github/ @Cjdcoy
+/public/_headers @Cjdcoy
+/public/.assetsignore @Cjdcoy
+/scripts/check-release-config.mjs @Cjdcoy
+/scripts/check-release-artifacts.mjs @Cjdcoy
+/scripts/smoke-production.mjs @Cjdcoy
+/SECURITY.md @Cjdcoy
+/docs/RELEASE.md @Cjdcoy
+/wrangler.jsonc @Cjdcoy
