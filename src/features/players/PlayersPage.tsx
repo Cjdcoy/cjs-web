@@ -21,15 +21,19 @@ const sourceLabels: Readonly<Record<Source, string>> = {
 };
 
 export function PlayersPage({
+  listPlayers,
   searchPlayers,
 }: {
+  listPlayers?: typeof api.players;
   searchPlayers?: typeof api.searchPlayers;
 } = {}) {
   const { source, setSource } = useSourceContext();
   const [queryState, setQueryState] = useQueryState(playerDiscoveryQuerySchema);
   const { error, players, retry, status } = usePlayerSearch({
+    listPlayers,
     query: queryState.q,
     searchPlayers,
+    sort: queryState.sort,
     source,
   });
   const sortedPlayers = useMemo(
@@ -46,9 +50,7 @@ export function PlayersPage({
           <div>
             <p className="cjs-player-discovery__eyebrow">Player directory</p>
             <h1>Find a player</h1>
-            <p>
-              Search the public player directory without loading the full roster into your browser.
-            </p>
+            <p>Browse recently seen players or search the public directory by name.</p>
           </div>
           <Badge tone="information">{sourceLabels[source]} data</Badge>
         </header>
@@ -98,8 +100,9 @@ export function PlayersPage({
         </Panel>
 
         <p className="cjs-player-discovery__note">
-          Results come from the documented name lookup and are limited to {PLAYER_SEARCH_LIMIT}.
-          Country, visits, and last-seen values appear only when the API supplies them.
+          Directory players are revealed in batches as you scroll. Name searches use the documented
+          lookup and are limited to {PLAYER_SEARCH_LIMIT} results. Country, visits, and last-seen
+          values appear only when the API supplies them.
         </p>
 
         <PlayerResults

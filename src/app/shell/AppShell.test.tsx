@@ -88,6 +88,16 @@ describe("AppShell", () => {
     expect(window.location.search).toBe("?query=mp+jump");
   });
 
+  it("returns to player discovery when changing source from a player profile", async () => {
+    window.history.replaceState(null, "", "/players/42?source=jh&view=runs");
+    const user = userEvent.setup();
+    renderShell("player-detail");
+
+    await user.click(screen.getByRole("radio", { name: "Jump4Life" }));
+
+    expect(`${window.location.pathname}${window.location.search}`).toBe("/players?source=j4l");
+  });
+
   it("announces route transitions", async () => {
     renderShell();
 

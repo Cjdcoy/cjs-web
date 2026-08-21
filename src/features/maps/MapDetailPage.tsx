@@ -11,6 +11,7 @@ import {
 import { useMemo, useState } from "react";
 import {
   Badge,
+  CodPlayerName,
   DataTable,
   EmptyState,
   ErrorState,
@@ -315,8 +316,8 @@ function useRunColumns(source: SourceId): readonly DataTableColumn<TopRun>[] {
         header: "Player",
         priority: "primary" as const,
         cell: (run: TopRun) => (
-          <Link href={playerDetailPath(run.player_id, source)} variant="standalone">
-            {getPlainPlayerName(run.playername)}
+          <Link href={playerDetailPath(run.player_id, source)} variant="player">
+            <CodPlayerName value={run.playername} />
           </Link>
         ),
       },

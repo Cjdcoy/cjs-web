@@ -3,6 +3,7 @@ import {
   leaderboardFixture,
   mapsFixture,
   playerActivityFixture,
+  playerJumpScoresFixture,
   playerPerformanceFixture,
   playerPositionsFixture,
   playerRankFixture,
@@ -33,6 +34,7 @@ const responses: Readonly<Record<string, unknown>> = {
   "/api/v1/player/id-from-name": playersFixture,
   "/api/v1/player/performance-stats": playerPerformanceFixture,
   "/api/v1/player/leaderboard-positions": playerPositionsFixture,
+  "/api/v1/player/jump-scores": playerJumpScoresFixture,
   "/api/v1/player/tops": topRunsFixture,
   "/api/v1/player/routes-completion": playerRoutesFixture,
   "/api/v1/player/rank": playerRankFixture,
@@ -40,7 +42,7 @@ const responses: Readonly<Record<string, unknown>> = {
 };
 
 const expectedQueries: Readonly<Record<string, readonly Readonly<Record<string, string>>[]>> = {
-  "/api/v1/tracker/servers": [{ source: "jh" }],
+  "/api/v1/tracker/servers": [{ source: "jh" }, { source: "j4l" }],
   "/api/v1/leaderboard/speed-skill": [{ source: "jh", fps: "125" }],
   "/api/v1/leaderboard/jump-skill": [{ source: "jh", fps: "125" }],
   "/api/v1/leaderboard/defrag-skill": [{ source: "jh", fps: "125" }],
@@ -54,6 +56,7 @@ const expectedQueries: Readonly<Record<string, readonly Readonly<Record<string, 
   "/api/v1/player/leaderboard-positions": [
     { source: "jh", playerid: "501", fps: "125", leaderboard: "speed" },
   ],
+  "/api/v1/player/jump-scores": [{ source: "jh", playerid: "501", fps: "125" }],
   "/api/v1/player/tops": [{ source: "jh", playerid: "501", fps: "125", limit: "25" }],
   "/api/v1/player/routes-completion": [{ source: "jh", playerid: "501" }],
   "/api/v1/player/rank": [{ source: "j4l", playerid: "501" }],

@@ -7,21 +7,22 @@ import {
   type PlayerActivitySummary,
   type PlayerLeaderboard,
   type PlayerLeaderboardPosition,
+  type PlayerJumpScores,
   type PlayerPerformanceStats,
   type PlayerRankInfo,
   type PlayerRouteCompletion,
   type Source,
-  type TopRun,
 } from "../../lib/api";
+import type { PlayerProfileView } from "./playerProfileModel";
 
 export type PlayerProfileApi = Pick<
   CjsApi,
   | "playerActivitySummary"
   | "playerLeaderboardPositions"
+  | "playerJumpScores"
   | "playerPerformance"
   | "playerRank"
   | "playerRoutes"
-  | "playerTops"
 >;
 
 export type ProfileResourceStatus = "error" | "loading" | "refreshing" | "success" | "unsupported";
@@ -43,7 +44,7 @@ export interface PlayerProfileResources {
   positions: ProfileResource<PlayerLeaderboardPosition[]>;
   rank: ProfileResource<PlayerRankInfo>;
   routes: ProfileResource<PlayerRouteCompletion[]>;
-  tops: ProfileResource<TopRun[]>;
+  scores: ProfileResource<PlayerJumpScores>;
 }
 
 interface UsePlayerProfileOptions {
@@ -52,6 +53,7 @@ interface UsePlayerProfileOptions {
   fps: Fps;
   playerId: number;
   source: Source;
+  view: PlayerProfileView;
 }
 
 type ResourceKind = keyof PlayerProfileResources;
@@ -62,7 +64,7 @@ interface ResourceDataMap {
   positions: PlayerLeaderboardPosition[];
   rank: PlayerRankInfo;
   routes: PlayerRouteCompletion[];
-  tops: TopRun[];
+  scores: PlayerJumpScores;
 }
 
 interface ResourceState<Data> extends ProfileResource<Data> {
@@ -75,6 +77,7 @@ export function usePlayerProfile({
   fps,
   playerId,
   source,
+  view,
 }: UsePlayerProfileOptions): PlayerProfileResources & { reload: () => void } {
   const [reloadVersion, setReloadVersion] = useState(0);
   const baseKey = `${source}:${playerId}`;
@@ -83,7 +86,7 @@ export function usePlayerProfile({
   const performance = useProfileResource(
     "performance",
     `${baseKey}:performance`,
-    true,
+    view === "overview",
     apiClient,
     options,
     reloadVersion,
@@ -91,15 +94,15 @@ export function usePlayerProfile({
   const positions = useProfileResource(
     "positions",
     `${baseKey}:positions:${fps}:${board}`,
-    true,
+    view === "overview",
     apiClient,
     options,
     reloadVersion,
   );
-  const tops = useProfileResource(
-    "tops",
-    `${baseKey}:tops:${fps}`,
-    true,
+  const scores = useProfileResource(
+    "scores",
+    `${baseKey}:scores:${fps}`,
+    view === "runs",
     apiClient,
     options,
     reloadVersion,
@@ -107,7 +110,7 @@ export function usePlayerProfile({
   const routes = useProfileResource(
     "routes",
     `${baseKey}:routes`,
-    true,
+    view === "routes",
     apiClient,
     options,
     reloadVersion,
@@ -115,7 +118,7 @@ export function usePlayerProfile({
   const rank = useProfileResource(
     "rank",
     `${baseKey}:rank`,
-    source === "j4l",
+    source === "j4l" && view === "overview",
     apiClient,
     options,
     reloadVersion,
@@ -123,14 +126,14 @@ export function usePlayerProfile({
   const activity = useProfileResource(
     "activity",
     `${baseKey}:activity`,
-    source === "j4l",
+    source === "j4l" && view === "overview",
     apiClient,
     options,
     reloadVersion,
   );
   const reload = useCallback(() => setReloadVersion((version) => version + 1), []);
 
-  return { activity, performance, positions, rank, reload, routes, tops };
+  return { activity, performance, positions, rank, reload, routes, scores };
 }
 
 function useProfileResource<Kind extends ResourceKind>(
@@ -227,11 +230,10 @@ function loadResource<Kind extends ResourceKind>(
       return apiClient.playerRank(context) as Promise<ResourceDataMap[Kind]>;
     case "routes":
       return apiClient.playerRoutes(context) as Promise<ResourceDataMap[Kind]>;
-    case "tops":
-      return apiClient.playerTops({
+    case "scores":
+      return apiClient.playerJumpScores({
         ...context,
         fps: options.fps,
-        limit: 25,
       }) as Promise<ResourceDataMap[Kind]>;
   }
 }

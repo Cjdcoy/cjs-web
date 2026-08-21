@@ -565,6 +565,293 @@ public exports rather than editing another feature.
   authorize enabling the currently false deployment gate. No production release
   or Cloudflare configuration mutation was performed for this task.
 
+### CJS-019 — Server browser readability refinement
+
+- **Status:** done
+- **Owner:** Codex / server-card readability session
+- **Dependencies:** CJS-007, CJS-015
+- **Primary boundary:** `src/features/servers`, `public/maps/cards`, focused
+  server fixtures/tests
+- **Goal:** make the combined live-server browser scannable without hiding
+  connection or roster details.
+- **Work:** display both documented sources with Jump4Life first, strengthen the
+  map-led card hierarchy, add derived country context and selectable/copyable
+  addresses, and remove redundant mode/player-count facts from individual cards.
+- **Acceptance:** both source feeds remain independently cancellable and expose
+  partial failures; map, country, hostname, address, status, and roster content
+  remain readable over artwork; source-correct map links and clipboard feedback
+  work with keyboard and assistive technology; grid/list layouts do not clip at
+  mobile or desktop widths.
+- **Validation:** focused server model/component tests, accessibility checks,
+  responsive browser inspection, `npm run verify`.
+- **Completed 2026-08-22:** Replaced the single-source card wall with independent
+  J4L/JH feeds grouped in a fixed J4L-first order, aggregate totals, and
+  source-local loading/error/refresh handling. Rebuilt cards around prominent
+  map artwork and names, hostname-derived country flags, selectable addresses,
+  compact copy actions, and rosters while removing redundant mode/player-count
+  facts. Imported the 609 tracked AVIF card images from the owned sibling
+  `j4l-web` asset library and resolve them directly by map name, with lazy
+  loading and the original 15 KB WebP as a decode/missing-image fallback.
+- **Contract evidence:** Rechecked the live API docs and OpenAPI contract on
+  2026-08-22. `/api/v1/tracker/servers` remains source-specific with the
+  documented `source=j4l|jh` parameter and an open JSON schema; no map-image or
+  country field/endpoint is published. Country labels are therefore explicitly
+  derived from known hostname prefixes, with an honest unknown-region fallback.
+- **Completion validation:** 21 focused server tests pass, including dual-source
+  loading/order, source-correct links, flags, address presentation, redundant
+  fact removal, independent cancellation/polling, partial failures, clipboard,
+  URL state, image URL/fallback behavior, and axe coverage. The focused server
+  lint and 21 tests pass; `npm run build` passes with production performance and
+  artifact budgets covering 638 release files. Chromium inspection against live
+  payloads at 360×800 and 1440×1000 found 24 cards, decoded every available
+  exact-match map image at 960px intrinsic width, and found no console errors or
+  horizontal overflow. A final repository-wide `npm run verify` rerun is pending
+  completion of the concurrent CJS-020 leaderboard edits; its current lint stop
+  is outside this task boundary.
+- **Refined 2026-08-22:** Removed the visible hero, aggregate summary, and
+  refresh-status rows so the page begins with compact controls and the J4L-first
+  server list. Removed the full-image gradient, reduced control sizing and mobile
+  wrapping, and standardized unknown or empty rosters as “Server empty.” A
+  follow-up removed experimental label backplates and dark-name outlines in
+  favor of plain white map names and a lighter roster-row surface. Chromium
+  inspection at 360×800 and 1440×1000 found no full-image overlay, no horizontal
+  overflow, and only the toolbar plus server groups in normal page flow.
+- **Interaction follow-up 2026-08-22:** Replaced the separate copy button with a
+  keyboard-accessible address row that explains “Click to copy” and confirms the
+  result without hiding the IP. A later refinement removed the redundant “View
+  map profile” cue; supported map names remain the link itself.
+- **Density follow-up 2026-08-22:** Removed the light per-player roster boxes in
+  favor of compact, unframed name-and-ping rows. The card view now uses four
+  columns on wide desktop screens and steps down to three, two, and one column
+  without clipping at narrower widths.
+- **Game-filter follow-up 2026-08-22:** Added a URL-backed COD2/COD4 segmented
+  filter using the live tracker feed's `game_type` discriminator. COD2 remains
+  the default across both sources; COD4 is capability-gated to the JH group and
+  does not link into COD2-only map profiles. The live JH feed exposed 13 COD2
+  and 11 COD4 cards during validation. The focused server suite passes with 22
+  tests, the production build passes, and Chromium checks at 390×844 and
+  1440×1000 found no console errors or horizontal overflow.
+
+### CJS-020 — Leaderboard presentation refinement
+
+- **Status:** done
+- **Owner:** Codex / leaderboard revamp session
+- **Dependencies:** CJS-008, CJS-015
+- **Primary boundary:** `src/features/leaderboards`, focused leaderboard tests
+- **Goal:** make leaderboard choices and player performance easier to scan.
+- **Work:** replace select-heavy board/FPS controls with visible option groups,
+  reduce country presentation to a compact flag, restore the API-provided top
+  1–10 distribution, and refine the responsive results layout.
+- **Acceptance:** every supported board and FPS choice is directly visible and
+  URL-backed; country remains accessible without dominating a row; top-place
+  counts 1–10 are readable in table and mobile layouts; unsupported J4L/JH
+  combinations remain capability-gated.
+- **Validation:** focused model/component tests, accessibility scan, responsive
+  browser inspection at mobile and desktop widths, `npm run verify`.
+- **Completed 2026-08-22:** Replaced board and FPS selects with directly visible,
+  keyboard-operable choices while preserving canonical URL state and source
+  capability rules. Moved country into a compact accessible flag beside each
+  player and restored a responsive top-1-through-top-10 count strip with relative
+  bars. Kept rank XP progress and board-specific metric/points columns distinct.
+- **Contract evidence:** Rechecked a live, anonymized
+  `/api/v1/leaderboard/speed-skill?source=jh&fps=125` response on 2026-08-22; the
+  existing `top_list` boundary supplies numeric string keys `1` through `10`, so
+  no endpoint or transport change was required.
+- **Completion validation:** 16 focused model/component tests pass, including
+  visible filter URL behavior, compact flag semantics, all ten top positions,
+  cancellation, and axe coverage. `npm run verify` passes with 30 files / 169
+  tests and production budgets. Live Chromium inspection at 390×844 and
+  1440×1000 found no clipped choices, console errors, or horizontal overflow;
+  the 320px E2E leaderboard reflow and keyboard checks passed. The broader
+  multi-route responsive test still records an unrelated mocked J4L tracker 500
+  from the concurrent server-browser slice.
+- **Refined 2026-08-22:** Restyled country markers as flat circular SVG flags
+  with podium rims matching the observable reference treatment. The
+  zero-dependency MIT `circle-flags` package is bundled locally so rendering is
+  consistent without an external runtime service or platform emoji. Removed
+  page-size and pagination controls in favor of 25-player progressive batches
+  loaded as the scroll sentinel approaches, with a keyboard-operable load-more
+  fallback. Legacy `page` and `limit` parameters are now removed from shared
+  URLs. Enlarged table labels and values, made uncolored player names white
+  without an underline, and retained explicit API-provided COD2 name colors.
+- **Follow-up validation:** 17 focused model/component tests pass, including
+  observer-triggered loading and legacy pagination URL cleanup. The production
+  build passes, and the full `npm run verify` gate passes with 32 files / 174
+  tests. Live Chromium checks at 390×844 and 1440×1000 found no console errors
+  or horizontal overflow; a mobile scroll expanded 25 initial rows to all 32
+  live results automatically.
+
+### CJS-021 — Shared COD2 player-name rendering
+
+- **Status:** done
+- **Owner:** Codex / COD2-name rendering session
+- **Dependencies:** CJS-007, CJS-008, CJS-010, CJS-012, CJS-013
+- **Primary boundary:** shared COD2 name parser/renderer and player-name callsites
+  in servers, maps, players, leaderboards, and favorites
+- **Goal:** preserve and display API-provided COD2 caret colors consistently
+  wherever a player name appears.
+- **Work:** centralize the `^0`–`^9` parser and canonical COD2 palette, normalize
+  duplicated caret encodings used by the legacy feed, keep plain names for
+  filtering and accessible labels, and replace feature-local stripping/rendering.
+- **Acceptance:** raw color controls never appear visually; all ten COD2 colors
+  match the owned J4L reference implementation; malformed controls remain safe
+  literal text; screen readers receive one plain name; server rosters, map runs,
+  player search/profile, leaderboards, and saved players use the shared renderer.
+- **Validation:** focused parser/component and affected feature tests,
+  accessibility scan, responsive browser inspection, `npm run verify`.
+- **Completed 2026-08-22:** Centralized COD2 name parsing and rendering in shared
+  code, including the canonical `^0`–`^9` palette and duplicated-caret
+  normalization from the owned J4L implementation. Server payload normalization
+  now preserves encoded names, and servers, map runs, player search/profile,
+  leaderboards, and favorite players all render the shared component. Plain
+  decoded names remain available for sorting, filtering, announcements, row
+  labels, and assistive technology.
+- **Completion validation:** 12 focused files / 72 tests pass across the parser,
+  shared component, and every affected feature; the full `npm run verify` gate
+  passes with 32 files / 174 tests, coverage, lint, formatting, production build,
+  performance budgets, and release-artifact checks. Live Chromium inspection at
+  360×800 and 1440×1000 rendered 24 server cards and 13 colored name segments
+  using the expected computed palette, with no console errors or horizontal
+  overflow.
+
+### CJS-022 — Progressive player directory
+
+- **Status:** done
+- **Owner:** Codex / progressive player-directory session
+- **Dependencies:** CJS-011, CJS-021
+- **Primary boundary:** player discovery files within `src/features/players`
+- **Goal:** make `/players` useful before a search while keeping the full directory
+  inexpensive to render.
+- **Work:** load the documented player list ordered by last seen when no search is
+  active, preserve bounded name search, and reveal directory rows incrementally
+  as the user scrolls with an accessible manual fallback.
+- **Acceptance:** the default route shows last-seen players; source/query/sort
+  changes cancel obsolete requests; only an initial batch is rendered until the
+  scroll sentinel advances; search behavior and stable profile/favorite actions
+  remain intact.
+- **Validation:** request-race and progressive-render component tests; mobile and
+  desktop inspection; `npm run verify`.
+- **Completed 2026-08-22:** The default `/players` route now requests the
+  documented directory with `sort=last-seen`, while meaningful name queries keep
+  using the bounded search endpoint. Results render 50 at a time and advance
+  through an Intersection Observer sentinel with an accessible Load more button
+  fallback. Source/query/sort changes retain cancellation and stale-state
+  handling, and local sorting, profile links, colored names, and favorites remain
+  intact.
+- **Completion validation:** 11 focused player discovery, progressive-render,
+  and request-race tests passed. Repository-wide `npm run verify` passed with 32
+  files / 174 tests, coverage, lint, formatting, strict TypeScript, production
+  build, performance budgets, and release-artifact checks. Live Chromium checks
+  at 390×844 and 1440×1000 displayed the current 8,813-player JH directory in an
+  initial 50-row/card batch with no clipping or horizontal overflow.
+- **Remaining risk:** The published `/api/v1/player/all` contract has no cursor,
+  offset, or limit, so progressive loading bounds browser rendering rather than
+  network payload size. True network pagination requires a future API contract.
+
+### CJS-023 — Player profile information architecture refinement
+
+- **Status:** done
+- **Owner:** Codex / player-profile refinement session
+- **Dependencies:** CJS-012, CJS-021
+- **Primary boundary:** player profile files within `src/features/players`, the
+  documented jump-score adapter in `src/lib/api`, source-switch behavior for the
+  player-detail route in `src/app/shell`, and corresponding browser fixtures
+- **Goal:** treat source-qualified player IDs as distinct identities and make the
+  profile easier to scan.
+- **Work:** prevent source switching from reusing a player ID; split overview,
+  best runs, and route completion into URL-backed views; surface common recent
+  activity and richer J4L-only rank/activity data on the overview; refine the
+  responsive visual hierarchy.
+- **Acceptance:** changing source from a profile opens player discovery for the
+  new source; tabs are keyboard-accessible and deep-linkable; JH never requests
+  J4L-only resources; loading, empty, error, stale, and partial states remain
+  deliberate in every view.
+- **Validation:** focused profile and shell tests, mobile/desktop inspection,
+  `npm run verify`.
+- **Completed 2026-08-22:** Source changes from a profile now return to player
+  discovery so source-specific numeric IDs are never reused. The profile has
+  URL-backed Overview, Best runs, and Route completion views. Overview combines
+  common performance/recent records with richer J4L rank and cumulative
+  activity. Best runs now consumes `/api/v1/player/jump-scores`, showing total
+  jump-skill points/rank and each scoring map's points, rank, and difficulty.
+- **Contract evidence:** Rechecked the live docs and OpenAPI contract on
+  2026-08-22 and sampled read-only JH/J4L jump-score payloads. Both sources
+  publish the same `map_scores` fields used by the view.
+- **Completion validation:** 45 focused API/profile/shell tests passed. The full
+  `npm run verify` gate passed with 33 files / 181 tests, formatting, lint,
+  coverage, strict TypeScript, production build, performance budgets, and
+  release-artifact checks. Focused Chromium validation at 320×800 and 1440×1000
+  confirmed visible skill points and no horizontal overflow.
+
+### CJS-024 — Server card metadata contrast
+
+- **Status:** done
+- **Owner:** Codex / server-card metadata polish session
+- **Dependencies:** CJS-019
+- **Primary boundary:** `src/features/servers/servers.css`
+- **Goal:** improve country and current-map readability over map artwork.
+- **Completed 2026-08-22:** Removed the framed backdrop from server country
+  flags, increased the flag glyph size, and gave the Current map label the same
+  bright foreground and subtle text shadow used by the map name.
+- **Validation:** focused formatting/lint checks and `npm run build`.
+
+### CJS-025 — Shared circular country flags
+
+- **Status:** done
+- **Owner:** Codex / shared country-flag session
+- **Dependencies:** CJS-020, CJS-023, CJS-024
+- **Primary boundary:** shared country-flag UI and country displays in servers and
+  players
+- **Goal:** replace platform-dependent flag emoji and plain country cells with
+  the locally bundled Circle Flags artwork already adopted by leaderboards.
+- **Acceptance:** server cards, player discovery, and player profiles use one
+  accessible shared flag component; invalid or unavailable codes fall back to a
+  globe without broken images; country text remains available where useful.
+- **Validation:** shared component and affected feature tests, responsive visual
+  inspection, `npm run verify`.
+- **Completed 2026-08-22:** Added one shared, size-aware country flag component
+  backed by the locally emitted Circle Flags SVGs, including `UK` to `GB`
+  normalization and an accessible globe fallback for invalid or failed artwork.
+  Server cards now use large circular flags; player discovery rows pair compact
+  flags with country codes; and profile identity metadata pairs the flag with the
+  full country label.
+- **Completion validation:** 26 focused shared UI, server, player-list, and player
+  profile tests passed. Formatting and repository lint passed; `npm run build`
+  passed strict TypeScript, Vite production output (including local country flag
+  assets), performance budgets, and release-artifact checks. Live Chromium at
+  1440×1000 verified circle flags on servers, the 8,813-player JH directory, and
+  a populated JH profile without clipping or broken artwork.
+- **Remaining validation:** The full `npm run verify` command reached coverage but
+  is currently blocked by two unrelated concurrent player jump-score tests whose
+  one-item array expectations were not updated when their shared fixture grew to
+  two items. This slice's affected suites remain green.
+
+### CJS-026 — Player run controls and shared player-link interaction
+
+- **Status:** done
+- **Owner:** Codex / player interaction polish session
+- **Dependencies:** CJS-020, CJS-023
+- **Primary boundary:** player profile run filters and shared player-link styling
+- **Goal:** make FPS choices immediately visible on Best runs and give linked
+  player names one consistent, neutral hover treatment throughout the site.
+- **Acceptance:** Best runs exposes one keyboard-accessible button per supported
+  FPS value; its key data is easier to read; player links no longer switch to the
+  generic green-and-underline treatment and match the leaderboard interaction.
+- **Validation:** affected component tests, mobile/desktop browser inspection,
+  `npm run verify`.
+- **Completed 2026-08-22:** Replaced the Best runs FPS dropdown with six visible
+  segmented buttons. The controls use radio semantics, roving keyboard focus,
+  concise labels, and a 3×2 phone layout. Increased the run summary and table
+  typography. Added a shared neutral player-link variant and applied it to
+  leaderboards, player discovery, map records, and favorite players, eliminating
+  generic accent-green and underline hover styling.
+- **Completion validation:** 23 focused profile, discovery, leaderboard, and
+  favorites tests passed before the full repository gate. `npm run verify` passed
+  with 33 files / 182 tests, coverage, formatting, lint, strict TypeScript,
+  production build, performance budgets, and release-artifact checks. Live
+  Chromium checks at 320×800 and 1440×1000 confirmed all FPS choices remain
+  readable without page overflow and the larger skill-point hierarchy is clear.
+
 ## Post-MVP
 
 ### CJS-017 — Replay, activity, and historical analytics

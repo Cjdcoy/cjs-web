@@ -103,21 +103,24 @@ describe("MapDetailPage", () => {
       source: "j4l",
       signal: expect.any(AbortSignal),
     });
-    expect(topsRequest).toHaveBeenCalledWith({
-      source: "j4l",
-      checkpointId: 102,
-      fps: "333",
-      limit: 100,
-      signal: expect.any(AbortSignal),
-    });
+    await waitFor(() =>
+      expect(topsRequest).toHaveBeenCalledWith({
+        source: "j4l",
+        checkpointId: 102,
+        fps: "333",
+        limit: 100,
+        signal: expect.any(AbortSignal),
+      }),
+    );
     expect(screen.getByRole("combobox", { name: "Checkpoint" })).toHaveValue("102");
     expect(screen.getByRole("combobox", { name: "FPS" })).toHaveValue("333");
     expect(screen.getByText("Map author not available")).toBeVisible();
     expect(screen.getByText("Release date unavailable")).toBeVisible();
-    expect(await screen.findByRole("link", { name: "Alpha Runner" })).toHaveAttribute(
-      "href",
-      "/players/7?source=j4l",
-    );
+    const playerLink = await screen.findByRole("link", { name: "Alpha Runner" });
+    expect(playerLink).toHaveAttribute("href", "/players/7?source=j4l");
+    expect(playerLink).toHaveAttribute("data-variant", "player");
+    expect(document.querySelector('[data-cod-color="1"]')).toHaveTextContent("Alpha");
+    expect(document.querySelector('[data-cod-color="2"]')).toHaveTextContent("Runner");
     expect(screen.getByRole("link", { name: /Watch map video/ })).toHaveAttribute(
       "href",
       "https://media.example.invalid/maps/mp_alpha",

@@ -26,3 +26,7 @@ export type { ErrorStateProps, SkeletonGroupProps, SkeletonProps } from "./feedb
 export { Pagination } from "./Pagination";
 export type { PaginationProps } from "./Pagination";
 export { VisuallyHidden } from "./VisuallyHidden";
+export { CodPlayerName } from "./CodPlayerName";
+export type { CodPlayerNameProps } from "./CodPlayerName";
+export { CountryFlag } from "./CountryFlag";
+export type { CountryFlagProps } from "./CountryFlag";

@@ -2,6 +2,7 @@ import {
   Activity,
   ArrowLeft,
   BarChart3,
+  CalendarClock,
   Clock3,
   Footprints,
   Gauge,
@@ -17,12 +18,15 @@ import { Page } from "../../components";
 import {
   Badge,
   Button,
+  CodPlayerName,
+  CountryFlag,
   DataTable,
   EmptyState,
   ErrorState,
   IconButton,
   Link,
   Panel,
+  SegmentedControl,
   Select,
   SkeletonGroup,
   type DataTableColumn,
@@ -32,16 +36,17 @@ import {
   PLAYER_LEADERBOARDS,
   type Player,
   type PlayerActivitySummary,
+  type PlayerJumpScores,
   type PlayerLeaderboardPosition,
+  type PlayerMapScore,
   type PlayerPerformanceStats,
   type PlayerRankInfo,
   type PlayerRouteCompletion,
   type Source,
-  type TopRun,
+  type SimpleTop,
 } from "../../lib/api";
-import { mapDetailPath, sourceOptions, useQueryState, useSourceContext } from "../../lib/routing";
+import { mapDetailPath, useQueryState, useSourceContext } from "../../lib/routing";
 import { formatDate, timeAgo } from "../../lib/format";
-import { CodPlayerName } from "./CodPlayerName";
 import {
   createPlayerProfileIdentity,
   formatDistance,
@@ -49,12 +54,12 @@ import {
   formatProfileDecimal,
   formatProfileNumber,
   formatProfilePercent,
-  formatRunTime,
   fpsLabel,
   hasProfileIdentity,
   playerBoardLabel,
   playerProfileQuerySchema,
   playerSourceLabel,
+  type PlayerProfileView,
 } from "./playerProfileModel";
 import { usePlayerProfile, type PlayerProfileApi, type ProfileResource } from "./usePlayerProfile";
 import { useFavoritePlayers } from "./useFavoritePlayers";
@@ -97,7 +102,7 @@ function PlayerProfile({
   apiClient?: PlayerProfileApi;
   playerId: number;
 }) {
-  const { source, setSource } = useSourceContext();
+  const { source } = useSourceContext();
   const [queryState, setQueryState] = useQueryState(playerProfileQuerySchema);
   const resources = usePlayerProfile({
     apiClient,
@@ -105,23 +110,27 @@ function PlayerProfile({
     fps: queryState.fps,
     playerId,
     source,
+    view: queryState.view,
   });
   const identity = createPlayerProfileIdentity(playerId, {
     performance: resources.performance.data,
     positions: resources.positions.data,
     rank: resources.rank.data,
     routes: resources.routes.data,
-    tops: resources.tops.data,
+    scores: resources.scores.data,
   });
   const { favoriteIds, toggleFavorite } = useFavoritePlayers(source);
   const isFavorite = favoriteIds.has(playerId);
-  const supportedResources = [
-    resources.performance,
-    resources.positions,
-    resources.tops,
-    resources.routes,
-    ...(source === "j4l" ? [resources.rank, resources.activity] : []),
-  ];
+  const supportedResources =
+    queryState.view === "runs"
+      ? [resources.scores]
+      : queryState.view === "routes"
+        ? [resources.routes]
+        : [
+            resources.performance,
+            resources.positions,
+            ...(source === "j4l" ? [resources.rank, resources.activity] : []),
+          ];
   const isSettling = supportedResources.some(
     (resource) => resource.status === "loading" || resource.status === "refreshing",
   );
@@ -162,7 +171,14 @@ function PlayerProfile({
                 <CodPlayerName value={identity.name} />
               </h1>
               <p className="cjs-player-profile__meta">
-                <span>{identity.country || "Country not provided"}</span>
+                <span className="cjs-player-profile__country">
+                  <CountryFlag
+                    code={identity.countryCode}
+                    label={identity.country || identity.region || "Country not provided"}
+                    size="small"
+                  />
+                  <span>{identity.country || identity.region || "Country not provided"}</span>
+                </span>
                 <span aria-hidden="true">·</span>
                 <span title={identity.lastSeen ? formatDate(identity.lastSeen) : undefined}>
                   {identity.lastSeen
@@ -183,55 +199,61 @@ function PlayerProfile({
           </IconButton>
         </header>
 
-        <Panel className="cjs-player-profile__controls" variant="strong" aria-label="Profile view">
-          <Select
-            label="Data source"
-            onChange={(event) => {
-              const nextSource = event.target.value;
-              if (nextSource === "jh" || nextSource === "j4l") setSource(nextSource);
-            }}
-            value={source}
-          >
-            {sourceOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
-          <Select
-            label="FPS"
-            helperText="Used for top runs and leaderboard position."
-            onChange={(event) => {
-              const fps = event.target.value;
-              if (FPS_VALUES.some((value) => value === fps)) {
-                setQueryState({ fps: fps as (typeof FPS_VALUES)[number] });
-              }
-            }}
-            value={queryState.fps}
-          >
-            {FPS_VALUES.map((fps) => (
-              <option key={fps} value={fps}>
-                {fpsLabel(fps)}
-              </option>
-            ))}
-          </Select>
-          <Select
-            label="Leaderboard"
-            helperText="Selects the position shown below."
-            onChange={(event) => {
-              const board = event.target.value;
-              if (PLAYER_LEADERBOARDS.some((value) => value === board)) {
-                setQueryState({ board: board as (typeof PLAYER_LEADERBOARDS)[number] });
-              }
-            }}
-            value={queryState.board}
-          >
-            {PLAYER_LEADERBOARDS.map((board) => (
-              <option key={board} value={board}>
-                {playerBoardLabel(board)}
-              </option>
-            ))}
-          </Select>
+        <ProfileNavigation
+          board={queryState.board}
+          fps={queryState.fps}
+          playerId={playerId}
+          source={source}
+          view={queryState.view}
+        />
+
+        <div className="cjs-player-profile__source-note">
+          <div>
+            <strong>{playerSourceLabel(source)} profile</strong>
+            <span>Player IDs belong to one source and cannot be reused across communities.</span>
+          </div>
+          <Link href={`/players?source=${source === "jh" ? "j4l" : "jh"}`} variant="muted">
+            Find this player in {playerSourceLabel(source === "jh" ? "j4l" : "jh")}
+          </Link>
+        </div>
+
+        <Panel className="cjs-player-profile__controls" variant="strong" aria-label="View filters">
+          {queryState.view === "overview" && (
+            <Select
+              label="Leaderboard"
+              helperText="Selects the position shown in Overview."
+              onChange={(event) => {
+                const board = event.target.value;
+                if (PLAYER_LEADERBOARDS.some((value) => value === board)) {
+                  setQueryState({ board: board as (typeof PLAYER_LEADERBOARDS)[number] });
+                }
+              }}
+              value={queryState.board}
+            >
+              {PLAYER_LEADERBOARDS.map((board) => (
+                <option key={board} value={board}>
+                  {playerBoardLabel(board)}
+                </option>
+              ))}
+            </Select>
+          )}
+          {queryState.view === "runs" && (
+            <fieldset className="cjs-player-profile__fps-filter">
+              <legend>FPS</legend>
+              <SegmentedControl
+                ariaLabel="Best runs FPS"
+                className="cjs-player-profile__fps-options"
+                onChange={(fps) => setQueryState({ fps })}
+                options={FPS_VALUES.map((fps) => ({
+                  accessibleLabel: fpsLabel(fps),
+                  label: fps === "0" ? "Mix" : fps,
+                  value: fps,
+                }))}
+                value={queryState.fps}
+              />
+              <p>Filters this player’s best runs.</p>
+            </fieldset>
+          )}
           <Button
             className="cjs-player-profile__refresh"
             isLoading={isSettling}
@@ -276,39 +298,54 @@ function PlayerProfile({
 
         {!unavailable && !allFailed && (
           <div className="cjs-player-profile__sections">
-            <PerformanceSection resource={resources.performance} onRetry={resources.reload} />
-            <PositionSection
-              board={queryState.board}
-              resource={resources.positions}
-              onRetry={resources.reload}
-            />
-            <TopRunsSection
-              fps={queryState.fps}
-              resource={resources.tops}
-              source={source}
-              onRetry={resources.reload}
-            />
-            <RouteCompletionSection
-              resource={resources.routes}
-              source={source}
-              onRetry={resources.reload}
-            />
-            {source === "j4l" ? (
+            {queryState.view === "overview" && (
               <>
-                <RankSection resource={resources.rank} onRetry={resources.reload} />
-                <ActivitySection resource={resources.activity} onRetry={resources.reload} />
+                <PerformanceSection resource={resources.performance} onRetry={resources.reload} />
+                <RecentActivitySection
+                  activity={resources.activity}
+                  performance={resources.performance}
+                  source={source}
+                  onRetry={resources.reload}
+                />
+                <PositionSection
+                  board={queryState.board}
+                  resource={resources.positions}
+                  onRetry={resources.reload}
+                />
+                {source === "j4l" ? (
+                  <>
+                    <RankSection resource={resources.rank} onRetry={resources.reload} />
+                    <ActivitySection resource={resources.activity} onRetry={resources.reload} />
+                  </>
+                ) : (
+                  <Panel className="cjs-player-profile__capability" role="note">
+                    <Badge tone="information">Source-specific data</Badge>
+                    <div>
+                      <h2>JumpersHeaven profile</h2>
+                      <p>
+                        JumpersHeaven publishes performance, placements, and recent records. XP rank
+                        and cumulative activity are Jump4Life-only and are not requested for this
+                        profile.
+                      </p>
+                    </div>
+                  </Panel>
+                )}
               </>
-            ) : (
-              <Panel className="cjs-player-profile__capability" role="note">
-                <Badge tone="information">Jump4Life feature</Badge>
-                <div>
-                  <h2>Rank and lifetime activity</h2>
-                  <p>
-                    XP rank and cumulative play activity are published for Jump4Life only. Switch
-                    the data source to view them for the matching player number.
-                  </p>
-                </div>
-              </Panel>
+            )}
+            {queryState.view === "runs" && (
+              <BestRunsSection
+                fps={queryState.fps}
+                resource={resources.scores}
+                source={source}
+                onRetry={resources.reload}
+              />
+            )}
+            {queryState.view === "routes" && (
+              <RouteCompletionSection
+                resource={resources.routes}
+                source={source}
+                onRetry={resources.reload}
+              />
             )}
           </div>
         )}
@@ -324,6 +361,141 @@ function BackToPlayers() {
       Back to players
     </Link>
   );
+}
+
+function ProfileNavigation({
+  board,
+  fps,
+  playerId,
+  source,
+  view,
+}: {
+  board: (typeof PLAYER_LEADERBOARDS)[number];
+  fps: (typeof FPS_VALUES)[number];
+  playerId: number;
+  source: Source;
+  view: PlayerProfileView;
+}) {
+  const views: ReadonlyArray<{ label: string; value: PlayerProfileView }> = [
+    { label: "Overview", value: "overview" },
+    { label: "Best runs", value: "runs" },
+    { label: "Route completion", value: "routes" },
+  ];
+
+  return (
+    <nav className="cjs-player-profile__tabs" aria-label="Player profile sections">
+      {views.map((option) => (
+        <a
+          key={option.value}
+          className="cjs-player-profile__tab"
+          data-active={view === option.value || undefined}
+          href={profileViewHref(playerId, source, option.value, fps, board)}
+          aria-current={view === option.value ? "page" : undefined}
+        >
+          {option.label}
+        </a>
+      ))}
+    </nav>
+  );
+}
+
+function RecentActivitySection({
+  activity,
+  onRetry,
+  performance,
+  source,
+}: {
+  activity: ProfileResource<PlayerActivitySummary>;
+  onRetry: () => void;
+  performance: ProfileResource<PlayerPerformanceStats>;
+  source: Source;
+}) {
+  return (
+    <ProfileSection
+      description={
+        source === "j4l"
+          ? "Recent records plus Jump4Life's richer tracked activity timestamps."
+          : "Recent records and last-seen signals published by JumpersHeaven."
+      }
+      icon={<CalendarClock size={19} />}
+      id="player-recent-activity"
+      title="Recent activity"
+    >
+      <ResourceState resource={performance} label="recent activity" onRetry={onRetry}>
+        {(data) => (
+          <div className="cjs-player-profile__recent">
+            <dl className="cjs-player-profile__stat-grid">
+              <ProfileStat
+                label="Last seen"
+                value={
+                  data.days_since_last_seen === null
+                    ? "Not available"
+                    : data.days_since_last_seen === 0
+                      ? "Today"
+                      : `${data.days_since_last_seen}d ago`
+                }
+              />
+              <ProfileStat label="Activity" value={data.activity_level || "Not available"} />
+              {source === "j4l" && activity.data ? (
+                <ProfileStat
+                  label="Last tracked session"
+                  value={
+                    activity.data.last_activity_at
+                      ? timeAgo(activity.data.last_activity_at)
+                      : "Not available"
+                  }
+                />
+              ) : (
+                <ProfileStat
+                  label="Recent records"
+                  value={formatProfileNumber(data.recent_tops.length)}
+                />
+              )}
+            </dl>
+            <RecentRuns runs={data.recent_tops} source={source} />
+          </div>
+        )}
+      </ResourceState>
+    </ProfileSection>
+  );
+}
+
+function RecentRuns({ runs, source }: { runs: readonly SimpleTop[]; source: Source }) {
+  if (runs.length === 0) {
+    return (
+      <p className="cjs-player-profile__recent-empty">
+        No recent personal records were returned for this player.
+      </p>
+    );
+  }
+
+  return (
+    <ul className="cjs-player-profile__recent-list" aria-label="Recent personal records">
+      {runs.slice(0, 5).map((run) => (
+        <li key={run.runid}>
+          <div>
+            <Link href={mapDetailPath(run.cpid, { lookup: "cpid", source })}>{run.map_name}</Link>
+            <span>{run.finish_date ? formatDate(run.finish_date) : "Date not provided"}</span>
+          </div>
+          <div>
+            <strong>#{run.rank}</strong>
+            <Badge>{fpsLabel(run.fps)}</Badge>
+          </div>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function profileViewHref(
+  playerId: number,
+  source: Source,
+  view: PlayerProfileView,
+  fps: (typeof FPS_VALUES)[number],
+  board: (typeof PLAYER_LEADERBOARDS)[number],
+): string {
+  const search = new URLSearchParams({ board, fps, source, view });
+  return `/players/${playerId}?${search.toString()}`;
 }
 
 function PerformanceSection({
@@ -457,7 +629,7 @@ function PositionSection({
   );
 }
 
-function TopRunsSection({
+function BestRunsSection({
   fps,
   onRetry,
   resource,
@@ -465,10 +637,10 @@ function TopRunsSection({
 }: {
   fps: (typeof FPS_VALUES)[number];
   onRetry: () => void;
-  resource: ProfileResource<TopRun[]>;
+  resource: ProfileResource<PlayerJumpScores>;
   source: Source;
 }) {
-  const columns = useMemo<readonly DataTableColumn<TopRun>[]>(
+  const columns = useMemo<readonly DataTableColumn<PlayerMapScore>[]>(
     () => [
       {
         id: "rank",
@@ -479,26 +651,19 @@ function TopRunsSection({
         id: "map",
         header: "Map",
         priority: "primary",
-        cell: (run) => (
-          <Link href={mapDetailPath(run.cpid, { lookup: "cpid", source })}>{run.mapname}</Link>
-        ),
+        cell: (run) => <Link href={mapDetailPath(run.map_id, { source })}>{run.map_name}</Link>,
       },
       {
-        id: "time",
-        header: "Time",
+        id: "skill-points",
+        header: "Skill points",
         align: "end",
-        cell: (run) => formatRunTime(run),
+        cell: (run) => <strong>{formatProfileNumber(run.score)}</strong>,
       },
       {
-        id: "fps",
-        header: "FPS",
+        id: "difficulty",
+        header: "Difficulty",
         align: "end",
-        cell: (run) => fpsLabel(run.fps),
-      },
-      {
-        id: "recorded",
-        header: "Recorded",
-        cell: (run) => (run.time_created ? formatDate(run.time_created) : "Not provided"),
+        cell: (run) => formatProfileDecimal(run.difficulty),
       },
     ],
     [source],
@@ -506,24 +671,34 @@ function TopRunsSection({
 
   return (
     <ProfileSection
-      description={`Personal records returned for ${fpsLabel(fps)}. Map names open the matching map profile.`}
+      description={`The player's highest-value ${fpsLabel(fps)} maps from the jump-skill leaderboard, ordered by contributed skill points.`}
       icon={<Trophy size={19} />}
       id="player-top-runs"
-      title="Top runs"
+      title="Best runs"
     >
-      <ResourceState resource={resource} label="top runs" onRetry={onRetry}>
-        {(tops) =>
-          tops.length ? (
-            <DataTable
-              caption={`Top runs at ${fpsLabel(fps)}`}
-              columns={columns}
-              getRowKey={(run) => run.run_id ?? `${run.cpid}-${run.fps}-${run.rank}`}
-              rows={tops}
-            />
+      <ResourceState resource={resource} label="best runs" onRetry={onRetry}>
+        {(scores) =>
+          scores.map_scores.length ? (
+            <div className="cjs-player-profile__best-runs">
+              <dl className="cjs-player-profile__stat-grid cjs-player-profile__skill-summary">
+                <ProfileStat label="Jump-skill rank" value={`#${scores.rank}`} />
+                <ProfileStat label="Total skill points" value={formatProfileNumber(scores.score)} />
+                <ProfileStat
+                  label="Scoring maps"
+                  value={formatProfileNumber(scores.map_scores.length)}
+                />
+              </dl>
+              <DataTable
+                caption={`Best jump-skill runs at ${fpsLabel(fps)}`}
+                columns={columns}
+                getRowKey={(run) => run.map_id}
+                rows={scores.map_scores}
+              />
+            </div>
           ) : (
             <EmptyState
-              description={`No personal records were returned for ${fpsLabel(fps)}.`}
-              title="No top runs"
+              description={`No jump-skill map scores were returned for ${fpsLabel(fps)}.`}
+              title="No best runs"
             />
           )
         }

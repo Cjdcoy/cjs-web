@@ -1,4 +1,5 @@
 import { FPS_VALUES, type GameMap, type TopRun } from "../../lib/api";
+import { stripCodColorCodes } from "../../lib/codName";
 import { defineQuerySchema, enumQueryParam, integerQueryParam } from "../../lib/routing";
 
 export type MapLookup = "mapid" | "cpid";
@@ -72,8 +73,7 @@ export function getSafeMediaUrl(value: string | null | undefined): string | null
 }
 
 export function getPlainPlayerName(value: string): string {
-  const plainText = value.replace(/\^[0-9]/g, "").trim();
-  return plainText || "Unknown player";
+  return stripCodColorCodes(value);
 }
 
 export function formatRunTime(run: TopRun): string {

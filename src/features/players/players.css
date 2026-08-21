@@ -86,8 +86,24 @@
   color: var(--cjs-color-danger);
 }
 
+.cjs-player-results__load-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cjs-space-3);
+  min-height: var(--cjs-control-height-lg);
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-sm);
+}
+
 .cjs-player-table .cjs-table__cell:first-child {
   min-width: 15rem;
+}
+
+.cjs-player-country {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cjs-space-2);
 }
 
 .cjs-player-link {
@@ -98,11 +114,6 @@
   border-radius: var(--cjs-radius-sm);
   color: var(--cjs-color-text);
   text-decoration: none;
-}
-
-.cjs-player-link:hover .cjs-player-link__identity strong {
-  text-decoration: underline;
-  text-underline-offset: var(--cjs-space-1);
 }
 
 .cjs-player-link__avatar {
@@ -133,40 +144,6 @@
   font-size: var(--cjs-font-size-xs);
 }
 
-.cjs-player-name__segment[data-cod-color="0"] {
-  color: var(--cjs-color-text-subtle);
-}
-
-.cjs-player-name__segment[data-cod-color="1"] {
-  color: var(--cjs-color-danger);
-}
-
-.cjs-player-name__segment[data-cod-color="2"] {
-  color: var(--cjs-color-accent-strong);
-}
-
-.cjs-player-name__segment[data-cod-color="3"],
-.cjs-player-name__segment[data-cod-color="8"] {
-  color: var(--cjs-color-accent-secondary);
-}
-
-.cjs-player-name__segment[data-cod-color="4"],
-.cjs-player-name__segment[data-cod-color="5"] {
-  color: var(--cjs-color-information);
-}
-
-.cjs-player-name__segment[data-cod-color="6"] {
-  color: color-mix(in srgb, var(--cjs-color-danger), var(--cjs-color-information));
-}
-
-.cjs-player-name__segment[data-cod-color="7"] {
-  color: var(--cjs-color-text);
-}
-
-.cjs-player-name__segment[data-cod-color="9"] {
-  color: var(--cjs-color-text-muted);
-}
-
 .cjs-player-favorite[aria-pressed="true"] {
   box-shadow: var(--cjs-shadow-accent);
 }
@@ -174,7 +151,8 @@
 @media (max-width: 47.999rem) {
   .cjs-player-discovery__header,
   .cjs-player-results__heading,
-  .cjs-player-results__refresh-error {
+  .cjs-player-results__refresh-error,
+  .cjs-player-results__load-more {
     align-items: stretch;
     flex-direction: column;
   }
