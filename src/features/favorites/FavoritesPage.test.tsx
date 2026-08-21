@@ -66,6 +66,12 @@ describe("FavoritesPage", () => {
       "href",
       "/players/41?source=j4l",
     );
+    expect(screen.getByRole("link", { name: "RunnerOne" })).toHaveAttribute(
+      "data-variant",
+      "player",
+    );
+    expect(document.querySelector('[data-cod-color="2"]')).toHaveTextContent("Runner");
+    expect(document.querySelector('[data-cod-color="7"]')).toHaveTextContent("One");
   });
 
   it("keeps unavailable snapshots removable and clears the active group", async () => {

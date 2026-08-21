@@ -17,6 +17,7 @@ import type {
   PlayerActivitySummary,
   PlayerLeaderboard,
   PlayerLeaderboardPosition,
+  PlayerJumpScores,
   PlayerPerformanceStats,
   PlayerRankInfo,
   PlayerRouteCompletion,
@@ -31,6 +32,7 @@ import {
   normalizeLeaderboard,
   normalizeMaps,
   normalizePlayerActivity,
+  normalizePlayerJumpScores,
   normalizePlayerPerformance,
   normalizePlayerPositions,
   normalizePlayerRank,
@@ -49,6 +51,7 @@ const PATHS = {
   playerSearch: "/api/v1/player/id-from-name",
   playerPerformance: "/api/v1/player/performance-stats",
   playerPositions: "/api/v1/player/leaderboard-positions",
+  playerJumpScores: "/api/v1/player/jump-scores",
   playerTops: "/api/v1/player/tops",
   playerRoutes: "/api/v1/player/routes-completion",
   playerRank: "/api/v1/player/rank",
@@ -85,6 +88,9 @@ export interface CjsApi {
       leaderboard: PlayerLeaderboard;
     },
   ): Promise<PlayerLeaderboardPosition[]>;
+  playerJumpScores(
+    options: RequestContext & { playerId: number; fps: Fps },
+  ): Promise<PlayerJumpScores>;
   playerTops(
     options: RequestContext & { playerId: number; fps: Fps; limit?: number },
   ): Promise<TopRun[]>;
@@ -226,6 +232,20 @@ export function createCjsApi(client: JsonClient): CjsApi {
           leaderboard: options.leaderboard,
         }),
         PATHS.playerPositions,
+      );
+    },
+
+    async playerJumpScores(options) {
+      const game = playerContext(options, PATHS.playerJumpScores);
+      assertCapability("players", options.source, game);
+      requireFps(options.fps, PATHS.playerJumpScores);
+      return normalizePlayerJumpScores(
+        await get(client, PATHS.playerJumpScores, options, {
+          source: options.source,
+          playerid: options.playerId,
+          fps: options.fps,
+        }),
+        PATHS.playerJumpScores,
       );
     },
 

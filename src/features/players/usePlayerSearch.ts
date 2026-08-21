@@ -7,6 +7,7 @@ import {
 } from "./playerDiscovery";
 
 type SearchPlayers = typeof api.searchPlayers;
+type ListPlayers = typeof api.players;
 
 export type PlayerSearchStatus =
   "idle" | "debouncing" | "loading" | "refreshing" | "success" | "error";
@@ -27,8 +28,10 @@ interface PlayerSearchState {
 
 interface UsePlayerSearchOptions {
   debounceMs?: number;
+  listPlayers?: ListPlayers;
   query: string;
   searchPlayers?: SearchPlayers;
+  sort?: "last-seen" | "name" | "visits";
   source: Source;
 }
 
@@ -41,27 +44,27 @@ const initialState: PlayerSearchState = {
 
 export function usePlayerSearch({
   debounceMs = PLAYER_SEARCH_DEBOUNCE_MS,
+  listPlayers = api.players,
   query,
   searchPlayers = api.searchPlayers,
+  sort = "last-seen",
   source,
 }: UsePlayerSearchOptions): PlayerSearchResult {
   const normalizedQuery = query.trim();
-  const requestKey = `${source}\u0000${normalizedQuery}`;
+  const isSearch = normalizedQuery.length >= PLAYER_SEARCH_MIN_LENGTH;
+  const directorySort = !isSearch && sort === "visits" ? "visits" : "last-seen";
+  const requestKey = isSearch
+    ? `search\u0000${source}\u0000${normalizedQuery}`
+    : `directory\u0000${source}\u0000${directorySort}`;
   const [retryVersion, setRetryVersion] = useState(0);
   const [state, setState] = useState<PlayerSearchState>(initialState);
   const previousRequestKey = useRef("");
 
   useEffect(() => {
-    if (normalizedQuery.length < PLAYER_SEARCH_MIN_LENGTH) {
-      previousRequestKey.current = requestKey;
-      setState({ ...initialState, requestKey });
-      return;
-    }
-
     const isRetry = previousRequestKey.current === requestKey;
     previousRequestKey.current = requestKey;
     const controller = new AbortController();
-    const delay = isRetry ? 0 : debounceMs;
+    const delay = isSearch && !isRetry ? debounceMs : 0;
 
     setState((current) => ({
       error: null,
@@ -81,12 +84,20 @@ export function usePlayerSearch({
         status: current.players.length > 0 ? "refreshing" : "loading",
       }));
 
-      void searchPlayers({
-        limit: PLAYER_SEARCH_LIMIT,
-        name: normalizedQuery,
-        signal: controller.signal,
-        source,
-      })
+      const request = isSearch
+        ? searchPlayers({
+            limit: PLAYER_SEARCH_LIMIT,
+            name: normalizedQuery,
+            signal: controller.signal,
+            source,
+          })
+        : listPlayers({
+            signal: controller.signal,
+            sort: directorySort,
+            source,
+          });
+
+      void request
         .then((players) => {
           if (controller.signal.aborted) return;
           setState({ error: null, players, requestKey, status: "success" });
@@ -95,7 +106,7 @@ export function usePlayerSearch({
           if (controller.signal.aborted) return;
           setState((current) => ({
             ...current,
-            error: reason instanceof Error ? reason.message : "The player search failed.",
+            error: reason instanceof Error ? reason.message : "The player request failed.",
             requestKey,
             status: "error",
           }));
@@ -106,7 +117,17 @@ export function usePlayerSearch({
       window.clearTimeout(timeout);
       controller.abort();
     };
-  }, [debounceMs, normalizedQuery, requestKey, retryVersion, searchPlayers, source]);
+  }, [
+    debounceMs,
+    directorySort,
+    isSearch,
+    listPlayers,
+    normalizedQuery,
+    requestKey,
+    retryVersion,
+    searchPlayers,
+    source,
+  ]);
 
   const retry = useCallback(() => setRetryVersion((version) => version + 1), []);
 
@@ -119,7 +140,7 @@ export function usePlayerSearch({
       error: null,
       players: [],
       retry,
-      status: normalizedQuery.length < PLAYER_SEARCH_MIN_LENGTH ? "idle" : ("debouncing" as const),
+      status: isSearch && debounceMs > 0 ? ("debouncing" as const) : ("loading" as const),
     };
-  }, [normalizedQuery.length, requestKey, retry, state]);
+  }, [debounceMs, isSearch, requestKey, retry, state]);
 }

@@ -23,6 +23,12 @@
 }
 
 .cjs-player-profile__hero {
+  padding: var(--cjs-space-5);
+  border: var(--cjs-border-width) solid var(--cjs-color-border);
+  border-radius: var(--cjs-radius-lg);
+  background:
+    linear-gradient(135deg, var(--cjs-color-accent-surface), transparent 58%),
+    var(--cjs-color-panel);
   justify-content: space-between;
   gap: var(--cjs-space-5);
 }
@@ -82,20 +88,116 @@
   font-size: var(--cjs-font-size-sm);
 }
 
+.cjs-player-profile__country {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cjs-space-2);
+}
+
 .cjs-player-profile__favorite[aria-pressed="true"] {
   box-shadow: var(--cjs-shadow-accent);
 }
 
-.cjs-player-profile__controls {
+.cjs-player-profile__tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
-  align-items: start;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--cjs-space-1);
+  padding: var(--cjs-space-1);
+  border: var(--cjs-border-width) solid var(--cjs-color-border);
+  border-radius: var(--cjs-radius-md);
+  background: var(--cjs-color-panel-soft);
+}
+
+.cjs-player-profile__tab {
+  display: flex;
+  min-height: var(--cjs-control-height-md);
+  align-items: center;
+  justify-content: center;
+  padding-inline: var(--cjs-space-3);
+  border-radius: var(--cjs-radius-sm);
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-sm);
+  font-weight: var(--cjs-font-weight-bold);
+  text-align: center;
+  text-decoration: none;
+}
+
+.cjs-player-profile__tab:hover {
+  background: var(--cjs-color-panel);
+  color: var(--cjs-color-text);
+}
+
+.cjs-player-profile__tab[data-active="true"] {
+  background: var(--cjs-color-accent-surface-strong);
+  color: var(--cjs-color-accent-strong);
+  box-shadow: var(--cjs-shadow-sm);
+}
+
+.cjs-player-profile__source-note {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cjs-space-4);
+  padding-inline: var(--cjs-space-1);
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-sm);
+}
+
+.cjs-player-profile__source-note > div {
+  display: grid;
+  gap: var(--cjs-space-1);
+}
+
+.cjs-player-profile__source-note strong {
+  color: var(--cjs-color-text);
+}
+
+.cjs-player-profile__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
   gap: var(--cjs-space-4);
 }
 
+.cjs-player-profile__controls > :first-child:not(.cjs-player-profile__refresh) {
+  width: min(100%, 22rem);
+}
+
+.cjs-player-profile__controls > .cjs-player-profile__fps-filter {
+  width: min(100%, 42rem);
+}
+
+.cjs-player-profile__fps-filter {
+  display: grid;
+  min-width: 0;
+  gap: var(--cjs-space-2);
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.cjs-player-profile__fps-filter legend {
+  margin-block-end: var(--cjs-space-2);
+  color: var(--cjs-color-text);
+  font-size: var(--cjs-font-size-md);
+  font-weight: var(--cjs-font-weight-bold);
+}
+
+.cjs-player-profile__fps-filter p {
+  margin: 0;
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-sm);
+}
+
+.cjs-player-profile__fps-options .cjs-segmented-control__option {
+  min-height: var(--cjs-control-height-md);
+  flex: 1 1 0;
+  padding-inline: var(--cjs-space-4);
+  font-size: var(--cjs-font-size-md);
+}
+
 .cjs-player-profile__refresh {
-  align-self: center;
-  margin-block-start: var(--cjs-space-5);
+  margin-inline-start: auto;
 }
 
 .cjs-player-profile__partial-error,
@@ -229,6 +331,79 @@
   margin-block-start: var(--cjs-space-4);
 }
 
+.cjs-player-profile__skill-summary {
+  margin-block-end: var(--cjs-space-4);
+}
+
+.cjs-player-profile__best-runs {
+  display: grid;
+  gap: var(--cjs-space-4);
+  font-size: var(--cjs-font-size-md);
+}
+
+.cjs-player-profile__best-runs .cjs-player-profile__stat-grid dt {
+  font-size: var(--cjs-font-size-sm);
+}
+
+.cjs-player-profile__best-runs .cjs-player-profile__stat-grid dd {
+  font-size: var(--cjs-font-size-xl);
+}
+
+.cjs-player-profile__best-runs .cjs-table__cell,
+.cjs-player-profile__best-runs .cjs-table th {
+  font-size: var(--cjs-font-size-md);
+}
+
+.cjs-player-profile__recent {
+  display: grid;
+  gap: var(--cjs-space-4);
+}
+
+.cjs-player-profile__recent-list {
+  display: grid;
+  gap: var(--cjs-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cjs-player-profile__recent-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cjs-space-4);
+  padding: var(--cjs-space-3) var(--cjs-space-4);
+  border: var(--cjs-border-width) solid var(--cjs-color-border);
+  border-radius: var(--cjs-radius-sm);
+  background: var(--cjs-color-panel-soft);
+}
+
+.cjs-player-profile__recent-list li > div {
+  display: flex;
+  align-items: center;
+  gap: var(--cjs-space-3);
+}
+
+.cjs-player-profile__recent-list li > div:first-child {
+  min-width: 0;
+  align-items: flex-start;
+  flex-direction: column;
+  gap: var(--cjs-space-1);
+}
+
+.cjs-player-profile__recent-list span,
+.cjs-player-profile__recent-empty {
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-sm);
+}
+
+.cjs-player-profile__recent-empty {
+  margin: 0;
+  padding: var(--cjs-space-4);
+  border-radius: var(--cjs-radius-sm);
+  background: var(--cjs-color-panel-soft);
+}
+
 .cjs-player-profile__progress {
   display: grid;
   gap: var(--cjs-space-3);
@@ -267,20 +442,11 @@
   flex: none;
 }
 
-@media (max-width: 64rem) {
-  .cjs-player-profile__controls {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
-  .cjs-player-profile__refresh {
-    margin-block-start: 0;
-  }
-}
-
 @media (max-width: 47.999rem) {
   .cjs-player-profile__hero,
   .cjs-player-profile__resource-error,
-  .cjs-player-profile__capability {
+  .cjs-player-profile__capability,
+  .cjs-player-profile__source-note {
     align-items: stretch;
     flex-direction: column;
   }
@@ -289,20 +455,38 @@
     align-self: flex-start;
   }
 
-  .cjs-player-profile__controls,
   .cjs-player-profile__stat-grid,
   .cjs-player-profile__activity-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 
+  .cjs-player-profile__tabs {
+    overflow-x: auto;
+    grid-template-columns: repeat(3, minmax(8.5rem, 1fr));
+  }
+
+  .cjs-player-profile__controls {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cjs-player-profile__fps-options {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
   .cjs-player-profile__refresh,
   .cjs-player-profile__resource-error .cjs-button {
     width: 100%;
+    margin-inline-start: 0;
   }
 
   .cjs-player-profile__resource-state,
   .cjs-player-profile__resource-content {
     padding: var(--cjs-space-4);
+  }
+
+  .cjs-player-profile__recent-list li {
+    align-items: flex-start;
   }
 }
 

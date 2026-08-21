@@ -54,7 +54,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 
 export interface LinkProps extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "href"> {
   href: string;
-  variant?: "default" | "muted" | "standalone";
+  variant?: "default" | "muted" | "player" | "standalone";
   isDisabled?: boolean;
 }
 

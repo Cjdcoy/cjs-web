@@ -5,6 +5,7 @@ import {
   leaderboardFixture,
   mapsFixture,
   playerActivityFixture,
+  playerJumpScoresFixture,
   playerPerformanceFixture,
   playerPositionsFixture,
   playerRankFixture,
@@ -18,6 +19,7 @@ import {
   normalizeLeaderboard,
   normalizeMaps,
   normalizePlayerActivity,
+  normalizePlayerJumpScores,
   normalizePlayerPerformance,
   normalizePlayerPositions,
   normalizePlayerRank,
@@ -130,6 +132,23 @@ describe("API response normalizers", () => {
     });
   });
 
+  it("normalizes player jump-skill map scores", () => {
+    expect(normalizePlayerJumpScores(playerJumpScoresFixture, path)).toMatchObject({
+      player_id: 501,
+      rank: 4,
+      score: 2740,
+      map_scores: expect.arrayContaining([
+        {
+          map_id: 101,
+          map_name: "mp_cjs_training",
+          score: 1536,
+          difficulty: 9.7588,
+          rank: 1,
+        },
+      ]),
+    });
+  });
+
   it("normalizes J4L rank and activity summaries", () => {
     expect(normalizePlayerRank(playerRankFixture, path)).toMatchObject({
       level: 12,
@@ -149,6 +168,7 @@ describe("API response normalizers", () => {
     ["top run", () => normalizeTopRuns([{ rank: 1 }], path)],
     ["performance", () => normalizePlayerPerformance({ top10_count: "many" }, path)],
     ["position", () => normalizePlayerPositions([{ rank: 1 }], path)],
+    ["jump scores", () => normalizePlayerJumpScores({ player_id: 1 }, path)],
     ["routes", () => normalizePlayerRoutes([{ map_id: 1 }], path)],
     ["rank", () => normalizePlayerRank({ player_id: 1 }, path)],
     ["activity", () => normalizePlayerActivity({ player_id: 1 }, path)],

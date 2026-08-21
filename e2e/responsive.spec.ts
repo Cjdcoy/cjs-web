@@ -72,3 +72,25 @@ test("reduced-motion preference disables loading shimmer animation", async ({ pa
   await expect(skeleton).toHaveCSS("animation-name", "none");
   await expect(page.getByRole("link", { name: "mp_cjs_training", exact: true })).toBeVisible();
 });
+
+test("best runs expose jump-skill points without mobile or desktop overflow", async ({ page }) => {
+  await mockApi(page);
+  await page.goto("/players/501?source=jh&view=runs&fps=125");
+
+  await expect(page.getByRole("heading", { level: 2, name: "Best runs" })).toBeVisible();
+  await expect(page.getByText("Total skill points")).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Skill points" })).toBeAttached();
+  await expect(page.getByRole("cell", { name: "1,536" })).toBeVisible();
+
+  for (const viewport of [
+    { width: 320, height: 800 },
+    { width: 1440, height: 1000 },
+  ]) {
+    await page.setViewportSize(viewport);
+    const overflow = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(overflow.scrollWidth).toBeLessThanOrEqual(overflow.clientWidth + 1);
+  }
+});

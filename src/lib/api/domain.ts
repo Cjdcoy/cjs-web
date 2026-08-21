@@ -205,6 +205,28 @@ export interface PlayerLeaderboardPosition {
   last_seen?: string;
 }
 
+export interface PlayerMapScore {
+  map_id: number;
+  map_name: string;
+  score: number;
+  difficulty: number;
+  rank: number;
+}
+
+export interface PlayerJumpScores {
+  player_id: number;
+  player_name: string;
+  rank: number;
+  rating: number;
+  score: number;
+  country?: string;
+  country_code?: string;
+  region?: string;
+  last_seen?: string;
+  top_list: Record<string, number>;
+  map_scores: PlayerMapScore[];
+}
+
 export interface PlayerRouteCompletion {
   map_id: number;
   map_name: string;

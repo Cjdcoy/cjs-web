@@ -6,10 +6,10 @@ import {
   type RankLeaderboardEntry,
   type Source,
 } from "../../lib/api";
+import { stripCodColorCodes } from "../../lib/codName";
 import {
   defineQuerySchema,
   enumQueryParam,
-  integerQueryParam,
   readQueryState,
   stringQueryParam,
   updateQuerySearch,
@@ -25,14 +25,10 @@ export type LeaderboardSort = (typeof LEADERBOARD_SORTS)[number];
 export const SORT_ORDERS = ["asc", "desc"] as const;
 export type SortOrder = (typeof SORT_ORDERS)[number];
 
-export const PAGE_SIZES = ["10", "25", "50", "100"] as const;
-
 export const leaderboardQuerySchema = defineQuerySchema({
   board: enumQueryParam(LEADERBOARD_BOARDS, "speed-skill"),
   fps: enumQueryParam(FPS_VALUES, "125"),
-  limit: enumQueryParam(PAGE_SIZES, "25"),
   order: enumQueryParam(SORT_ORDERS, "asc"),
-  page: integerQueryParam({ defaultValue: 1, min: 1, max: 10_000 }),
   query: stringQueryParam({ defaultValue: "", maxLength: 80, trim: true }),
   sort: enumQueryParam(LEADERBOARD_SORTS, "rank"),
 });
@@ -56,16 +52,19 @@ export interface LeaderboardRow {
   metric: number | null;
 }
 
-export interface PaginatedRows {
-  page: number;
-  pageCount: number;
-  rows: LeaderboardRow[];
-  total: number;
-  firstResult: number;
-  lastResult: number;
+export interface TopPlaceCount {
+  place: number;
+  count: number;
 }
 
-const unsupportedLegacyParameters = ["country", "player", "region", "seen"] as const;
+const unsupportedLegacyParameters = [
+  "country",
+  "limit",
+  "page",
+  "player",
+  "region",
+  "seen",
+] as const;
 
 export function boardUsesFps(board: LeaderboardBoard): boolean {
   return board !== "howmany" && board !== "rank-xp";
@@ -147,7 +146,7 @@ export function filterLeaderboardRows(
   if (!normalizedQuery) return [...rows];
 
   return rows.filter((row) =>
-    [row.playerName, row.country, row.countryCode, row.region]
+    [stripCodColorCodes(row.playerName), row.country, row.countryCode, row.region]
       .filter((value): value is string => Boolean(value))
       .some((value) => value.toLocaleLowerCase().includes(normalizedQuery)),
   );
@@ -167,7 +166,11 @@ export function sortLeaderboardRows(
       let comparison = 0;
 
       if (sort === "player") {
-        comparison = collator.compare(left.row.playerName, right.row.playerName) * direction;
+        comparison =
+          collator.compare(
+            stripCodColorCodes(left.row.playerName),
+            stripCodColorCodes(right.row.playerName),
+          ) * direction;
       } else if (sort === "value") {
         comparison = compareOptionalNumbers(left.row.metric, right.row.metric, direction);
       } else {
@@ -179,24 +182,28 @@ export function sortLeaderboardRows(
     .map(({ row }) => row);
 }
 
-export function paginateLeaderboardRows(
-  rows: readonly LeaderboardRow[],
-  requestedPage: number,
-  pageSize: number,
-): PaginatedRows {
-  const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-  const page = Math.min(Math.max(requestedPage, 1), pageCount);
-  const start = (page - 1) * pageSize;
-  const pageRows = rows.slice(start, start + pageSize);
+export function createTopPlaceDistribution(
+  topList: Readonly<Record<string, number>> | undefined,
+): TopPlaceCount[] | null {
+  if (!topList) return null;
 
-  return {
-    page,
-    pageCount,
-    rows: pageRows,
-    total: rows.length,
-    firstResult: pageRows.length ? start + 1 : 0,
-    lastResult: pageRows.length ? start + pageRows.length : 0,
-  };
+  let hasKnownPlace = false;
+  const distribution = Array.from({ length: 10 }, (_, index) => {
+    const place = index + 1;
+    const directCount = topList[String(place)];
+    const legacyCount = topList[`top${place}`];
+
+    if (directCount !== undefined || legacyCount !== undefined) {
+      hasKnownPlace = true;
+    }
+
+    return {
+      place,
+      count: directCount ?? legacyCount ?? 0,
+    };
+  });
+
+  return hasKnownPlace ? distribution : null;
 }
 
 export function metricLabel(board: LeaderboardBoard): string {

@@ -1,19 +1,26 @@
 import { Heart, UsersRound } from "lucide-react";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
+  CodPlayerName,
+  CountryFlag,
   DataTable,
   EmptyState,
   ErrorState,
   IconButton,
+  Link,
   SkeletonGroup,
   type DataTableColumn,
 } from "../../components/ui";
 import type { Player, Source } from "../../lib/api";
 import { playerDetailPath } from "../../lib/routing";
 import { formatDate, formatNumber, timeAgo } from "../../lib/format";
-import { CodPlayerName } from "./CodPlayerName";
-import { PLAYER_SEARCH_MIN_LENGTH, parseCodName, playerDisplayName } from "./playerDiscovery";
+import {
+  PLAYER_DIRECTORY_BATCH_SIZE,
+  PLAYER_SEARCH_MIN_LENGTH,
+  parseCodName,
+  playerDisplayName,
+} from "./playerDiscovery";
 import type { PlayerSearchStatus } from "./usePlayerSearch";
 
 const sourceLabels: Readonly<Record<Source, string>> = {
@@ -44,6 +51,32 @@ export function PlayerResults({
 }: PlayerResultsProps) {
   const hasSearch = query.length >= PLAYER_SEARCH_MIN_LENGTH;
   const hasStaleResults = status === "error" && players.length > 0;
+  const [visibleCount, setVisibleCount] = useState(PLAYER_DIRECTORY_BATCH_SIZE);
+  const loadMoreTarget = useRef<HTMLDivElement>(null);
+  const visiblePlayers = useMemo(() => players.slice(0, visibleCount), [players, visibleCount]);
+  const hasMore = visiblePlayers.length < players.length;
+  const loadMore = useCallback(() => {
+    setVisibleCount((current) => Math.min(current + PLAYER_DIRECTORY_BATCH_SIZE, players.length));
+  }, [players.length]);
+
+  useEffect(() => {
+    setVisibleCount(PLAYER_DIRECTORY_BATCH_SIZE);
+  }, [players]);
+
+  useEffect(() => {
+    const target = loadMoreTarget.current;
+    if (!hasMore || !target || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) loadMore();
+      },
+      { rootMargin: "400px 0px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMore, loadMore]);
+
   const columns = useMemo<readonly DataTableColumn<Player>[]>(
     () => [
       {
@@ -55,7 +88,17 @@ export function PlayerResults({
       {
         id: "country",
         header: "Country",
-        cell: (player) => player.country?.trim() || "Not provided",
+        cell: (player) => {
+          const country = player.country?.trim();
+          return country ? (
+            <span className="cjs-player-country">
+              <CountryFlag code={country} label={country} size="small" />
+              <span>{country}</span>
+            </span>
+          ) : (
+            "Not provided"
+          );
+        },
       },
       {
         id: "visits",
@@ -102,40 +145,41 @@ export function PlayerResults({
     <section className="cjs-player-results" aria-labelledby="player-results-heading">
       <div className="cjs-player-results__heading">
         <div>
-          <h2 id="player-results-heading">Search results</h2>
+          <h2 id="player-results-heading">{hasSearch ? "Search results" : "Players"}</h2>
           <p aria-live="polite" role="status">
             <PlayerResultSummary
-              count={players.length}
+              count={visiblePlayers.length}
               hasSearch={hasSearch}
               query={query}
               source={source}
               status={status}
+              total={players.length}
             />
           </p>
         </div>
       </div>
 
-      {!hasSearch && (
-        <EmptyState
-          description={`Enter at least ${PLAYER_SEARCH_MIN_LENGTH} characters to search ${sourceLabels[source]}.`}
-          icon={UsersRound}
-          title="Search by player name"
-        />
-      )}
-
-      {hasSearch && (status === "debouncing" || status === "loading") && (
+      {(status === "debouncing" || status === "loading") && (
         <SkeletonGroup
           count={5}
-          label={`Searching ${sourceLabels[source]} players`}
+          label={
+            hasSearch
+              ? `Searching ${sourceLabels[source]} players`
+              : `Loading ${sourceLabels[source]} players`
+          }
           variant="card"
         />
       )}
 
-      {hasSearch && status === "error" && !hasStaleResults && (
+      {status === "error" && !hasStaleResults && (
         <ErrorState
-          description={`The ${sourceLabels[source]} player search for “${query}” could not be completed${error ? `: ${error}` : "."}`}
+          description={
+            hasSearch
+              ? `The ${sourceLabels[source]} player search for “${query}” could not be completed${error ? `: ${error}` : "."}`
+              : `The ${sourceLabels[source]} player directory could not be loaded${error ? `: ${error}` : "."}`
+          }
           onRetry={retry}
-          title="Unable to search players"
+          title={hasSearch ? "Unable to search players" : "Unable to load players"}
         />
       )}
 
@@ -148,15 +192,19 @@ export function PlayerResults({
         </div>
       )}
 
-      {hasSearch && status === "success" && players.length === 0 && (
+      {status === "success" && players.length === 0 && (
         <EmptyState
-          description={`No ${sourceLabels[source]} player names matched “${query}”. Try a broader spelling.`}
+          description={
+            hasSearch
+              ? `No ${sourceLabels[source]} player names matched “${query}”. Try a broader spelling.`
+              : `The ${sourceLabels[source]} directory did not return any players.`
+          }
           icon={UsersRound}
-          title="No players found"
+          title={hasSearch ? "No players found" : "No directory players"}
         />
       )}
 
-      {hasSearch && players.length > 0 && (
+      {players.length > 0 && (
         <>
           {status === "refreshing" && (
             <p className="cjs-player-results__refreshing" aria-live="polite" role="status">
@@ -164,15 +212,29 @@ export function PlayerResults({
             </p>
           )}
           <DataTable
-            caption={`${sourceLabels[source]} players matching ${query}`}
+            caption={
+              hasSearch
+                ? `${sourceLabels[source]} players matching ${query}`
+                : `${sourceLabels[source]} player directory`
+            }
             className="cjs-player-table"
             columns={columns}
             getRowKey={(player) => player.player_id}
             getRowLabel={(player) =>
               `${parseCodName(playerDisplayName(player)).plainText}, player ${player.player_id}`
             }
-            rows={players}
+            rows={visiblePlayers}
           />
+          {hasMore && (
+            <div className="cjs-player-results__load-more" ref={loadMoreTarget}>
+              <Button onClick={loadMore} size="small" variant="secondary">
+                Load more players
+              </Button>
+              <span>
+                Showing {visiblePlayers.length} of {players.length}
+              </span>
+            </div>
+          )}
         </>
       )}
     </section>
@@ -184,7 +246,11 @@ function PlayerLink({ player, source }: { player: Player; source: Source }) {
   const initial = parsedName.plainText.slice(0, 1).toUpperCase() || "?";
 
   return (
-    <a className="cjs-player-link" href={playerDetailPath(player.player_id, source)}>
+    <Link
+      className="cjs-player-link"
+      href={playerDetailPath(player.player_id, source)}
+      variant="player"
+    >
       <span className="cjs-player-link__avatar" aria-hidden="true">
         {initial}
       </span>
@@ -194,7 +260,7 @@ function PlayerLink({ player, source }: { player: Player; source: Source }) {
         </strong>
         <small>Player #{player.player_id}</small>
       </span>
-    </a>
+    </Link>
   );
 }
 
@@ -204,14 +270,30 @@ function PlayerResultSummary({
   query,
   source,
   status,
+  total,
 }: {
   count: number;
   hasSearch: boolean;
   query: string;
   source: Source;
   status: PlayerSearchStatus;
+  total: number;
 }) {
-  if (!hasSearch) return <>Waiting for a name.</>;
+  if (!hasSearch && status === "loading")
+    return <>Loading recently seen players from {sourceLabels[source]}.</>;
+  if (!hasSearch && status === "refreshing")
+    return (
+      <>
+        Refreshing {total} players from {sourceLabels[source]}.
+      </>
+    );
+  if (!hasSearch && status === "error" && total === 0) return <>Player directory failed.</>;
+  if (!hasSearch)
+    return (
+      <>
+        Showing {count} of {total} players from {sourceLabels[source]}.
+      </>
+    );
   if (status === "debouncing") return <>Waiting to search for “{query}”.</>;
   if (status === "loading")
     return (

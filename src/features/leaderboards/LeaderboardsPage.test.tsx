@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -56,11 +56,12 @@ function rankEntry(id: number) {
 
 describe("LeaderboardsPage", () => {
   beforeEach(() => {
+    vi.unstubAllGlobals();
     vi.restoreAllMocks();
     window.history.replaceState(null, "", "/leaderboards");
   });
 
-  it("direct-loads a representative J4L rank XP URL with paging and player links", async () => {
+  it("direct-loads a representative J4L rank XP URL and removes legacy paging", async () => {
     const rankXpLeaderboard = vi
       .spyOn(api, "rankXpLeaderboard")
       .mockResolvedValue(Array.from({ length: 12 }, (_, index) => rankEntry(index + 1)));
@@ -72,21 +73,23 @@ describe("LeaderboardsPage", () => {
 
     renderPage();
 
-    expect(await screen.findByText("XP Runner 11")).toBeInTheDocument();
+    expect(await screen.findByText("XP Runner 1")).toBeInTheDocument();
+    expect(screen.getByText("XP Runner 11")).toBeInTheDocument();
     expect(screen.getByText("XP Runner 12")).toBeInTheDocument();
-    expect(screen.queryByText("XP Runner 10")).not.toBeInTheDocument();
-    expect(screen.getByText("Showing 11–12 of 12 matching players.")).toBeVisible();
+    expect(screen.getByText("Showing 12 of 12 matching players.")).toBeVisible();
     expect(screen.getByRole("link", { name: "XP Runner 11" })).toHaveAttribute(
       "href",
       "/players/11?source=j4l",
+    );
+    expect(screen.getByRole("link", { name: "XP Runner 11" })).toHaveAttribute(
+      "data-variant",
+      "player",
     );
     expect(screen.getByRole("columnheader", { name: /total xp/i })).toHaveAttribute(
       "aria-sort",
       "descending",
     );
-    expect(window.location.search).toBe(
-      "?source=j4l&board=rank-xp&limit=10&page=2&sort=value&order=desc",
-    );
+    expect(window.location.search).toBe("?source=j4l&board=rank-xp&sort=value&order=desc");
     expect(rankXpLeaderboard).toHaveBeenCalledWith(
       expect.objectContaining({ source: "j4l", signal: expect.any(AbortSignal) }),
     );
@@ -116,7 +119,7 @@ describe("LeaderboardsPage", () => {
     expect(rankXpLeaderboard).not.toHaveBeenCalled();
   });
 
-  it("updates the URL and results when board, search, limit, and sort controls change", async () => {
+  it("updates the URL and results from visible board and FPS choices", async () => {
     vi.spyOn(api, "leaderboard").mockImplementation(async ({ kind }) => {
       return [
         standardEntry(1, { player_name: `${kind} Alpha`, score: 20 }),
@@ -127,18 +130,23 @@ describe("LeaderboardsPage", () => {
     renderPage();
     await screen.findByText("speed-skill Alpha");
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Board" }), "howmany");
+    expect(screen.getByRole("radiogroup", { name: "Board" })).toBeVisible();
+    expect(screen.getByRole("radiogroup", { name: "FPS" })).toBeVisible();
+
+    await user.click(screen.getByRole("radio", { name: "Jump" }));
+    await user.click(screen.getByRole("radio", { name: "333" }));
+    expect(await screen.findByText("jump-skill Alpha")).toBeInTheDocument();
+    expect(window.location.search).toBe("?board=jump-skill&fps=333");
+
+    await user.click(screen.getByRole("radio", { name: "Completions" }));
     expect(await screen.findByText("howmany Alpha")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: /fps/i })).toBeDisabled();
+    expect(screen.getByRole("radio", { name: "125" })).toBeDisabled();
     expect(window.location.search).toBe("?board=howmany");
 
     await user.type(screen.getByRole("searchbox", { name: "Find a player or country" }), "Beta");
     expect(screen.queryByText("howmany Alpha")).not.toBeInTheDocument();
     expect(screen.getByText("howmany Beta")).toBeInTheDocument();
     expect(new URLSearchParams(window.location.search).get("query")).toBe("Beta");
-
-    await user.selectOptions(screen.getByRole("combobox", { name: "Rows per page" }), "10");
-    expect(new URLSearchParams(window.location.search).get("limit")).toBe("10");
 
     await user.click(screen.getByRole("button", { name: "Sort by maps completed, descending" }));
     expect(new URLSearchParams(window.location.search).get("sort")).toBe("value");
@@ -147,6 +155,75 @@ describe("LeaderboardsPage", () => {
       "aria-sort",
       "descending",
     );
+  });
+
+  it("reveals more players when the scroll sentinel enters view", async () => {
+    let triggerIntersection: (() => void) | undefined;
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        constructor(callback: IntersectionObserverCallback) {
+          triggerIntersection = () =>
+            callback(
+              [{ isIntersecting: true } as IntersectionObserverEntry],
+              this as unknown as IntersectionObserver,
+            );
+        }
+
+        observe() {}
+
+        disconnect() {}
+      },
+    );
+    vi.spyOn(api, "leaderboard").mockResolvedValue(
+      Array.from({ length: 30 }, (_, index) => standardEntry(index + 1)),
+    );
+    renderPage();
+
+    expect(await screen.findByText("Runner 25")).toBeInTheDocument();
+    expect(screen.queryByText("Runner 26")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Load 5 more players" })).toBeVisible();
+
+    await act(async () => triggerIntersection?.());
+
+    expect(await screen.findByText("Runner 30")).toBeInTheDocument();
+    expect(screen.getByText("Showing 30 of 30 matching players.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: /load .* more players/i })).not.toBeInTheDocument();
+  });
+
+  it("shows a compact country flag and the full top 1–10 distribution", async () => {
+    vi.spyOn(api, "leaderboard").mockResolvedValue([
+      standardEntry(1, {
+        country: "United Kingdom",
+        country_code: "UK",
+        top_list: {
+          "1": 12,
+          "2": 10,
+          "3": 9,
+          "4": 8,
+          "5": 7,
+          "6": 6,
+          "7": 5,
+          "8": 4,
+          "9": 3,
+          "10": 2,
+        },
+      }),
+    ]);
+    renderPage();
+
+    const table = await screen.findByRole("table", { name: /speed skill rankings/i });
+    const countryFlag = within(table).getByRole("img", { name: "United Kingdom" });
+    expect(countryFlag.querySelector("img")).toHaveAttribute("src", "/country-flags/gb.svg");
+    expect(countryFlag).not.toHaveTextContent("🇬🇧");
+    expect(within(table).queryByRole("columnheader", { name: "Country" })).not.toBeInTheDocument();
+
+    const distribution = within(table).getByRole("list", {
+      name: /top-place distribution: top 1: 12.*top 10: 2/i,
+    });
+    expect(within(distribution).getAllByRole("listitem")).toHaveLength(10);
+    expect(within(distribution).getByText("#1")).toBeVisible();
+    expect(within(distribution).getByText("#10")).toBeVisible();
   });
 
   it("cancels an obsolete board request so late data is not presented", async () => {
@@ -170,7 +247,7 @@ describe("LeaderboardsPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Board" }), "jump-skill");
+    await user.click(screen.getByRole("radio", { name: "Jump" }));
 
     expect(await screen.findByText("Current runner")).toBeInTheDocument();
     expect(obsoleteSignal?.aborted).toBe(true);
@@ -194,7 +271,9 @@ describe("LeaderboardsPage", () => {
   });
 
   it("has accessible ranking and control semantics", async () => {
-    vi.spyOn(api, "leaderboard").mockResolvedValue([standardEntry(1)]);
+    vi.spyOn(api, "leaderboard").mockResolvedValue([
+      standardEntry(1, { player_name: "^2Runner ^71" }),
+    ]);
     const { container } = renderPage();
 
     const table = await screen.findByRole("table", { name: /speed skill rankings/i });
@@ -203,6 +282,8 @@ describe("LeaderboardsPage", () => {
       "ascending",
     );
     expect(within(table).getByRole("row", { name: "Runner 1, official rank 1" })).toBeVisible();
+    expect(table.querySelector('[data-cod-color="2"]')).toHaveTextContent("Runner");
+    expect(table.querySelector('[data-cod-color="7"]')).toHaveTextContent("1");
 
     const results = await axe.run(container);
     expect(results.violations).toEqual([]);

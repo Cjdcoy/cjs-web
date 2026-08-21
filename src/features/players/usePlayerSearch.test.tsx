@@ -12,12 +12,16 @@ describe("usePlayerSearch", () => {
     vi.useRealTimers();
   });
 
-  it("waits for a meaningful query and debounces the request", async () => {
+  it("loads the directory for a short query and debounces a meaningful search", async () => {
+    const listPlayers = vi
+      .fn<typeof api.players>()
+      .mockResolvedValue([{ player_id: 1, playername: "Recent" }]);
     const searchPlayers = vi.fn<typeof api.searchPlayers>().mockResolvedValue([]);
     const { result, rerender } = renderHook(
       ({ query }) =>
         usePlayerSearch({
           debounceMs: 50,
+          listPlayers,
           query,
           searchPlayers,
           source: "jh",
@@ -25,10 +29,16 @@ describe("usePlayerSearch", () => {
       { initialProps: { query: "a" } },
     );
 
-    expect(result.current.status).toBe("idle");
+    expect(result.current.status).toBe("loading");
     await act(async () => {
-      vi.advanceTimersByTime(100);
+      vi.advanceTimersByTime(0);
+      await Promise.resolve();
+      await Promise.resolve();
     });
+    expect(listPlayers).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: "last-seen", source: "jh" }),
+    );
+    expect(result.current.players[0]?.playername).toBe("Recent");
     expect(searchPlayers).not.toHaveBeenCalled();
 
     rerender({ query: "alpha" });

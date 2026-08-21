@@ -2,6 +2,7 @@ import { Menu, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IconButton, SegmentedControl, VisuallyHidden } from "../../components/ui";
 import {
+  navigate,
   sourceOptions,
   useNavigationPending,
   useSourceContext,
@@ -61,7 +62,7 @@ export function AppShell({ children, route }: { children: ReactNode; route: Rout
           </nav>
 
           <div className="cjs-site-header__actions">
-            <SourceSwitcher />
+            <SourceSwitcher route={route} />
             <IconButton
               ref={mobileNavigationButton}
               className="cjs-mobile-navigation__toggle"
@@ -152,8 +153,16 @@ function NavigationLink({
   );
 }
 
-function SourceSwitcher() {
+function SourceSwitcher({ route }: { route: RouteMatch }) {
   const { source, setSource } = useSourceContext();
+
+  const changeSource = (nextSource: SourceId) => {
+    if (route.id === "player-detail") {
+      navigate(`/players?source=${nextSource}`);
+      return;
+    }
+    setSource(nextSource);
+  };
 
   return (
     <div className="cjs-source-switcher">
@@ -161,7 +170,7 @@ function SourceSwitcher() {
       <SegmentedControl<SourceId>
         ariaLabel="Data source"
         value={source}
-        onChange={setSource}
+        onChange={changeSource}
         options={sourceOptions.map((option) => ({
           accessibleLabel: option.label,
           label: option.shortLabel,

@@ -10,6 +10,7 @@ import {
   type PlayerActivitySummary,
   type PlayerLeaderboard,
   type PlayerLeaderboardPosition,
+  type PlayerJumpScores,
   type PlayerPerformanceStats,
   type PlayerRankInfo,
   type PlayerRouteCompletion,
@@ -167,6 +168,33 @@ export function normalizePlayerPositions(
       last_seen: optionalString(object, "last_seen", path),
     };
   });
+}
+
+export function normalizePlayerJumpScores(value: unknown, path: string): PlayerJumpScores {
+  const object = record(value, path, "$response");
+  return {
+    player_id: requiredNumber(object, "player_id", path, "$response"),
+    player_name: requiredString(object, "player_name", path, "$response"),
+    rank: requiredNumber(object, "rank", path, "$response"),
+    rating: requiredNumber(object, "rating", path, "$response"),
+    score: requiredNumber(object, "score", path, "$response"),
+    country: optionalString(object, "country", path),
+    country_code: optionalString(object, "country_code", path),
+    region: optionalString(object, "region", path),
+    last_seen: optionalString(object, "last_seen", path),
+    top_list: optionalNumberRecord(object, "top_list", path) ?? {},
+    map_scores: array(object.map_scores, path, "$response.map_scores").map((entry, index) => {
+      const at = `$response.map_scores[${index}]`;
+      const score = record(entry, path, at);
+      return {
+        map_id: requiredNumber(score, "map_id", path, at),
+        map_name: requiredString(score, "map_name", path, at),
+        score: requiredNumber(score, "score", path, at),
+        difficulty: requiredNumber(score, "difficulty", path, at),
+        rank: requiredNumber(score, "rank", path, at),
+      };
+    }),
+  };
 }
 
 export function normalizePlayerRoutes(value: unknown, path: string): PlayerRouteCompletion[] {

@@ -1,12 +1,16 @@
-import { VisuallyHidden } from "../../components/ui";
-import { parseCodName } from "./playerDiscovery";
+import { parseCodName } from "../../lib/codName";
 
-export function CodPlayerName({ value }: { value: string }) {
+export interface CodPlayerNameProps {
+  readonly className?: string;
+  readonly value: string;
+}
+
+export function CodPlayerName({ className, value }: CodPlayerNameProps) {
   const parsed = parseCodName(value);
+  const classes = ["cjs-player-name", className].filter(Boolean).join(" ");
 
   return (
-    <span className="cjs-player-name">
-      <VisuallyHidden>{parsed.plainText}</VisuallyHidden>
+    <span className={classes} role="group" aria-label={parsed.plainText}>
       <span aria-hidden="true">
         {parsed.segments.map((segment, index) => (
           <span

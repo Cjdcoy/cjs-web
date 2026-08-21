@@ -10,14 +10,17 @@ export interface ServerPlayerViewModel {
   readonly ping: number | null;
 }
 
+export const SERVER_GAMES = ["cod2", "cod4"] as const;
+export type ServerGame = (typeof SERVER_GAMES)[number];
+
 export interface ServerViewModel {
   readonly connectionAddress: string | null;
   readonly domain: string;
+  readonly game: ServerGame;
   readonly id: string;
   readonly ip: string;
   readonly mapId: number | null;
   readonly mapName: string;
-  readonly mode: string;
   readonly online: boolean;
   readonly playerCount: number;
   readonly players: readonly ServerPlayerViewModel[] | null;
@@ -62,8 +65,11 @@ export function normalizeServerDashboard(
 export function filterServers(
   servers: readonly ServerViewModel[],
   populatedOnly: boolean,
+  game: ServerGame = "cod2",
 ): readonly ServerViewModel[] {
-  return populatedOnly ? servers.filter((server) => server.playerCount > 0) : servers;
+  return servers.filter(
+    (server) => server.game === game && (!populatedOnly || server.playerCount > 0),
+  );
 }
 
 export function formatUpdatedTime(timestamp: number, now = Date.now()): string {
@@ -92,17 +98,17 @@ function normalizeServer(value: unknown, index: number): ServerViewModel | null 
   const players = normalizePlayers(server.players);
   const playerCount = nonNegativeInteger(server.player_count) ?? players?.length ?? 0;
   const mapId = nonNegativeInteger(server.mapid);
-  const mode = displayText(server.game_type);
+  const game = normalizeServerGame(server.game_type);
   const host = validHost(domain) ?? validHost(ip);
 
   return {
     connectionAddress: host && port ? `${host}:${port}` : null,
     domain: domain || ip || "Unnamed server",
-    id: `${domain || ip || "server"}:${port ?? "unknown"}:${mapId ?? (mapName || "map")}:${index}`,
+    game,
+    id: `${game}:${domain || ip || "server"}:${port ?? "unknown"}:${mapId ?? (mapName || "map")}:${index}`,
     ip,
     mapId,
     mapName: mapName || "Map unavailable",
-    mode: mode ? titleCase(mode) : "Mode unavailable",
     online: server.online === true,
     playerCount,
     players,
@@ -118,7 +124,7 @@ function normalizePlayers(value: unknown): readonly ServerPlayerViewModel[] | nu
     const player = asRecord(entry);
     if (!player) return [];
 
-    const name = cleanPlayerName(displayText(player.playername));
+    const name = displayText(player.playername);
     return [
       {
         id: nonNegativeInteger(player.playerid),
@@ -169,10 +175,6 @@ function validHost(value: string): string | null {
     : null;
 }
 
-function cleanPlayerName(value: string): string {
-  return value.replace(/\^./g, "").trim();
-}
-
-function titleCase(value: string): string {
-  return value.replace(/[_-]+/g, " ").replace(/\b\w/g, (character) => character.toUpperCase());
+function normalizeServerGame(value: unknown): ServerGame {
+  return displayText(value).toLocaleLowerCase() === "cod4" ? "cod4" : "cod2";
 }

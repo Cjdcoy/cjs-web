@@ -30,8 +30,8 @@ describe("server dashboard normalizer", () => {
     });
     expect(dashboard.servers[0]).toMatchObject({
       connectionAddress: "cod2.example.invalid:28960",
+      game: "cod2",
       mapName: "mp_training",
-      mode: "Classic Jump",
       playerCount: 0,
       players: null,
     });
@@ -63,11 +63,11 @@ describe("server dashboard normalizer", () => {
     expect(dashboard.onlineServers).toBe(0);
     expect(dashboard.servers[0]).toMatchObject({
       connectionAddress: null,
+      game: "cod2",
       mapId: null,
-      mode: "Mode unavailable",
       online: false,
       playerCount: 1,
-      players: [{ id: 7, name: "Runner", ping: 38 }],
+      players: [{ id: 7, name: "^2Runner", ping: 38 }],
       port: null,
     });
   });
@@ -81,14 +81,18 @@ describe("server dashboard normalizer", () => {
   it("filters only servers that currently report players", () => {
     const dashboard = normalizeServerDashboard({
       servers: [
-        { domain: "empty.invalid", map: "mp_empty", player_count: 0 },
-        { domain: "busy.invalid", map: "mp_busy", player_count: 3 },
+        { domain: "empty.invalid", map: "mp_empty", player_count: 0, game_type: "COD2" },
+        { domain: "busy.invalid", map: "mp_busy", player_count: 3, game_type: "COD2" },
+        { domain: "cod4.invalid", map: "mp_cod4", player_count: 2, game_type: "COD4" },
       ],
     });
 
     expect(filterServers(dashboard.servers, false)).toHaveLength(2);
     expect(filterServers(dashboard.servers, true).map((server) => server.domain)).toEqual([
       "busy.invalid",
+    ]);
+    expect(filterServers(dashboard.servers, false, "cod4").map((server) => server.domain)).toEqual([
+      "cod4.invalid",
     ]);
   });
 });

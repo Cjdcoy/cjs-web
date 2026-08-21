@@ -21,7 +21,7 @@ describe("createPlayerProfileIdentity", () => {
       positions: [position({ player_name: "Position name" })],
       rank,
       routes: [route({ player_name: "Route name" })],
-      tops: [topRun({ playername: "Top name" })],
+      scores: null,
     });
 
     expect(identity).toEqual({
@@ -41,7 +41,7 @@ describe("createPlayerProfileIdentity", () => {
       positions: [],
       rank: null,
       routes: [],
-      tops: [],
+      scores: null,
     });
 
     expect(identity.name).toBe("Player #42");

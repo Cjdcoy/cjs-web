@@ -3,9 +3,9 @@ import { readQueryState } from "../../lib/routing";
 import {
   canonicalizeLeaderboardSearch,
   createLeaderboardRows,
+  createTopPlaceDistribution,
   filterLeaderboardRows,
   leaderboardQuerySchema,
-  paginateLeaderboardRows,
   sortLeaderboardRows,
   type LeaderboardQueryState,
 } from "./leaderboardModel";
@@ -23,13 +23,13 @@ describe("leaderboard query normalization", () => {
       name: "removes FPS from map completion boards",
       search: "?board=howmany&fps=333&page=2",
       source: "jh" as const,
-      expectedSearch: "?board=howmany&page=2",
+      expectedSearch: "?board=howmany",
     },
     {
       name: "keeps supported J4L rank XP controls",
       search: "?source=j4l&board=rank-xp&fps=76&limit=50&page=3&sort=value&order=desc",
       source: "j4l" as const,
-      expectedSearch: "?source=j4l&board=rank-xp&limit=50&page=3&sort=value&order=desc",
+      expectedSearch: "?source=j4l&board=rank-xp&sort=value&order=desc",
     },
     {
       name: "trims search input and drops prototype-only controls",
@@ -43,7 +43,7 @@ describe("leaderboard query normalization", () => {
 
   it("round-trips every supported query value", () => {
     const search = canonicalizeLeaderboardSearch(
-      "?source=j4l&board=jump-skill&fps=333&limit=100&page=8&query=Runner&sort=player&order=desc",
+      "?source=j4l&board=jump-skill&fps=333&query=Runner&sort=player&order=desc",
       "j4l",
     );
     const state = readQueryState(search, leaderboardQuerySchema);
@@ -51,9 +51,7 @@ describe("leaderboard query normalization", () => {
     expect(state).toEqual<LeaderboardQueryState>({
       board: "jump-skill",
       fps: "333",
-      limit: "100",
       order: "desc",
-      page: 8,
       query: "Runner",
       sort: "player",
     });
@@ -95,6 +93,18 @@ describe("leaderboard view transformations", () => {
     expect(filterLeaderboardRows(rows, "ALP")).toMatchObject([{ playerName: "alpha", rank: 2 }]);
   });
 
+  it("filters and sorts names by their visible text instead of caret controls", () => {
+    const coloredRows = [
+      { ...rows[0], playerName: "^2Zulu" },
+      { ...rows[1], playerName: "^1alpha" },
+    ];
+
+    expect(filterLeaderboardRows(coloredRows, "zulu")).toMatchObject([{ playerName: "^2Zulu" }]);
+    expect(sortLeaderboardRows(coloredRows, "player", "asc").map((row) => row.playerId)).toEqual([
+      2, 1,
+    ]);
+  });
+
   it("sorts presentation values stably and keeps missing metrics last", () => {
     expect(sortLeaderboardRows(rows, "value", "desc").map(({ playerName }) => playerName)).toEqual([
       "alpha",
@@ -108,21 +118,18 @@ describe("leaderboard view transformations", () => {
     ]);
   });
 
-  it("clamps invalid and out-of-range pages predictably", () => {
-    expect(paginateLeaderboardRows(rows, 99, 2)).toMatchObject({
-      page: 2,
-      pageCount: 2,
-      firstResult: 3,
-      lastResult: 3,
-      total: 3,
+  it("normalizes current and legacy top-list keys into positions 1 through 10", () => {
+    expect(createTopPlaceDistribution({ "1": 12, "10": 2 })).toEqual(
+      Array.from({ length: 10 }, (_, index) => ({
+        place: index + 1,
+        count: index === 0 ? 12 : index === 9 ? 2 : 0,
+      })),
+    );
+    expect(createTopPlaceDistribution({ top1: 4, top10: 1 })?.at(0)).toEqual({
+      place: 1,
+      count: 4,
     });
-    expect(paginateLeaderboardRows([], 99, 25)).toEqual({
-      page: 1,
-      pageCount: 1,
-      rows: [],
-      total: 0,
-      firstResult: 0,
-      lastResult: 0,
-    });
+    expect(createTopPlaceDistribution({ unrelated: 3 })).toBeNull();
+    expect(createTopPlaceDistribution(undefined)).toBeNull();
   });
 });

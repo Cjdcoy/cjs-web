@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   Card,
+  CodPlayerName,
   EmptyState,
   IconButton,
   Link,
@@ -11,6 +12,7 @@ import {
   SegmentedControl,
   VisuallyHidden,
 } from "../../components/ui";
+import { stripCodColorCodes } from "../../lib/codName";
 import {
   defineQuerySchema,
   enumQueryParam,
@@ -264,6 +266,8 @@ function FavoritePlayers({
             href={playerDetailPath(entry.id, entry.source)}
             icon={<UserRound aria-hidden="true" size={24} />}
             name={playerName(entry)}
+            renderedName={<CodPlayerName value={playerRawName(entry)} />}
+            linkVariant="player"
             onRemove={(trigger) => onRemove(entry, trigger)}
             source={entry.source}
             snapshotAvailable={entry.snapshot !== null}
@@ -281,6 +285,8 @@ function FavoriteCard({
   icon,
   name,
   onRemove,
+  renderedName,
+  linkVariant = "standalone",
   snapshotAvailable,
   source,
 }: {
@@ -290,6 +296,8 @@ function FavoriteCard({
   icon: ReactNode;
   name: string;
   onRemove: (trigger: HTMLButtonElement) => void;
+  renderedName?: ReactNode;
+  linkVariant?: "player" | "standalone";
   snapshotAvailable: boolean;
   source: "jh" | "j4l";
 }) {
@@ -306,8 +314,8 @@ function FavoriteCard({
             {snapshotAvailable ? "Saved snapshot" : "Details unavailable"}
           </Badge>
         </div>
-        <Link id={titleId} href={href} variant="standalone">
-          {name}
+        <Link id={titleId} href={href} variant={linkVariant}>
+          {renderedName ?? name}
         </Link>
         <p>{details}</p>
       </div>
@@ -328,8 +336,11 @@ function mapName(entry: MapFavorite): string {
 }
 
 function playerName(entry: PlayerFavorite): string {
-  const name = (entry.snapshot?.name ?? "").replace(/\^./g, "").trim();
-  return name || `Player #${entry.id}`;
+  return stripCodColorCodes(playerRawName(entry));
+}
+
+function playerRawName(entry: PlayerFavorite): string {
+  return entry.snapshot?.name?.trim() || `Player #${entry.id}`;
 }
 
 function formatCount(value: number | null): string {

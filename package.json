@@ -29,6 +29,7 @@
     "smoke:production": "node scripts/smoke-production.mjs"
   },
   "dependencies": {
+    "circle-flags": "^2.8.3",
     "lucide-react": "^1.27.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

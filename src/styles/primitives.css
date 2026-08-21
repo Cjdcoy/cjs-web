@@ -1,3 +1,43 @@
+.cjs-player-name__segment[data-cod-color="0"] {
+  color: var(--cjs-color-cod-0);
+}
+
+.cjs-player-name__segment[data-cod-color="1"] {
+  color: var(--cjs-color-cod-1);
+}
+
+.cjs-player-name__segment[data-cod-color="2"] {
+  color: var(--cjs-color-cod-2);
+}
+
+.cjs-player-name__segment[data-cod-color="3"] {
+  color: var(--cjs-color-cod-3);
+}
+
+.cjs-player-name__segment[data-cod-color="4"] {
+  color: var(--cjs-color-cod-4);
+}
+
+.cjs-player-name__segment[data-cod-color="5"] {
+  color: var(--cjs-color-cod-5);
+}
+
+.cjs-player-name__segment[data-cod-color="6"] {
+  color: var(--cjs-color-cod-6);
+}
+
+.cjs-player-name__segment[data-cod-color="7"] {
+  color: var(--cjs-color-cod-7);
+}
+
+.cjs-player-name__segment[data-cod-color="8"] {
+  color: var(--cjs-color-cod-8);
+}
+
+.cjs-player-name__segment[data-cod-color="9"] {
+  color: var(--cjs-color-cod-9);
+}
+
 .cjs-button,
 .cjs-icon-button,
 .cjs-segmented-control__option,
@@ -134,6 +174,16 @@
 
 .cjs-link[data-variant="muted"] {
   color: var(--cjs-color-text-muted);
+}
+
+.cjs-link[data-variant="player"] {
+  color: var(--cjs-color-text);
+  text-decoration: none;
+}
+
+.cjs-link[data-variant="player"]:hover {
+  background: var(--cjs-color-panel-hover);
+  color: var(--cjs-color-text);
 }
 
 .cjs-link[data-variant="standalone"] {
@@ -711,6 +761,45 @@
   .cjs-table__empty::before {
     content: none;
   }
+}
+
+.cjs-country-flag {
+  display: inline-grid;
+  width: var(--cjs-control-height-sm);
+  height: var(--cjs-control-height-sm);
+  flex: none;
+  overflow: hidden;
+  place-items: center;
+  border-radius: var(--cjs-radius-pill);
+  color: var(--cjs-color-information);
+  line-height: 1;
+}
+
+.cjs-country-flag[data-size="small"] {
+  width: var(--cjs-space-6);
+  height: var(--cjs-space-6);
+}
+
+.cjs-country-flag[data-size="large"] {
+  width: var(--cjs-control-height-md);
+  height: var(--cjs-control-height-md);
+}
+
+.cjs-country-flag img,
+.cjs-country-flag svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cjs-country-flag img {
+  border-radius: inherit;
+  object-fit: cover;
+}
+
+.cjs-country-flag[data-fallback="true"] svg {
+  width: 70%;
+  height: 70%;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -17,6 +17,9 @@
   --cjs-color-accent: #61d69d;
   --cjs-color-accent-strong: #98edc3;
   --cjs-color-accent-secondary: #d4b267;
+  --cjs-color-podium-gold: #ffc107;
+  --cjs-color-podium-silver: #c0c0c0;
+  --cjs-color-podium-bronze: #cd7f32;
   --cjs-color-danger: #ef8178;
   --cjs-color-information: #8fb8e8;
   --cjs-color-on-accent: #07130d;
@@ -28,6 +31,16 @@
   --cjs-color-information-surface: rgb(143 184 232 / 0.13);
   --cjs-color-selection: rgb(97 214 157 / 0.28);
   --cjs-color-backdrop: rgb(0 0 0 / 0.68);
+  --cjs-color-cod-0: #000;
+  --cjs-color-cod-1: #da0120;
+  --cjs-color-cod-2: #00b906;
+  --cjs-color-cod-3: #e8ff19;
+  --cjs-color-cod-4: #170bdb;
+  --cjs-color-cod-5: #23c2c6;
+  --cjs-color-cod-6: #e201db;
+  --cjs-color-cod-7: #eee;
+  --cjs-color-cod-8: #8080fe;
+  --cjs-color-cod-9: #757575;
 
   /* Type */
   --cjs-font-sans:

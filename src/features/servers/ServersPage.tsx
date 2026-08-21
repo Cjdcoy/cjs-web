@@ -1,29 +1,28 @@
-import {
-  Check,
-  Clipboard,
-  Clock3,
-  Grid2X2,
-  List,
-  MapPin,
-  Radio,
-  RefreshCw,
-  Server as ServerIcon,
-  Users,
-} from "lucide-react";
+import { Clipboard, Grid2X2, List, MapPin, RefreshCw } from "lucide-react";
 import { useId, useMemo, useState } from "react";
-import { Badge, Button, Card, EmptyState, ErrorState, SegmentedControl } from "../../components/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CodPlayerName,
+  CountryFlag,
+  EmptyState,
+  ErrorState,
+  SegmentedControl,
+} from "../../components/ui";
 import {
   booleanQueryParam,
   defineQuerySchema,
   enumQueryParam,
   mapDetailPath,
   useQueryState,
-  useSourceContext,
   type SourceId,
 } from "../../lib/routing";
 import {
+  SERVER_GAMES,
   filterServers,
   formatUpdatedTime,
+  type ServerGame,
   type ServerPlayerViewModel,
   type ServerViewModel,
 } from "./serverModel";
@@ -33,6 +32,7 @@ import "./servers.css";
 type ServerView = "grid" | "list";
 
 const serverQuerySchema = defineQuerySchema({
+  game: enumQueryParam(SERVER_GAMES, "cod2"),
   populated: booleanQueryParam(false),
   view: enumQueryParam(["grid", "list"] as const, "grid"),
 });
@@ -42,6 +42,22 @@ const sourceNames: Readonly<Record<SourceId, string>> = {
   jh: "JumpersHeaven",
 };
 
+const serverSources = ["j4l", "jh"] as const satisfies readonly SourceId[];
+
+const serverCountries: Readonly<Record<string, { code: string; name: string }>> = {
+  au: { code: "AU", name: "Australia" },
+  de: { code: "DE", name: "Germany" },
+  fr: { code: "FR", name: "France" },
+  gb: { code: "GB", name: "United Kingdom" },
+  hk: { code: "HK", name: "Hong Kong" },
+  hu: { code: "HU", name: "Hungary" },
+  ro: { code: "RO", name: "Romania" },
+  ru: { code: "RU", name: "Russia" },
+  uae: { code: "AE", name: "United Arab Emirates" },
+  uk: { code: "GB", name: "United Kingdom" },
+  us: { code: "US", name: "United States" },
+};
+
 export interface ServersPageProps {
   readonly loadServers?: ServerLoader;
   readonly pollIntervalMs?: number;
@@ -49,40 +65,74 @@ export interface ServersPageProps {
 }
 
 export function ServersPage({ loadServers, pollIntervalMs, staleAfterMs }: ServersPageProps = {}) {
-  const { source } = useSourceContext();
   const [filters, setFilters] = useQueryState(serverQuerySchema);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const { data, error, initialLoading, lastUpdatedAt, refresh, refreshing, stale } = useLiveServers(
-    source,
-    {
-      autoRefresh,
-      loadServers,
-      pollIntervalMs,
-      staleAfterMs,
-    },
+  const j4lState = useLiveServers("j4l", {
+    autoRefresh,
+    loadServers,
+    pollIntervalMs,
+    staleAfterMs,
+  });
+  const jhState = useLiveServers("jh", {
+    autoRefresh,
+    loadServers,
+    pollIntervalMs,
+    staleAfterMs,
+  });
+  const j4lServers = useMemo(
+    () => filterServers(j4lState.data?.servers ?? [], filters.populated, filters.game),
+    [filters.game, filters.populated, j4lState.data?.servers],
   );
-  const servers = useMemo(
-    () => filterServers(data?.servers ?? [], filters.populated),
-    [data?.servers, filters.populated],
+  const jhServers = useMemo(
+    () => filterServers(jhState.data?.servers ?? [], filters.populated, filters.game),
+    [filters.game, filters.populated, jhState.data?.servers],
   );
+  const sourceGroups = [
+    { source: serverSources[0], state: j4lState, servers: j4lServers },
+    { source: serverSources[1], state: jhState, servers: jhServers },
+  ] as const;
+  const visibleSourceGroups: ReadonlyArray<(typeof sourceGroups)[number]> =
+    filters.game === "cod4" ? sourceGroups.filter(({ source }) => source === "jh") : sourceGroups;
+  const states = sourceGroups.map(({ state }) => state);
+  const dashboards = states.flatMap(({ data }) => (data ? [data] : []));
+  const hasData = dashboards.length > 0;
+  const initialLoading = !hasData && states.some((state) => state.initialLoading);
+  const failed = !hasData && states.every((state) => !state.initialLoading && state.error !== null);
+  const refreshing = states.some((state) => state.refreshing);
+  const stale = states.some((state) => state.stale);
+  const updatedTimes = states.flatMap(({ lastUpdatedAt }) =>
+    lastUpdatedAt === null ? [] : [lastUpdatedAt],
+  );
+  const lastUpdatedAt = updatedTimes.length > 0 ? Math.min(...updatedTimes) : null;
+  const matchingServers = visibleSourceGroups.reduce(
+    (total, group) => total + group.servers.length,
+    0,
+  );
+  const reportingServers = dashboards.reduce((total, data) => total + data.servers.length, 0);
+  const omittedServerCount = dashboards.reduce((total, data) => total + data.omittedServerCount, 0);
+  const failedDescription = sourceGroups
+    .flatMap(({ source, state }) => (state.error ? [`${sourceNames[source]}: ${state.error}`] : []))
+    .join(" ");
+  const refresh = () => {
+    j4lState.refresh();
+    jhState.refresh();
+  };
 
   return (
     <div className="servers-page">
-      <header className="servers-page__hero">
-        <div>
-          <p className="servers-page__eyebrow">
-            <Radio size={16} aria-hidden="true" /> Live tracker
-          </p>
-          <h1>Live servers</h1>
-          <p>Current server, map, and player activity from the {sourceNames[source]} tracker.</p>
-        </div>
-        <Badge tone="success" icon={<span className="servers-page__live-dot" />}>
-          COD2 live data
-        </Badge>
-      </header>
+      <h1 className="cjs-visually-hidden">Live servers</h1>
 
       <section className="servers-toolbar" aria-label="Server display controls">
         <div className="servers-toolbar__toggles">
+          <SegmentedControl<ServerGame>
+            ariaLabel="Game version"
+            value={filters.game}
+            onChange={(game) => setFilters({ game })}
+            options={SERVER_GAMES.map((game) => ({
+              label: game.toUpperCase(),
+              value: game,
+            }))}
+          />
           <label className="servers-toggle">
             <input
               type="checkbox"
@@ -121,6 +171,7 @@ export function ServersPage({ loadServers, pollIntervalMs, staleAfterMs }: Serve
           />
           <Button
             variant="secondary"
+            size="small"
             onClick={refresh}
             isLoading={refreshing}
             loadingLabel="Refreshing"
@@ -133,91 +184,152 @@ export function ServersPage({ loadServers, pollIntervalMs, staleAfterMs }: Serve
       </section>
 
       <ServerRequestStatus
-        failed={!data && !initialLoading && error !== null}
+        failed={failed}
         initialLoading={initialLoading}
         refreshing={refreshing}
         stale={stale}
         lastUpdatedAt={lastUpdatedAt}
       />
 
-      {initialLoading && !data && <ServerSkeleton />}
+      {initialLoading && <ServerSkeleton />}
 
-      {!data && !initialLoading && error && (
+      {failed && (
         <ErrorState
           className="servers-page__state"
           title="Live servers are unavailable"
-          description={error}
-          retryLabel="Retry server feed"
+          description={failedDescription}
+          retryLabel="Retry server feeds"
           onRetry={refresh}
         />
       )}
 
-      {data && (
+      {hasData && (
         <>
-          <ServerSummary
-            matchingServers={servers.length}
-            onlineServers={data.onlineServers}
-            totalPlayers={data.totalPlayers}
-          />
-
-          {error && (
-            <div className="servers-page__notice" data-tone="warning" role="alert">
-              <div>
-                <strong>Refresh failed.</strong>
-                <span>{error} Showing the last successful update.</span>
-              </div>
-              <Button variant="ghost" size="small" onClick={refresh}>
-                Try again
-              </Button>
-            </div>
-          )}
-
-          {data.omittedServerCount > 0 && (
+          {omittedServerCount > 0 && (
             <div className="servers-page__notice" data-tone="warning" role="status">
               <span>
-                {data.omittedServerCount === 1
+                {omittedServerCount === 1
                   ? "One incomplete server entry could not be shown."
-                  : `${data.omittedServerCount} incomplete server entries could not be shown.`}
+                  : `${omittedServerCount} incomplete server entries could not be shown.`}
               </span>
             </div>
           )}
 
-          {data.servers.length === 0 ? (
+          {reportingServers === 0 ? (
             <EmptyState
               className="servers-page__state"
               title="No servers are reporting"
-              description={`${sourceNames[source]} is not reporting any live COD2 servers right now.`}
+              description="Neither tracker is reporting any live servers right now."
               action={
                 <Button variant="secondary" onClick={refresh}>
-                  Refresh server feed
+                  Refresh server feeds
                 </Button>
               }
             />
-          ) : servers.length === 0 ? (
+          ) : matchingServers === 0 ? (
             <EmptyState
               className="servers-page__state"
-              title="No populated servers"
-              description="No players are connected to the reporting servers. Show all servers to keep browsing."
+              title={
+                filters.populated
+                  ? `No populated ${filters.game.toUpperCase()} servers`
+                  : `No ${filters.game.toUpperCase()} servers`
+              }
+              description={
+                filters.populated
+                  ? "No players are connected to matching servers. Show all servers to keep browsing."
+                  : `No ${filters.game.toUpperCase()} servers are currently reporting.`
+              }
               action={
-                <Button variant="secondary" onClick={() => setFilters({ populated: false })}>
-                  Show all servers
-                </Button>
+                filters.populated ? (
+                  <Button variant="secondary" onClick={() => setFilters({ populated: false })}>
+                    Show all servers
+                  </Button>
+                ) : (
+                  <Button variant="secondary" onClick={() => setFilters({ game: "cod2" })}>
+                    Show COD2 servers
+                  </Button>
+                )
               }
             />
           ) : (
-            <section
-              className="servers-grid"
-              data-view={filters.view}
-              aria-label={`${servers.length} matching live servers`}
-            >
-              {servers.map((server) => (
-                <ServerCard server={server} source={source} key={server.id} />
+            <div className="server-source-groups">
+              {visibleSourceGroups.map((group) => (
+                <ServerSourceGroup
+                  key={group.source}
+                  source={group.source}
+                  state={group.state}
+                  servers={group.servers}
+                  view={filters.view}
+                />
               ))}
-            </section>
+            </div>
           )}
         </>
       )}
     </div>
+  );
+}
+
+function ServerSourceGroup({
+  source,
+  state,
+  servers,
+  view,
+}: {
+  source: SourceId;
+  state: ReturnType<typeof useLiveServers>;
+  servers: readonly ServerViewModel[];
+  view: ServerView;
+}) {
+  return (
+    <section className="server-source-group" aria-labelledby={`servers-${source}`}>
+      <header className="server-source-group__header">
+        <div>
+          <Badge tone={source === "j4l" ? "success" : "neutral"}>{source.toUpperCase()}</Badge>
+          <h2 id={`servers-${source}`}>{sourceNames[source]}</h2>
+        </div>
+        {state.data && (
+          <span>
+            {servers.length} {servers.length === 1 ? "server" : "servers"}
+          </span>
+        )}
+      </header>
+
+      {!state.data && state.initialLoading && <ServerSkeleton count={2} />}
+
+      {!state.data && !state.initialLoading && state.error && (
+        <ErrorState
+          title={`${sourceNames[source]} is unavailable`}
+          description={state.error}
+          retryLabel={`Retry ${sourceNames[source]}`}
+          onRetry={state.refresh}
+        />
+      )}
+
+      {state.data && state.error && (
+        <div className="servers-page__notice" data-tone="warning" role="alert">
+          <div>
+            <strong>{sourceNames[source]} refresh failed.</strong>
+            <span>{state.error} Showing the last successful update.</span>
+          </div>
+          <Button variant="ghost" size="small" onClick={state.refresh}>
+            Try again
+          </Button>
+        </div>
+      )}
+
+      {state.data && servers.length > 0 && (
+        <div
+          className="servers-grid"
+          data-view={view}
+          aria-label={`${sourceNames[source]}: ${servers.length} matching live servers`}
+        >
+          {servers.map((server) => (
+            <ServerCard server={server} source={source} key={server.id} />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
@@ -250,52 +362,16 @@ function ServerRequestStatus({
       role="status"
       aria-live="polite"
     >
-      <Clock3 size={15} aria-hidden="true" />
       <span>{message}</span>
-      {lastUpdatedAt !== null && (
-        <time dateTime={new Date(lastUpdatedAt).toISOString()}>
-          {new Intl.DateTimeFormat(undefined, {
-            dateStyle: "medium",
-            timeStyle: "medium",
-          }).format(lastUpdatedAt)}
-        </time>
-      )}
     </p>
   );
 }
 
-function ServerSummary({
-  matchingServers,
-  onlineServers,
-  totalPlayers,
-}: {
-  matchingServers: number;
-  onlineServers: number;
-  totalPlayers: number;
-}) {
-  return (
-    <dl className="servers-summary" aria-label="Live server summary">
-      <div>
-        <dt>Online servers</dt>
-        <dd>{onlineServers.toLocaleString()}</dd>
-      </div>
-      <div>
-        <dt>Connected players</dt>
-        <dd>{totalPlayers.toLocaleString()}</dd>
-      </div>
-      <div>
-        <dt>Matching filters</dt>
-        <dd>{matchingServers.toLocaleString()}</dd>
-      </div>
-    </dl>
-  );
-}
-
-function ServerSkeleton() {
+function ServerSkeleton({ count = 4 }: { count?: number }) {
   return (
     <div className="servers-grid" data-view="grid" role="status" aria-live="polite">
       <span className="cjs-visually-hidden">Loading live servers</span>
-      {Array.from({ length: 4 }, (_, index) => (
+      {Array.from({ length: count }, (_, index) => (
         <div className="servers-card-skeleton cjs-skeleton" data-variant="card" key={index} />
       ))}
     </div>
@@ -305,7 +381,10 @@ function ServerSkeleton() {
 function ServerCard({ server, source }: { server: ServerViewModel; source: SourceId }) {
   const headingId = useId();
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
+  const [imageFailed, setImageFailed] = useState(false);
   const visiblePlayers = server.players?.slice(0, 5) ?? [];
+  const country = getServerCountry(server.domain);
+  const imagePath = getMapImagePath(server.mapName);
 
   const copyAddress = async () => {
     if (!server.connectionAddress) return;
@@ -321,72 +400,80 @@ function ServerCard({ server, source }: { server: ServerViewModel; source: Sourc
   return (
     <Card
       className="server-card"
+      padding="none"
       variant={server.playerCount > 0 ? "strong" : "default"}
       aria-labelledby={headingId}
     >
-      <header className="server-card__header">
-        <span className="server-card__icon" aria-hidden="true">
-          <ServerIcon size={20} />
-        </span>
-        <div>
-          <h2 id={headingId}>{server.domain}</h2>
-          {server.connectionAddress && <code>{server.connectionAddress}</code>}
-        </div>
-        <Badge tone={server.online ? "success" : "neutral"}>
-          {server.online ? "Online" : "Offline"}
-        </Badge>
-      </header>
+      <div className="server-card__visual">
+        {imagePath && !imageFailed && (
+          <img
+            className="server-card__visual-image"
+            src={imagePath}
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={() => setImageFailed(true)}
+          />
+        )}
+        <header className="server-card__header">
+          <CountryFlag
+            className="server-card__country"
+            code={country.code}
+            label={country.name}
+            size="large"
+          />
+          <h3 id={headingId}>{server.domain}</h3>
+          <Badge tone={server.online ? "success" : "neutral"}>
+            {server.online ? "Online" : "Offline"}
+          </Badge>
+        </header>
 
-      <dl className="server-card__facts">
-        <div>
-          <dt>
-            <MapPin size={16} aria-hidden="true" /> Map
-          </dt>
-          <dd>
-            {server.mapId !== null ? (
-              <a href={mapDetailPath(server.mapId, { source })}>{server.mapName}</a>
-            ) : (
-              server.mapName
-            )}
-          </dd>
+        <div className="server-card__map">
+          <span>
+            <MapPin size={15} aria-hidden="true" /> Current map
+          </span>
+          {server.mapId !== null && server.game === "cod2" ? (
+            <a href={mapDetailPath(server.mapId, { source })}>
+              <span>{server.mapName}</span>
+            </a>
+          ) : (
+            <strong>{server.mapName}</strong>
+          )}
         </div>
-        <div>
-          <dt>
-            <Radio size={16} aria-hidden="true" /> Mode
-          </dt>
-          <dd>{server.mode}</dd>
-        </div>
-        <div>
-          <dt>
-            <Users size={16} aria-hidden="true" /> Players
-          </dt>
-          <dd>{server.playerCount.toLocaleString()}</dd>
-        </div>
-      </dl>
+      </div>
 
-      <ServerRoster
-        players={visiblePlayers}
-        rosterKnown={server.players !== null}
-        totalPlayers={server.playerCount}
-      />
-
-      <footer className="server-card__footer">
+      <div className="server-card__body">
         {server.connectionAddress ? (
-          <Button variant="secondary" size="small" onClick={copyAddress}>
-            {copyState === "copied" ? (
-              <Check size={16} aria-hidden="true" />
-            ) : (
-              <Clipboard size={16} aria-hidden="true" />
-            )}
-            {copyState === "copied"
-              ? "Copied"
-              : copyState === "failed"
-                ? "Copy failed"
-                : "Copy address"}
-          </Button>
+          <div className="server-card__address">
+            <span>Server address</span>
+            <button
+              className="server-card__address-copy"
+              type="button"
+              aria-label={`Copy server address ${server.connectionAddress}`}
+              data-copy-state={copyState}
+              onClick={copyAddress}
+            >
+              <code>{server.connectionAddress}</code>
+              <small>
+                <Clipboard size={14} aria-hidden="true" />
+                {copyState === "copied"
+                  ? "Copied"
+                  : copyState === "failed"
+                    ? "Copy failed"
+                    : "Click to copy"}
+              </small>
+            </button>
+          </div>
         ) : (
           <span className="server-card__unavailable">Connection address unavailable</span>
         )}
+
+        <ServerRoster
+          players={visiblePlayers}
+          rosterKnown={server.players !== null}
+          totalPlayers={server.playerCount}
+        />
+
         <span className="cjs-visually-hidden" role="status" aria-live="polite">
           {copyState === "copied"
             ? `${server.connectionAddress} copied to clipboard.`
@@ -394,9 +481,21 @@ function ServerCard({ server, source }: { server: ServerViewModel; source: Sourc
               ? "The server address could not be copied."
               : ""}
         </span>
-      </footer>
+      </div>
     </Card>
   );
+}
+
+function getServerCountry(domain: string) {
+  const regionKey = domain.split(".")[0]?.toLowerCase() ?? "";
+  const country = serverCountries[regionKey];
+  if (!country) return { code: null, name: "Server region unavailable" };
+  return { code: country.code, name: country.name };
+}
+
+function getMapImagePath(mapName: string) {
+  if (mapName === "Map unavailable") return null;
+  return `/maps/cards/${encodeURIComponent(mapName)}.avif`;
 }
 
 function ServerRoster({
@@ -408,11 +507,8 @@ function ServerRoster({
   rosterKnown: boolean;
   totalPlayers: number;
 }) {
-  if (!rosterKnown) {
-    return <p className="server-card__roster-empty">Player list unavailable</p>;
-  }
-  if (players.length === 0) {
-    return <p className="server-card__roster-empty">No players connected</p>;
+  if (!rosterKnown || players.length === 0) {
+    return <p className="server-card__roster-empty">Server empty</p>;
   }
 
   return (
@@ -421,7 +517,7 @@ function ServerRoster({
       <ul>
         {players.map((player, index) => (
           <li key={`${player.id ?? player.name}:${index}`}>
-            <span>{player.name}</span>
+            <CodPlayerName value={player.name} />
             {player.ping !== null && <small>{player.ping} ms</small>}
           </li>
         ))}

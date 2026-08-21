@@ -2,6 +2,7 @@ import type {
   Fps,
   PlayerLeaderboard,
   PlayerLeaderboardPosition,
+  PlayerJumpScores,
   PlayerPerformanceStats,
   PlayerRankInfo,
   PlayerRouteCompletion,
@@ -11,9 +12,13 @@ import type {
 import { FPS_VALUES, PLAYER_LEADERBOARDS } from "../../lib/api";
 import { defineQuerySchema, enumQueryParam } from "../../lib/routing";
 
+export const PLAYER_PROFILE_VIEWS = ["overview", "runs", "routes"] as const;
+export type PlayerProfileView = (typeof PLAYER_PROFILE_VIEWS)[number];
+
 export const playerProfileQuerySchema = defineQuerySchema({
   board: enumQueryParam(PLAYER_LEADERBOARDS, "speed"),
   fps: enumQueryParam(FPS_VALUES, "125"),
+  view: enumQueryParam(PLAYER_PROFILE_VIEWS, "overview"),
 });
 
 export interface PlayerProfileIdentity {
@@ -30,7 +35,7 @@ export interface PlayerIdentityInputs {
   positions: readonly PlayerLeaderboardPosition[] | null;
   rank: PlayerRankInfo | null;
   routes: readonly PlayerRouteCompletion[] | null;
-  tops: readonly TopRun[] | null;
+  scores: PlayerJumpScores | null;
 }
 
 const boardLabels: Readonly<Record<PlayerLeaderboard, string>> = {
@@ -61,27 +66,26 @@ export function playerSourceLabel(source: Source): string {
 
 export function createPlayerProfileIdentity(
   playerId: number,
-  { performance, positions, rank, routes, tops }: PlayerIdentityInputs,
+  { performance, positions, rank, routes, scores }: PlayerIdentityInputs,
 ): PlayerProfileIdentity {
   const embeddedRank = rank ?? performance?.rank ?? null;
   const position = positions?.[0];
-  const top = tops?.[0];
   const route = routes?.[0];
   const name = firstText(
     embeddedRank?.player_name,
     position?.player_name,
-    top?.player_name,
-    top?.playername,
+    scores?.player_name,
     route?.player_name,
   );
 
   return {
-    country: firstText(embeddedRank?.country, position?.country) || null,
-    countryCode: firstText(embeddedRank?.country_code, position?.country_code) || null,
-    lastSeen: firstText(embeddedRank?.last_seen, position?.last_seen) || null,
+    country: firstText(embeddedRank?.country, position?.country, scores?.country) || null,
+    countryCode:
+      firstText(embeddedRank?.country_code, position?.country_code, scores?.country_code) || null,
+    lastSeen: firstText(embeddedRank?.last_seen, position?.last_seen, scores?.last_seen) || null,
     name: name || `Player #${playerId}`,
     playerId,
-    region: firstText(embeddedRank?.region, position?.region) || null,
+    region: firstText(embeddedRank?.region, position?.region, scores?.region) || null,
   };
 }
 

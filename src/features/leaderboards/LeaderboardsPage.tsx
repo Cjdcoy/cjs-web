@@ -1,31 +1,32 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, RefreshCw, Search, Trophy } from "lucide-react";
-import { useEffect, useMemo, type ReactNode } from "react";
+import { ArrowDown, ArrowUp, ArrowUpDown, Globe2, RefreshCw, Search, Trophy } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   Badge,
   Button,
+  CodPlayerName,
   EmptyState,
   ErrorState,
   Input,
   Link,
-  Pagination,
   Panel,
+  SegmentedControl,
   Select,
   SkeletonGroup,
 } from "../../components/ui";
+import { stripCodColorCodes } from "../../lib/codName";
 import { playerDetailPath } from "../../lib/routing";
 import { navigate, useBrowserLocation, useQueryState, useSourceContext } from "../../lib/routing";
 import {
   LEADERBOARD_BOARDS,
-  PAGE_SIZES,
   boardLabel,
   boardUsesFps,
   canonicalizeLeaderboardSearch,
   createLeaderboardRows,
+  createTopPlaceDistribution,
   filterLeaderboardRows,
   leaderboardQuerySchema,
   metricLabel,
   normalizeLeaderboardState,
-  paginateLeaderboardRows,
   sortLeaderboardRows,
   type LeaderboardBoard,
   type LeaderboardQueryState,
@@ -37,6 +38,26 @@ import { useLeaderboardData } from "./useLeaderboardData";
 import "./leaderboards.css";
 
 const fpsOptions = ["43", "76", "125", "250", "333", "0"] as const;
+const PLAYER_BATCH_SIZE = 25;
+const boardOptions = LEADERBOARD_BOARDS.map((board) => ({
+  value: board,
+  label:
+    board === "speed-skill"
+      ? "Speed"
+      : board === "jump-skill"
+        ? "Jump"
+        : board === "defrag-skill"
+          ? "Defrag"
+          : board === "surf-skill"
+            ? "Surf"
+            : board === "howmany"
+              ? "Completions"
+              : "Rank XP",
+}));
+const fpsFilterOptions = fpsOptions.map((fps) => ({
+  value: fps,
+  label: fps === "0" ? "Mix" : fps,
+}));
 const numberFormatter = new Intl.NumberFormat();
 const decimalFormatter = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 2,
@@ -57,26 +78,46 @@ export function LeaderboardsPage() {
     fps: state.fps,
     source,
   });
+  const [visiblePlayerCount, setVisiblePlayerCount] = useState(PLAYER_BATCH_SIZE);
+  const loadMoreRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (canonicalSearch === location.search) return;
     navigate(`${location.pathname}${canonicalSearch}${location.hash}`, { replace: true });
   }, [canonicalSearch, location.hash, location.pathname, location.search]);
 
-  const result = useMemo(() => {
+  const rankedRows = useMemo(() => {
     const rows = createLeaderboardRows(data ?? [], state.board);
     const filteredRows = filterLeaderboardRows(rows, state.query);
-    const sortedRows = sortLeaderboardRows(filteredRows, state.sort, state.order);
-    return paginateLeaderboardRows(sortedRows, state.page, Number(state.limit));
-  }, [data, state.board, state.limit, state.order, state.page, state.query, state.sort]);
+    return sortLeaderboardRows(filteredRows, state.sort, state.order);
+  }, [data, state.board, state.order, state.query, state.sort]);
+
+  const visibleRows = rankedRows.slice(0, visiblePlayerCount);
+  const remainingPlayerCount = Math.max(rankedRows.length - visibleRows.length, 0);
+  const hasMorePlayers = remainingPlayerCount > 0;
 
   useEffect(() => {
-    if (!data || state.page === result.page) return;
-    setQueryState({ page: result.page }, { replace: true });
-  }, [data, result.page, setQueryState, state.page]);
+    setVisiblePlayerCount(PLAYER_BATCH_SIZE);
+  }, [data, source, state.board, state.fps, state.order, state.query, state.sort]);
+
+  useEffect(() => {
+    const target = loadMoreRef.current;
+    if (!hasMorePlayers || !target || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((entry) => entry.isIntersecting)) return;
+        setVisiblePlayerCount((count) => Math.min(count + PLAYER_BATCH_SIZE, rankedRows.length));
+      },
+      { rootMargin: "320px 0px" },
+    );
+
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [hasMorePlayers, rankedRows.length]);
 
   const updateFilters = (update: Partial<LeaderboardQueryState>) => {
-    setQueryState({ ...update, page: 1 });
+    setQueryState(update);
   };
 
   const changeBoard = (board: LeaderboardBoard) => {
@@ -97,9 +138,7 @@ export function LeaderboardsPage() {
     setQueryState({
       board: "speed-skill",
       fps: "125",
-      limit: "25",
       order: "asc",
-      page: 1,
       query: "",
       sort: "rank",
     });
@@ -127,60 +166,50 @@ export function LeaderboardsPage() {
         variant="strong"
         aria-label="Leaderboard filters"
       >
-        <div className="cjs-leaderboards__filter-grid">
-          <Select
-            label="Board"
-            value={state.board}
-            onChange={(event) => changeBoard(event.target.value as LeaderboardBoard)}
-          >
-            {LEADERBOARD_BOARDS.map((board) => (
-              <option key={board} value={board} disabled={source === "jh" && board === "rank-xp"}>
-                {boardLabel(board)}
-                {board === "rank-xp" ? " · J4L only" : ""}
-              </option>
-            ))}
-          </Select>
+        <div className="cjs-leaderboards__primary-filters">
+          <div className="cjs-leaderboards__choice-group">
+            <h2>Board</h2>
+            <SegmentedControl
+              className="cjs-leaderboards__choice-control cjs-leaderboards__choice-control--boards"
+              ariaLabel="Board"
+              options={boardOptions.map((option) => ({
+                ...option,
+                disabled: source === "jh" && option.value === "rank-xp",
+                accessibleLabel:
+                  option.value === "rank-xp" ? `${option.label} · Jump4Life only` : option.label,
+              }))}
+              value={state.board}
+              onChange={changeBoard}
+            />
+          </div>
 
-          <Select
-            label="FPS"
-            helperText={
-              boardUsesFps(state.board)
-                ? "Mix represents records without a fixed FPS."
-                : "This board does not accept an FPS parameter."
-            }
-            value={state.fps}
-            disabled={!boardUsesFps(state.board)}
-            onChange={(event) => updateFilters({ fps: event.target.value as typeof state.fps })}
-          >
-            {fpsOptions.map((fps) => (
-              <option key={fps} value={fps}>
-                {fps === "0" ? "Mix" : fps}
-              </option>
-            ))}
-          </Select>
+          <div className="cjs-leaderboards__choice-group">
+            <div className="cjs-leaderboards__choice-heading">
+              <h2>FPS</h2>
+              <small>
+                {boardUsesFps(state.board) ? "Mix includes every FPS." : "Not used by this board."}
+              </small>
+            </div>
+            <SegmentedControl
+              className="cjs-leaderboards__choice-control cjs-leaderboards__choice-control--fps"
+              ariaLabel="FPS"
+              options={fpsFilterOptions}
+              value={state.fps}
+              disabled={!boardUsesFps(state.board)}
+              onChange={(fps) => updateFilters({ fps })}
+            />
+          </div>
+        </div>
 
+        <div className="cjs-leaderboards__utility-filters">
           <Input
             type="search"
             label="Find a player or country"
             leading={<Search size={17} />}
             placeholder="Player name, country, or region"
             value={state.query}
-            onChange={(event) =>
-              setQueryState({ page: 1, query: event.target.value }, { replace: true })
-            }
+            onChange={(event) => setQueryState({ query: event.target.value }, { replace: true })}
           />
-
-          <Select
-            label="Rows per page"
-            value={state.limit}
-            onChange={(event) => updateFilters({ limit: event.target.value as typeof state.limit })}
-          >
-            {PAGE_SIZES.map((limit) => (
-              <option key={limit} value={limit}>
-                {limit}
-              </option>
-            ))}
-          </Select>
         </div>
 
         <div className="cjs-leaderboards__filter-actions">
@@ -202,8 +231,8 @@ export function LeaderboardsPage() {
             <p aria-live="polite">
               {isInitialLoading
                 ? "Loading ranked players…"
-                : result.total
-                  ? `Showing ${result.firstResult}–${result.lastResult} of ${result.total} matching players.`
+                : rankedRows.length
+                  ? `Showing ${visibleRows.length} of ${rankedRows.length} matching players.`
                   : "No matching players to show."}
             </p>
           </div>
@@ -249,7 +278,7 @@ export function LeaderboardsPage() {
           />
         )}
 
-        {data && data.length > 0 && result.total === 0 && (
+        {data && data.length > 0 && rankedRows.length === 0 && (
           <EmptyState
             title="No players match"
             description="Try a broader player, country, or region search."
@@ -261,7 +290,7 @@ export function LeaderboardsPage() {
           />
         )}
 
-        {data && result.total > 0 && (
+        {data && rankedRows.length > 0 && (
           <>
             <div className="cjs-leaderboards__mobile-sort" aria-label="Leaderboard sorting">
               <Select
@@ -291,18 +320,26 @@ export function LeaderboardsPage() {
             <LeaderboardTable
               board={state.board}
               order={state.order}
-              rows={result.rows}
+              rows={visibleRows}
               sort={state.sort}
               source={source}
               onSort={changeSort}
             />
-            <Pagination
-              className="cjs-leaderboards__pagination"
-              page={result.page}
-              pageCount={result.pageCount}
-              onPageChange={(page) => setQueryState({ page })}
-              ariaLabel={`${boardLabel(state.board)} pages`}
-            />
+            {hasMorePlayers && (
+              <div className="cjs-leaderboards__load-more" ref={loadMoreRef}>
+                <Button
+                  variant="secondary"
+                  onClick={() =>
+                    setVisiblePlayerCount((count) =>
+                      Math.min(count + PLAYER_BATCH_SIZE, rankedRows.length),
+                    )
+                  }
+                >
+                  Load {Math.min(PLAYER_BATCH_SIZE, remainingPlayerCount)} more players
+                </Button>
+                <small>More players load automatically as you scroll.</small>
+              </div>
+            )}
           </>
         )}
       </section>
@@ -347,7 +384,6 @@ function LeaderboardTable({ board, onSort, order, rows, sort, source }: Leaderbo
               order={order}
               onSort={onSort}
             />
-            <th scope="col">Country</th>
             <SortableHeader
               label={valueLabel}
               sortKey="value"
@@ -356,12 +392,20 @@ function LeaderboardTable({ board, onSort, order, rows, sort, source }: Leaderbo
               onSort={onSort}
               align="end"
             />
-            <th scope="col">Details</th>
+            {board !== "rank-xp" && board !== "howmany" && (
+              <th scope="col" data-align="end">
+                Points
+              </th>
+            )}
+            <th scope="col">{board === "rank-xp" ? "Progress" : "Tops 1–10"}</th>
           </tr>
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.playerId} aria-label={`${row.playerName}, official rank ${row.rank}`}>
+            <tr
+              key={row.playerId}
+              aria-label={`${stripCodColorCodes(row.playerName)}, official rank ${row.rank}`}
+            >
               <td className="cjs-table__cell" data-label="Rank" data-priority="primary">
                 <span className="cjs-leaderboards__rank" data-podium={row.rank <= 3 || undefined}>
                   <span className="cjs-visually-hidden">Official rank </span>
@@ -369,16 +413,34 @@ function LeaderboardTable({ board, onSort, order, rows, sort, source }: Leaderbo
                 </span>
               </td>
               <td className="cjs-table__cell" data-label="Player" data-priority="primary">
-                <Link href={playerDetailPath(row.playerId, source)}>{row.playerName}</Link>
-              </td>
-              <td className="cjs-table__cell" data-label="Country">
-                <Country row={row} />
+                <span className="cjs-leaderboards__player">
+                  <CountryFlag row={row} />
+                  <Link href={playerDetailPath(row.playerId, source)} variant="player">
+                    <CodPlayerName value={row.playerName} />
+                  </Link>
+                </span>
               </td>
               <td className="cjs-table__cell" data-label={valueLabel} data-align="end">
                 <strong>{formatMetric(row, board)}</strong>
               </td>
-              <td className="cjs-table__cell" data-label="Details">
-                <RowDetails row={row} board={board} />
+              {board !== "rank-xp" && board !== "howmany" && (
+                <td className="cjs-table__cell" data-label="Points" data-align="end">
+                  {row.score === undefined ? (
+                    <span className="cjs-leaderboards__muted">—</span>
+                  ) : (
+                    numberFormatter.format(row.score)
+                  )}
+                </td>
+              )}
+              <td
+                className="cjs-table__cell cjs-leaderboards__distribution-cell"
+                data-label={board === "rank-xp" ? "Progress" : "Tops 1–10"}
+              >
+                {board === "rank-xp" ? (
+                  <RankProgress row={row} />
+                ) : (
+                  <TopPlaceDistribution row={row} />
+                )}
               </td>
             </tr>
           ))}
@@ -435,44 +497,73 @@ function SortableHeader({
   );
 }
 
-function Country({ row }: { row: LeaderboardRow }) {
-  if (!row.country && !row.countryCode) return <span className="cjs-leaderboards__muted">—</span>;
+function CountryFlag({ row }: { row: LeaderboardRow }) {
+  const countryLabel = row.country ?? row.region ?? row.countryCode ?? "Country unavailable";
+  const flagCode = normalizeCountryCode(row.countryCode);
 
   return (
-    <span className="cjs-leaderboards__country">
-      {row.countryCode && <Badge>{row.countryCode.toLocaleUpperCase()}</Badge>}
-      <span>{row.country ?? row.region}</span>
+    <span
+      className="cjs-leaderboards__flag"
+      data-fallback={!flagCode || undefined}
+      data-podium={row.rank <= 3 ? row.rank : undefined}
+      role="img"
+      aria-label={countryLabel}
+      title={countryLabel}
+    >
+      {flagCode ? (
+        <img
+          className="cjs-leaderboards__flag-art"
+          src={`/country-flags/${flagCode}.svg`}
+          alt=""
+          loading="lazy"
+          decoding="async"
+          aria-hidden="true"
+        />
+      ) : (
+        <Globe2 className="cjs-leaderboards__flag-fallback" size={18} aria-hidden="true" />
+      )}
     </span>
   );
 }
 
-function RowDetails({ row, board }: { row: LeaderboardRow; board: LeaderboardBoard }) {
-  if (board === "rank-xp") {
-    return (
-      <span className="cjs-leaderboards__details">
-        <span>{row.levelDisplay || "Level unavailable"}</span>
-        {row.prestige !== undefined && (
-          <small>Prestige {numberFormatter.format(row.prestige)}</small>
-        )}
-      </span>
-    );
-  }
-
-  const topCount = row.topList
-    ? Object.values(row.topList).reduce((total, value) => total + value, 0)
-    : null;
-
+function RankProgress({ row }: { row: LeaderboardRow }) {
   return (
     <span className="cjs-leaderboards__details">
-      {board !== "howmany" && row.score !== undefined && (
-        <span>{numberFormatter.format(row.score)} points</span>
-      )}
-      {topCount !== null && <small>{numberFormatter.format(topCount)} recorded top places</small>}
-      {board === "howmany" && topCount === null && (
-        <span className="cjs-leaderboards__muted">—</span>
-      )}
+      <span>{row.levelDisplay || "Level unavailable"}</span>
+      {row.prestige !== undefined && <small>Prestige {numberFormatter.format(row.prestige)}</small>}
     </span>
   );
+}
+
+function TopPlaceDistribution({ row }: { row: LeaderboardRow }) {
+  const distribution = createTopPlaceDistribution(row.topList);
+
+  if (!distribution) return <span className="cjs-leaderboards__muted">—</span>;
+
+  const maximum = Math.max(...distribution.map(({ count }) => count), 1);
+  const summary = distribution.map(({ count, place }) => `top ${place}: ${count}`).join(", ");
+
+  return (
+    <ol className="cjs-leaderboards__top-places" aria-label={`Top-place distribution: ${summary}`}>
+      {distribution.map(({ count, place }) => (
+        <li key={place} data-place={place}>
+          <span className="cjs-leaderboards__top-place-label">#{place}</span>
+          <strong>{numberFormatter.format(count)}</strong>
+          <progress aria-hidden="true" max={maximum} value={count} />
+        </li>
+      ))}
+    </ol>
+  );
+}
+
+function normalizeCountryCode(countryCode: string | undefined): string | null {
+  if (!countryCode) return null;
+
+  const normalizedCode =
+    countryCode.trim().toLocaleUpperCase() === "UK" ? "GB" : countryCode.trim().toLocaleUpperCase();
+  if (!/^[A-Z]{2}$/.test(normalizedCode)) return null;
+
+  return normalizedCode.toLocaleLowerCase();
 }
 
 function formatMetric(row: LeaderboardRow, board: LeaderboardBoard): ReactNode {

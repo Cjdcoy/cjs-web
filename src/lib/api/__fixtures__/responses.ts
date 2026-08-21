@@ -143,6 +143,35 @@ export const playerPositionsFixture: unknown = [
   },
 ];
 
+export const playerJumpScoresFixture: unknown = {
+  player_id: 501,
+  player_name: "^2Runner",
+  rank: 4,
+  rating: 812.5,
+  score: 2_740,
+  country: "Exampleland",
+  country_code: "EX",
+  region: "Other",
+  last_seen: "2026-01-02T03:04:05Z",
+  top_list: { "1": 2, "2": 1 },
+  map_scores: [
+    {
+      map_id: 101,
+      map_name: "mp_cjs_training",
+      score: 1_536,
+      difficulty: 9.7588,
+      rank: 1,
+    },
+    {
+      map_id: 102,
+      map_name: "mp_cjs_advanced",
+      score: 1_204,
+      difficulty: 8.411,
+      rank: 2,
+    },
+  ],
+};
+
 export const playerRoutesFixture: unknown = [
   {
     map_id: 101,

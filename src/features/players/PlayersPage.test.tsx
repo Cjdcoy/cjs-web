@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../../lib/api";
@@ -7,8 +7,36 @@ import { FAVORITES_STORAGE_KEY } from "../../lib/storage";
 import { PlayersPage } from "./PlayersPage";
 
 describe("PlayersPage", () => {
+  let intersect: (() => void) | null;
+
   beforeEach(() => {
+    intersect = null;
     vi.stubGlobal("localStorage", createStorage());
+    vi.stubGlobal(
+      "IntersectionObserver",
+      class {
+        private target: Element | null = null;
+
+        constructor(private readonly callback: IntersectionObserverCallback) {
+          intersect = () => {
+            if (!this.target) return;
+            this.callback(
+              [{ isIntersecting: true, target: this.target } as IntersectionObserverEntry],
+              this as unknown as IntersectionObserver,
+            );
+          };
+        }
+
+        disconnect() {}
+        observe(target: Element) {
+          this.target = target;
+        }
+        takeRecords(): IntersectionObserverEntry[] {
+          return [];
+        }
+        unobserve() {}
+      },
+    );
     localStorage.clear();
     window.history.replaceState(null, "", "/players");
   });
@@ -17,13 +45,30 @@ describe("PlayersPage", () => {
     vi.unstubAllGlobals();
   });
 
-  it("waits for a search term instead of downloading the full directory", () => {
+  it("loads last-seen players by default and reveals more at the scroll sentinel", async () => {
     const searchPlayers = vi.fn<typeof api.searchPlayers>().mockResolvedValue([]);
+    const listPlayers = vi.fn<typeof api.players>().mockResolvedValue(
+      Array.from({ length: 75 }, (_, index) => ({
+        player_id: index + 1,
+        playername: `Directory ${index + 1}`,
+        last_seen: new Date(Date.UTC(2026, 0, 1, 0, 0, index)).toISOString(),
+      })),
+    );
 
-    renderPlayersPage(searchPlayers);
+    renderPlayersPage(searchPlayers, listPlayers);
 
-    expect(screen.getByRole("heading", { name: "Search by player name" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: /Directory 75.*75/i })).toBeInTheDocument();
+    expect(listPlayers).toHaveBeenCalledWith(
+      expect.objectContaining({ sort: "last-seen", source: "jh" }),
+    );
     expect(searchPlayers).not.toHaveBeenCalled();
+    expect(screen.getByText(/Showing 50 of 75 players/)).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Directory 25.*25/i })).not.toBeInTheDocument();
+
+    act(() => intersect?.());
+
+    expect(await screen.findByRole("link", { name: /Directory 25.*25/i })).toBeInTheDocument();
+    expect(screen.getByText(/Showing 75 of 75 players/)).toBeInTheDocument();
   });
 
   it("uses URL-backed source and filters, renders game colors safely, and links profiles", async () => {
@@ -44,7 +89,7 @@ describe("PlayersPage", () => {
         playername: "^2Runner^7One",
         last_seen: "2026-02-01T00:00:00Z",
         visits: 24,
-        country: "Testland",
+        country: "GB",
       },
     ]);
     window.history.replaceState(
@@ -53,7 +98,8 @@ describe("PlayersPage", () => {
       "/players?source=j4l&q=runner&sort=visits&campaign=summer",
     );
 
-    const { container } = renderPlayersPage(searchPlayers);
+    const listPlayers = vi.fn<typeof api.players>().mockResolvedValue([]);
+    const { container } = renderPlayersPage(searchPlayers, listPlayers);
     const runnerLink = await screen.findByRole(
       "link",
       { name: /RunnerOne.*501/i },
@@ -63,7 +109,13 @@ describe("PlayersPage", () => {
     expect(searchPlayers).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 50, name: "runner", source: "j4l" }),
     );
+    expect(listPlayers).not.toHaveBeenCalled();
     expect(runnerLink).toHaveAttribute("href", "/players/501?source=j4l");
+    expect(runnerLink).toHaveAttribute("data-variant", "player");
+    expect(screen.getByRole("img", { name: "GB" }).querySelector("img")).toHaveAttribute(
+      "src",
+      "/country-flags/gb.svg",
+    );
     expect(container.querySelector('[data-cod-color="2"]')).toHaveTextContent("Runner");
     expect(container.querySelector('[data-cod-color="1"]')).toHaveTextContent(
       "<script>alert(1)</script>",
@@ -90,9 +142,10 @@ describe("PlayersPage", () => {
 
   it("reports an empty search without presenting inferred player statuses", async () => {
     const searchPlayers = vi.fn<typeof api.searchPlayers>().mockResolvedValue([]);
+    const listPlayers = vi.fn<typeof api.players>().mockResolvedValue([]);
     window.history.replaceState(null, "", "/players?q=missing");
 
-    renderPlayersPage(searchPlayers);
+    renderPlayersPage(searchPlayers, listPlayers);
 
     expect(
       await screen.findByRole("heading", { name: "No players found" }, { timeout: 2000 }),
@@ -101,10 +154,13 @@ describe("PlayersPage", () => {
   });
 });
 
-function renderPlayersPage(searchPlayers: typeof api.searchPlayers) {
+function renderPlayersPage(
+  searchPlayers: typeof api.searchPlayers,
+  listPlayers: typeof api.players,
+) {
   return render(
     <SourceProvider>
-      <PlayersPage searchPlayers={searchPlayers} />
+      <PlayersPage listPlayers={listPlayers} searchPlayers={searchPlayers} />
     </SourceProvider>,
   );
 }

@@ -1,9 +1,14 @@
 import type { Player } from "../../lib/api";
+import { parseCodName } from "../../lib/codName";
 import { defineQuerySchema, enumQueryParam, stringQueryParam } from "../../lib/routing";
+
+export { parseCodName } from "../../lib/codName";
+export type { CodColorCode, CodNameSegment, ParsedCodName } from "../../lib/codName";
 
 export const PLAYER_SEARCH_LIMIT = 50;
 export const PLAYER_SEARCH_MIN_LENGTH = 2;
 export const PLAYER_SEARCH_DEBOUNCE_MS = 300;
+export const PLAYER_DIRECTORY_BATCH_SIZE = 50;
 
 export const playerDiscoveryQuerySchema = defineQuerySchema({
   q: stringQueryParam({ maxLength: 64, trim: true }),
@@ -12,62 +17,10 @@ export const playerDiscoveryQuerySchema = defineQuerySchema({
 
 export type PlayerDiscoverySort = (typeof playerDiscoveryQuerySchema)["sort"]["defaultValue"];
 
-export type CodColorCode = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9";
-
-export interface CodNameSegment {
-  color: CodColorCode | null;
-  text: string;
-}
-
-export interface ParsedCodName {
-  plainText: string;
-  segments: CodNameSegment[];
-}
-
-const codColorPattern = /^[0-9]$/;
 const playerNameCollator = new Intl.Collator("en", {
   numeric: true,
   sensitivity: "base",
 });
-
-export function parseCodName(value: string): ParsedCodName {
-  const segments: CodNameSegment[] = [];
-  let color: CodColorCode | null = null;
-  let text = "";
-
-  const flush = () => {
-    if (!text) return;
-    segments.push({ color, text });
-    text = "";
-  };
-
-  for (let index = 0; index < value.length; index += 1) {
-    const character = value[index];
-    const possibleColor = value[index + 1];
-
-    if (character === "^" && possibleColor !== undefined && codColorPattern.test(possibleColor)) {
-      flush();
-      color = possibleColor as CodColorCode;
-      index += 1;
-      continue;
-    }
-
-    text += character;
-  }
-
-  flush();
-  const plainText = segments
-    .map((segment) => segment.text)
-    .join("")
-    .trim();
-
-  if (plainText) return { plainText, segments };
-
-  return {
-    plainText: "Unknown player",
-    segments: [{ color: null, text: "Unknown player" }],
-  };
-}
 
 export function playerDisplayName(player: Player): string {
   return player.pref_name?.trim() || player.playername;
