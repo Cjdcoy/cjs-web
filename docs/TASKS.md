@@ -334,6 +334,140 @@ public exports rather than editing another feature.
 - **Follow-up resolved:** CJS-013 replaced the temporary favorite adapter;
   CJS-010 owns the completed map-detail behavior.
 
+### CJS-009A — Display map card artwork
+
+- **Status:** done
+- **Owner:** Codex / map-card artwork follow-up
+- **Dependencies:** CJS-009
+- **Primary boundary:** `src/features/maps`, focused map-list tests
+- **Goal:** display the existing `/maps/cards/<mapname>.avif` artwork in map
+  discovery cards while preserving a useful fallback when an asset is missing.
+- **Acceptance:** map artwork loads lazily without changing link semantics;
+  missing artwork falls back without broken-image UI; focused tests cover both
+  paths.
+- **Validation:** focused map-list tests, `npm run verify`.
+- **Completed 2026-08-30:** Map discovery cards now load the existing encoded
+  `/maps/cards/<mapname>.avif` asset lazily, crop it responsively, and replace a
+  failed image with the original initials/map-icon fallback.
+- **Completion validation:** Focused map integration tests passed for the image
+  path, loading hints, and error fallback; `npm run verify` passed with 33 test
+  files and 183 tests; Playwright inspection at 390×844 and 1440×1000 confirmed
+  loaded artwork without card overflow or displaced controls.
+
+### CJS-009B — Refine map result cards
+
+- **Status:** done
+- **Owner:** Codex / map-card layout refinement
+- **Dependencies:** CJS-009A
+- **Primary boundary:** `src/features/maps`, focused map-list tests
+- **Goal:** make map results easier to scan with fully visible artwork, compact
+  per-FPS difficulty ratings, and reliable newest-release ordering.
+- **Acceptance:** known release dates precede unknown dates when sorting newest;
+  artwork keeps its full composition; available 43/76/125/250/333 FPS ratings
+  are visible without overwhelming mobile cards; list and grid layouts retain
+  accessible actions and metadata.
+- **Validation:** discovery sorting tests, map-list integration tests, mobile and
+  desktop visual inspection, `npm run verify`.
+- **Completed 2026-08-30:** Reworked list and grid cards around full 16:9 map
+  artwork, a compact available-rating strip for 43/76/125/250/333 FPS, and a
+  two-column completion/release summary. The selected difficulty FPS is subtly
+  highlighted, and missing ratings retain an explicit empty state.
+- **Completion validation:** Eight focused discovery/map-list tests passed,
+  including UI-level `2026 → 2024 → Unknown` release ordering and accessible FPS
+  rating labels. `npm run build` passed with performance and release-artifact
+  checks. Playwright inspection passed at 390×844 and 1440×1000 in list and grid
+  views with complete 960×540 artwork and no horizontal overflow.
+- **Validation exception:** Repository-wide `npm run verify` reached 32 passing
+  test files and 186 passing tests, then stopped on an unrelated concurrent
+  players-page assertion for the `Directory 25…25` link. The map suites, lint,
+  formatting, typecheck, and production build passed; rerun the full gate after
+  the players slice settles.
+
+### CJS-009C — Infinite map discovery results
+
+- **Status:** done
+- **Owner:** Codex / map infinite-scroll refinement
+- **Dependencies:** CJS-009B
+- **Primary boundary:** `src/features/maps`, focused map-list tests
+- **Goal:** replace numbered map pagination with cumulative infinite scrolling,
+  retain shareable result depth and a keyboard-accessible fallback, and make
+  repeated map rows distinguishable by their route name.
+- **Acceptance:** the first 96 maps render initially; approaching the result-list
+  end loads the next batch automatically; a visible load-more control works when
+  automatic observation is unavailable; filter changes reset result depth; and
+  direct `page` query values restore all batches up to that depth without numbered
+  pagination; route rows render their source-provided `ender` label when present.
+- **Validation:** focused map-list tests, mobile and desktop browser inspection,
+  `npm run build`, and `npm run verify`.
+- **Completed 2026-08-30:** Replaced numbered pagination with a cumulative
+  96-result scroll window observed 640 px before its boundary. Result depth uses
+  the existing `page` query with history replacement, direct links restore every
+  preceding batch, filters reset the depth, and a load-more button remains as the
+  non-observer and keyboard fallback. Cards now display the API's `ender` route
+  label and use `mapid:cp_id` row keys so multi-route maps remain distinct.
+- **Contract evidence:** the live OpenAPI contract and JH `/api/v1/map/all`
+  response were checked on 2026-08-30; `mp_12` supplies route labels such as
+  `125(hard)` and `250(easy)` through the already-normalized `ender` field.
+- **Completion validation:** 12 focused map discovery/list tests passed,
+  including automatic loading, manual fallback, direct depth restoration,
+  filter reset, absence of numbered navigation, and duplicate-name route labels.
+  `npm run verify` passed with 33 files / 191 tests, coverage, formatting, lint,
+  strict TypeScript, production build, performance budgets, and artifact checks.
+  Chromium inspection at 390×844 and 1440×1000 confirmed 96→110 automatic
+  loading, readable route labels, `page=2` restoration, and no horizontal
+  overflow.
+
+### CJS-009D — Condense map card heading metadata
+
+- **Status:** done
+- **Owner:** Codex / map-card heading refinement
+- **Dependencies:** CJS-009C
+- **Primary boundary:** `src/features/maps`, focused map-list tests
+- **Goal:** keep route and verified-video identity beside the map name while
+  removing redundant lower card badges.
+- **Acceptance:** route names render inline in parentheses using the established
+  accent; maps with a safe media URL expose an accessible YouTube icon beside
+  the title; maps without media show no placeholder; and route-type/category
+  badges no longer appear on cards.
+- **Validation:** focused map-list tests, mobile and desktop browser inspection,
+  `npm run build`, and `npm run verify`.
+- **Completed 2026-08-30:** Moved route names beside the map title in the existing
+  route accent, added an accessible red Lucide video control only for sanitized
+  media URLs, and removed the redundant media placeholder and route-type badges
+  from map cards. Media filter wording remains unchanged outside the cards.
+- **Completion validation:** 16 focused map-list, discovery, and media-model tests
+  passed. `npm run verify` passed with 33 files / 191 tests, coverage, formatting,
+  lint, strict TypeScript, production build, performance budgets, and artifact
+  checks. Chromium inspection at 390×844 and 1440×1000 confirmed inline route
+  titles, title-adjacent video links, absent lower badges, and no horizontal
+  overflow.
+
+### CJS-009E — Compact map discovery defaults
+
+- **Status:** done
+- **Owner:** Codex / compact map discovery refinement
+- **Dependencies:** CJS-009D
+- **Primary boundary:** `src/features/maps`, focused map discovery tests
+- **Goal:** reduce the space used before map results and make the preferred
+  discovery presentation the default.
+- **Acceptance:** difficulty status is removed from map discovery state and UI;
+  newest release and card/grid view are the defaults and reset targets; the
+  heading and filter panel use a compact responsive layout without losing labels,
+  keyboard access, or URL-backed non-default selections.
+- **Validation:** focused map tests, desktop and mobile Chromium inspection,
+  `npm run build`, and `npm run verify`.
+- **Completed 2026-08-30:** Removed difficulty-status URL state and filtering,
+  changed the canonical defaults and reset targets to newest release plus grid
+  cards, and compacted the discovery heading, panel padding, control gaps, and
+  responsive filter grid. Non-default sort, FPS, media, route, search, and list
+  selections remain URL-backed.
+- **Completion validation:** 12 focused map discovery/page tests passed.
+  `npm run verify` passed with 34 files / 196 tests, coverage, formatting, lint,
+  strict TypeScript, production build, performance budgets, and artifact checks.
+  Chromium inspection at 390×844, 1440×1000, and 2048×1024 confirmed the new
+  defaults, absent difficulty-status control, one-row desktop controls, compact
+  two-column mobile controls, keyboard labels, and no horizontal overflow.
+
 ### CJS-010 — Map detail and top runs
 
 - **Status:** done
@@ -370,6 +504,24 @@ public exports rather than editing another feature.
   otherwise valid checkpoint; the map remains usable and the failure is confined
   to a retryable runs panel. Replay links remain omitted until the API publishes
   a URL contract.
+
+### CJS-010A — Refine map profile routes and top-run selection
+
+- **Status:** in progress
+- **Owner:** Codex / map-profile refinement follow-up
+- **Dependencies:** CJS-010, CJS-009A
+- **Primary boundary:** map detail files within `src/features/maps`, shared map
+  image resolver, and focused map-detail tests
+- **Goal:** make map profiles artwork-led and route-aware, with immediately
+  visible FPS availability and a useful no-tops state.
+- **Acceptance:** the profile displays map artwork with a safe fallback; release
+  metadata sits with the author; route controls and labels replace checkpoint
+  language and appear only for multi-route maps; 125/250/333/mix are individual
+  URL-backed buttons, FPS values without tops are disabled, and default selection
+  falls back through 125, 250, 333, then mix; failed or empty top-run requests
+  present a map/FPS-specific no-tops state rather than an API error.
+- **Validation:** focused model/component tests, mobile and desktop inspection,
+  `npm run build`, and `npm run verify`.
 
 ### CJS-011 — Player discovery experience
 
@@ -430,6 +582,41 @@ public exports rather than editing another feature.
   filters, source capability gating, map links, partial failure, request
   cancellation, deleted/unavailable players, and malformed player IDs. All 152
   tests across 25 files pass through `npm run verify`.
+
+### CJS-012A — Sparse player profile states
+
+- **Status:** done
+- **Owner:** Codex / sparse-profile follow-up
+- **Dependencies:** CJS-012
+- **Primary boundary:** player-performance normalization and focused profile UI
+- **Goal:** present valid low-activity player data as an expected profile state,
+  without hiding genuine transport or malformed-response failures.
+- **Acceptance:** the live JumpersHeaven empty `best_fps` sentinel normalizes as
+  no ranked FPS; zero rank sentinels do not render as real placements; sparse
+  profiles retain useful completion and last-seen data, including sub-one-percent
+  precision beside their completed-route count; recent-record copy makes the
+  expected new-player state clear; jump-score responses that omit
+  `map_scores` render as no ranked runs at the selected FPS; actual resource
+  failures still use the retryable error treatment.
+- **Validation:** normalizer and player-profile integration tests, desktop and
+  mobile browser inspection, `npm run build`, and `npm run verify`.
+- **Completed 2026-08-30:** Normalized the live JH empty `best_fps`, zero-rank,
+  and omitted `map_scores` sentinels without relaxing validation for malformed
+  non-empty values. Sparse overview data now shows unranked labels, expected
+  recent-record copy, and `3 completed · 0.47%` rather than a rounded `0%`;
+  best-runs views render a normal selected-FPS empty state instead of a profile
+  outage. Real rejected requests retain the existing retryable error treatment.
+- **Contract evidence:** Live JH player `143872` was checked on 2026-08-30.
+  Performance publishes `best_fps: ""`, rank zeros, three completed routes, and
+  `maps_completed_ratio: 0.00473186119873817`; jump-score responses omit
+  `map_scores` at every supported FPS. The live OpenAPI contract documents both
+  endpoints but leaves jump-score response shape open.
+- **Completion validation:** Three focused normalizer/model/profile suites passed
+  with 41 tests. `npm run verify` passed with 34 files / 201 tests, coverage,
+  lint, formatting, strict TypeScript, production build, performance budgets,
+  and artifact checks. Live Chromium inspection at 390×844 and 1440×1000 showed
+  no error panels, console errors, or horizontal overflow on overview or best
+  runs.
 
 ### CJS-013 — Versioned favorites
 
@@ -559,8 +746,9 @@ public exports rather than editing another feature.
   Docker/nginx syntax, nested SPA fallback, security-header, and immutable-cache
   checks passed. Evidence and owner-only first-release actions are recorded in
   [CJS-016-VALIDATION.md](CJS-016-VALIDATION.md).
-- **Owner decisions before first release:** publish a license before accepting
-  outside code, choose the dashboard-managed HTTPS domain, set
+- **Owner decision resolved 2026-08-30:** the repository is published under the
+  MIT License. Remaining owner decisions are to choose the dashboard-managed
+  HTTPS domain, set
   `CJS_PRODUCTION_URL` and least-privilege production secrets, then explicitly
   authorize enabling the currently false deployment gate. No production release
   or Cloudflare configuration mutation was performed for this task.
@@ -852,11 +1040,360 @@ public exports rather than editing another feature.
   Chromium checks at 320×800 and 1440×1000 confirmed all FPS choices remain
   readable without page overflow and the larger skill-point hierarchy is clear.
 
+### CJS-027 — Navigation pending-state lifecycle
+
+- **Status:** done
+- **Owner:** Codex / navigation pending-state fix
+- **Dependencies:** CJS-006, CJS-015
+- **Primary boundary:** `src/app`, `src/lib/routing`, focused routing tests
+- **Goal:** ensure the shared route progress indicator clears after every
+  completed client-side navigation, including query-only filter and view changes.
+- **Acceptance:** pathname, query-string, hash, and legacy redirect navigation
+  commits cannot leave the shell busy or the progress bar active; pathname-only
+  focus and page announcements keep their existing behavior.
+- **Validation:** focused router tests and `npm run verify`.
+- **Completed 2026-08-30:** Keyed route readiness to the complete browser
+  location rather than the routed pathname alone. Query-only filter/view changes,
+  hash changes, and canonical legacy redirects now clear the shared pending state
+  after the rendered route commits, while focus and page announcements remain
+  limited to pathname changes.
+- **Completion validation:** 8 focused AppRouter/browser-routing tests passed,
+  including query/hash and legacy-redirect pending-state regressions. The full
+  `npm run verify` gate passed with 33 files / 183 tests plus formatting, lint,
+  coverage, strict TypeScript, production build, performance budgets, and
+  artifact checks. All 10 Chromium/Firefox critical-flow E2E cases passed;
+  WebKit could not launch in the local environment because `libevent-2.1.so.7`
+  is unavailable.
+
+### CJS-028 — Player directory identity and levels
+
+- **Status:** done
+- **Owner:** Codex / player-directory metadata follow-up
+- **Dependencies:** CJS-011, CJS-025
+- **Primary boundary:** player discovery files, focused API/player-list tests, and
+  shared table alignment behavior
+- **Goal:** keep country with player identity, align visit counts with their
+  heading, and expose source-backed admin and J4L player levels in the directory.
+- **Acceptance:** country is no longer a standalone column; visits align under
+  their heading; JH and J4L rows show the supplied admin level; J4L rows show the
+  documented rank level without per-player requests; unavailable values have a
+  clear fallback; mobile and desktop table layouts remain accessible.
+- **Validation:** focused API/player-list/table tests and `npm run verify`.
+- **Completed 2026-08-30:** moved each country flag and code into the player
+  identity cell, applied numeric alignment to both table headings and values,
+  exposed the optional admin level for both sources, and added the J4L player
+  level through one cancellable rank-leaderboard request with retry and fallback
+  states. Rank normalization now tolerates the live API's nullable country
+  metadata without discarding otherwise valid level rows.
+- **Contract evidence:** checked the live docs and OpenAPI contract on 2026-08-30.
+  Player directory payloads supply visits and live JH/J4L responses supply the
+  optional admin value; `/api/v1/leaderboard/rank-xp` is J4L-only and supplies the
+  actual player level. Loading it once avoids per-player requests.
+- **Completion validation:** focused API/player-list/table coverage passed (3
+  files, 32 tests); `npm run verify` passed (33 files, 186 tests, production
+  build, performance budgets, and release-artifact policy). Live-data browser
+  checks at 1440×1000 and 320×800 showed no horizontal overflow and confirmed
+  country-in-player identity plus aligned visits, admin, and J4L level values.
+- **Remaining risk:** `admin` is present in current live player-directory payloads
+  but omitted from the published `PlayerInfo` schema, so the UI treats it as
+  optional and renders a safe fallback when absent.
+
+### CJS-029 — Dense player profile redesign
+
+- **Status:** done
+- **Owner:** Codex / dense player-profile redesign
+- **Dependencies:** CJS-023, CJS-025, CJS-026
+- **Primary boundary:** player profile components, styles, view-model helpers, and
+  focused profile tests within `src/features/players`
+- **Goal:** make JH and J4L profiles substantially more information-dense while
+  preserving clear hierarchy and source-specific capability rules.
+- **Work:** consolidate identity and activity facts into a compact profile header,
+  promote key performance signals into dense stat groups, reduce oversized empty
+  surfaces, and improve the scanability of overview, best-run, and route views.
+- **Acceptance:** common JH/J4L data and J4L-only rank/activity data are visibly
+  grouped without unsupported placeholders; desktop uses space efficiently;
+  mobile, keyboard, loading, partial, empty, and error states remain deliberate.
+- **Validation:** focused profile/model tests, accessibility scan, responsive
+  browser inspection at mobile and desktop widths, `npm run verify`.
+- **Completed:** 2026-08-30. Reworked the JH/J4L identity header, overview
+  hierarchy, performance/FPS summaries, recent records, leaderboard position,
+  J4L rank, and lifetime activity into compact source-aware panels. Added an axe
+  assertion and confirmed zero horizontal overflow or console errors at 390px
+  J4L and 1440px JH viewports. `npm run verify` passes (191 tests).
+
+### CJS-030 — Responsive corrected map artwork
+
+- **Status:** done
+- **Owner:** Codex / corrected responsive map-asset session
+- **Dependencies:** CJS-009A, CJS-019
+- **Primary boundary:** shared map-image paths, map/server image consumers,
+  generated `public/maps` AVIF assets, and focused tests
+- **Goal:** replace raw-derived map artwork with contrast-corrected 480px and
+  960px AVIF variants while keeping both deployments self-contained and serving
+  an appropriate responsive size.
+- **Acceptance:** corrected sources produce both variants in CJS and J4L; maps
+  without a corrected source retain a working fallback; map discovery and server
+  cards advertise responsive sources without losing their existing error states.
+- **Validation:** asset count/dimension/provenance audit, focused image-consumer
+  tests, and production builds for both repositories.
+- **Completed:** regenerated 579 corrected-source maps and preserved 31 fallback
+  cards, producing 610 matching 480px/960px pairs in CJS and J4L. All 1,220
+  cross-repository asset hashes and both manifests match; `npm run verify`
+  passes (196 tests), and the J4L production build passes with a temporary
+  output directory because its existing
+  `dist/assets` directory is owned by `nobody`.
+
+### CJS-031 — Preserve profile identity and empty placement states
+
+- **Status:** done
+- **Owner:** Codex / JH profile identity follow-up
+- **Dependencies:** CJS-026, CJS-029
+- **Primary boundary:** player directory cache, player-profile data composition,
+  leaderboard-position normalization, and focused tests
+- **Goal:** keep directory identity fields visible after profile navigation and
+  treat the API's successful null placement response as an empty leaderboard.
+- **Acceptance:** directory and search navigation preserve player name, country,
+  and last-seen metadata; direct profile loads can recover the same metadata;
+  null placement responses render a friendly empty state while malformed,
+  transport, and server responses remain errors.
+- **Validation:** focused profile/cache/API tests, live REDsherpa response check,
+  responsive browser inspection, and `npm run verify`.
+- **Completed:** 2026-08-30. Player directory and name-search results now seed a
+  source-keyed in-memory identity cache; direct profile loads use the documented
+  directory endpoint as a cancellable fallback. The observed HTTP 200 `null`
+  placement payload normalizes to an empty list and renders a friendly empty
+  card, while other malformed shapes remain errors. Verified the full live
+  directory-to-REDsherpa click flow uses one directory request and retains `ES`
+  plus last-seen metadata at 1440px and 390px. `npm run verify` passes (196
+  tests).
+
+### CJS-032 — Complete profile activity and placement overview
+
+- **Status:** done
+- **Owner:** Codex / profile overview follow-up
+- **Dependencies:** CJS-029, CJS-031
+- **Primary boundary:** player profile overview, profile query state, player
+  placement request options, and focused tests
+- **Goal:** show every published leaderboard placement without a board selector
+  and make the complete recent-record window available without lengthening the
+  overview page.
+- **Acceptance:** overview requests all leaderboard positions for the selected
+  FPS and renders them in a full-width bottom section; recent activity exposes
+  all 50 returned records in a keyboard-scrollable region; redundant activity
+  labels are removed from the hero and recent summary.
+- **Validation:** focused endpoint/profile tests, accessibility scan, responsive
+  browser inspection at mobile and desktop widths, `npm run verify`.
+- **Completed:** 2026-08-30. Removed the board query/control and now uses the
+  contract's optional `leaderboard` parameter to fetch every placement in one
+  cancellable request. The full-width placement table is last in the overview,
+  all 50 recent records render inside a bounded scrolling region, and redundant
+  activity labels no longer appear. Refresh moved into the compact source row so
+  removing the selector did not leave an empty toolbar.
+- **Completion validation:** live JH desktop (1440×1000) and J4L mobile
+  (390×844) profiles each rendered four placement rows and 50 scrollable recent
+  records with no page overflow or console errors. The leaderboard selector and
+  activity labels were absent, the placement section was last, and the full
+  `npm run verify` gate passed with 34 files / 197 tests plus formatting, lint,
+  coverage,
+  strict TypeScript, production build, performance budgets, and artifact checks.
+
+### CJS-033 — Celebrate top player runs
+
+- **Status:** done
+- **Owner:** Codex / player run achievement emphasis
+- **Dependencies:** CJS-029, CJS-032
+- **Primary boundary:** player profile run presentation, profile model helpers,
+  and focused tests
+- **Goal:** make leaderboard-quality runs feel like commendable achievements in
+  both profile overview activity and the Best runs table.
+- **Acceptance:** first, second, and third place rank numbers use distinct podium
+  colors; ranks 4–10 use the accent color; rows and surrounding controls remain
+  visually neutral, with accessible names carrying the non-color-only meaning.
+- **Validation:** focused model/profile tests, accessibility scan, responsive
+  browser inspection at mobile and desktop widths, `npm run verify`.
+- **Completed:** 2026-08-30. Added one shared achievement classifier and rank
+  treatment across recent records, the oldest standing record, and Best runs.
+  First, second, third, and ranks 4–10 now use gold, silver, bronze, and teal
+  rank numbers respectively, with accessible rank names. Removed the earlier
+  achievement pills and row-wide tints so lower placements and surrounding rows
+  retain the neutral presentation.
+- **Completion validation:** live JH overview at 1440×1000 and Best runs at
+  390×844 exposed all four visual tiers with no horizontal overflow or console
+  errors. Focused tests cover every rank boundary and both profile views. The
+  full `npm run verify` gate passed with 35 files / 207 tests plus formatting,
+  lint, coverage,
+  strict TypeScript, production build, performance budgets, and artifact checks.
+
+### CJS-034 — Neutral global link treatment
+
+- **Status:** done
+- **Owner:** Codex / shared link interaction refinement
+- **Dependencies:** CJS-005, CJS-015
+- **Primary boundary:** global and shared-primitive link styles, shell footer,
+  responsive browser validation
+- **Goal:** keep content links visually neutral until interaction while applying
+  one consistent accent transition across pages.
+- **Acceptance:** standard links use the primary text color with no underline;
+  hover and keyboard focus transition to the green accent; muted links receive
+  the same interaction feedback; specialized navigation, active, player-name,
+  media, and disabled treatments preserve their semantic styling.
+- **Validation:** computed-style checks across profile tabs and representative
+  non-profile pages at desktop and mobile widths, `npm run build`, and
+  `npm run verify`.
+- **Completion evidence:** the shared link primitive, raw-anchor fallback, map
+  title, and footer now render without underlines in the primary text color and
+  transition to the accent for hover and keyboard focus. Headless browser checks
+  passed on Overview, Best runs, Route completion, map discovery, footer, and a
+  mobile profile route; 35 focused integration assertions, `npm run build`, and
+  all 207 assertions in `npm run verify` passed on 2026-08-30.
+
+### CJS-036 — Promote and reflow J4L lifetime activity
+
+- **Status:** done
+- **Owner:** Codex / J4L lifetime-activity refinement
+- **Dependencies:** CJS-029, CJS-032
+- **Primary boundary:** J4L player-profile overview ordering, activity metric
+  layout, and focused profile tests
+- **Goal:** make source-specific lifetime activity immediately visible and keep
+  every label and value readable across desktop and mobile widths.
+- **Acceptance:** J4L lifetime activity is the first overview section; JH keeps
+  its capability-gated layout; activity labels and values no longer compete on
+  one line; responsive layouts avoid clipping and horizontal overflow.
+- **Validation:** focused profile tests, responsive browser inspection at mobile
+  and desktop widths, `npm run build`, and `npm run verify`.
+- **Completed 2026-08-30:** Promoted the J4L-only lifetime activity panel to the
+  first overview position. Activity metrics now place values beneath labels in a
+  five-column desktop grid that reflows to three, two, and one column at narrower
+  breakpoints. Explicit overview-column modifiers preserve the existing 7/5
+  Performance and Recent activity split independently of section order.
+- **Completion validation:** The focused profile suite passed 13 tests. A new
+  Chromium regression test passed at 1440×1000 and 390×844, confirming overview
+  order, 13 stacked metric cards, the desktop/mobile column counts, and no page
+  overflow. `npm run verify` passed formatting, lint, 35 files / 207 tests with
+  coverage, strict TypeScript, the production build, performance budgets, and
+  release-artifact checks.
+
+### CJS-035 — Route completion inventory
+
+- **Status:** done
+- **Owner:** Codex / route-completion inventory session
+- **Dependencies:** CJS-023, CJS-029
+- **Primary boundary:** player route-completion view, profile query state, focused
+  profile resource/model tests, and task documentation
+- **Goal:** make route progress understandable as a complete source inventory,
+  not only a list of successful finishes.
+- **Work:** join the documented completed-route response with the source map
+  catalog; show completed, remaining, total, and completion-rate summaries; add
+  URL-backed search and status filters; keep map links and responsive states.
+- **Acceptance:** completed and remaining maps are distinguishable without color
+  alone; all visible counts agree with the filtered/source-backed inventory;
+  catalog and completion failures remain independently retryable; keyboard,
+  mobile, loading, empty, stale, and error states stay deliberate.
+- **Validation:** focused model/resource/profile tests, accessibility and
+  responsive browser inspection, `npm run build`, and `npm run verify`.
+- **Completed 2026-08-30:** Joined the cancellable completed-route and map-catalog
+  resources into a source-qualified inventory keyed by map and ender. The view
+  now shows completed, remaining, published-route, finish, and progress totals;
+  explicit completed/remaining/historical status labels; URL-backed search and
+  status filters; and a 100-row progressive rendering boundary. Catalog failure
+  leaves completed routes usable with unavailable totals called out rather than
+  inferred.
+- **Contract evidence:** Rechecked the live OpenAPI contract and JH responses on
+  2026-08-30. `/api/v1/player/routes-completion` publishes completed route rows,
+  while `/api/v1/map/all` publishes the full route catalog. Live multi-ender maps
+  confirmed that route identity requires `map_id` plus normalized `ender`.
+- **Completion validation:** The focused profile/model suites passed 26 tests,
+  including axe, multi-ender identity, URL filters, and catalog-failure behavior.
+  Live JH player 46077 showed 553 completed, 83 remaining, 634 published routes,
+  and 3,016 finishes; the remaining filter returned exactly 83 rows. Chromium at
+  1440×1000 and 390×844 had no console errors or horizontal overflow. `npm run
+build` and `npm run verify` passed with 35 files / 211 tests, coverage, lint,
+  formatting, strict TypeScript, performance budgets, and artifact checks.
+
+### CJS-037 — Finish-time chart date axis
+
+- **Status:** done
+- **Owner:** Codex / player run analytics refinement
+- **Dependencies:** CJS-017A
+- **Primary boundary:** player run-progression chart rendering and responsive
+  presentation
+- **Goal:** expose recorded dates along the finish-time chart's horizontal axis
+  without making long histories unreadable.
+- **Acceptance:** short histories display every recorded date; long histories
+  display at most five evenly distributed date ticks including the first and
+  last finish; missing dates remain honest; labels fit the existing scrollable
+  chart at desktop and mobile widths.
+- **Validation:** player-profile integration tests, desktop and mobile browser
+  inspection, `npm run build`, and `npm run verify`.
+- **Completed 2026-08-30:** Added a bottom date axis sourced from each finish's
+  recorded timestamp. Histories of five finishes or fewer show every date;
+  longer histories show five evenly distributed ticks with first and last
+  retained, and unknown timestamps use the existing honest fallback.
+- **Completion validation:** Focused profile/model suites passed 17 tests. Live
+  JH chart inspection at 1440×1000 and 390×844 displayed five non-overlapping
+  dates. `npm run build` and `npm run verify` passed with 35 files / 211 tests,
+  coverage, lint, formatting, strict TypeScript, performance budgets, and
+  artifact checks.
+
+### CJS-038 — Flatten player profile surfaces
+
+- **Status:** done
+- **Owner:** Codex / player-profile surface cleanup session
+- **Dependencies:** CJS-029
+- **Primary boundary:** player profile overview components and responsive styles
+- **Goal:** preserve the profile's dense information hierarchy while removing
+  unnecessary cards nested inside major section panels.
+- **Acceptance:** summary metrics, FPS distribution, recent records, and the JH
+  capability note use spacing and dividers instead of repeated boxed surfaces;
+  desktop and mobile layouts remain readable, accessible, and overflow-free.
+- **Validation:** focused player-profile tests, responsive browser inspection at
+  mobile and desktop widths, `npm run build`, and `npm run verify`.
+- **Completed 2026-08-30:** Kept one bordered surface per major profile section
+  while replacing nested metric, FPS, recent-record, progress, and run-detail
+  cards with whitespace and dividers. Section icons no longer sit in decorative
+  boxes, and the JumpersHeaven capability explanation is now an unboxed semantic
+  note. The profile's data, navigation, badges, and responsive reading order are
+  unchanged.
+- **Completion validation:** The focused profile suite passed (14 tests), and
+  live Chromium inspection at 1394×1245 and 390×844 confirmed borderless metric
+  and activity rows, no horizontal overflow, and no console errors. `npm run
+verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
+  TypeScript, production build, performance budgets, and artifact checks.
+
 ## Post-MVP
+
+### CJS-017A — Player map run analytics
+
+- **Status:** done
+- **Owner:** Codex / player run-progression analytics session
+- **Dependencies:** CJS-016
+- **Primary boundary:** player profile Run analytics view, `/api/v1/player/map-runs`
+  client boundary, progression model, and focused tests
+- **Goal:** let a player inspect how their completion time improved across every
+  recorded finish on a selected map.
+- **Acceptance:** the selected source, FPS, map, and Run analytics view are shareable
+  in the URL; a responsive chart shows finish and personal-best progression; a
+  chronological table provides the textual equivalent; selecting a run exposes
+  its time, change, rank, activity, type, and run ID; loading, empty, error,
+  refresh, cancellation, keyboard, and small-screen behavior are deliberate.
+- **Completed:** 2026-08-30. Added the map-run API contract and normalization,
+  a player Run analytics view with map search/selection, six summary measures,
+  interactive chart, selected-run details, and a chronological run table. The
+  desktop workspace expands into available page space with a dominant chart and
+  selected-run data to its right. The map progression identity and summary stats
+  sit in a separate run-by-run ledger surface below; narrower layouts keep the
+  same deliberate reading order. Refresh and personal-best controls remain on one
+  line at constrained desktop widths.
+  Route completion now labels its column `Completed FPS` and formats multiple
+  values with one suffix, for example `43, 125, 250 FPS`.
+- **Completion validation:** focused API/model/profile tests passed, axe found no
+  violations in the analytics deep link, browser checks at 2048, 1440, 1024, and
+  390 px had no horizontal overflow, and the full `npm run verify` gate passed on
+  2026-08-30.
 
 ### CJS-017 — Replay, activity, and historical analytics
 
-- **Status:** queued
+- **Status:** ready
 - **Dependencies:** CJS-016
 - **Primary boundary:** new feature modules and their API extensions
 - **Goal:** expose the remaining documented Replay/Historical/J4L activity value

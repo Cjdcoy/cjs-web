@@ -18,6 +18,7 @@ export function AppRouter() {
   const location = useBrowserLocation();
   const legacyRedirect = getLegacyRedirect(location);
   const routedLocation = legacyRedirect ? parseBrowserHref(legacyRedirect) : location;
+  const navigationKey = `${location.pathname}${location.search}${location.hash}`;
   const match = matchRoute(routedLocation.pathname);
   const lastReadyPath = useRef(routedLocation.pathname);
   const [routeAnnouncement, setRouteAnnouncement] = useState("");
@@ -51,6 +52,7 @@ export function AppRouter() {
           <Suspense fallback={<RouteLoadingFallback />}>
             <RouteReady
               label={routeLabels[match.id]}
+              navigationKey={navigationKey}
               pathname={routedLocation.pathname}
               onReady={handleRouteReady}
             >
@@ -81,17 +83,19 @@ const routeLabels = {
 function RouteReady({
   children,
   label,
+  navigationKey,
   onReady,
   pathname,
 }: {
   children: ReactNode;
   label: string;
+  navigationKey: string;
   onReady: (pathname: string, label: string) => void;
   pathname: string;
 }) {
   useEffect(() => {
     onReady(pathname, label);
-  }, [label, onReady, pathname]);
+  }, [label, navigationKey, onReady, pathname]);
 
   return children;
 }

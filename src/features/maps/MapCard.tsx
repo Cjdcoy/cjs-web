@@ -1,8 +1,11 @@
-import { CalendarDays, Film, Heart, Map as MapIcon, Route, Trophy } from "lucide-react";
-import { Badge, Card, IconButton, Link } from "../../components/ui";
+import { CalendarDays, Heart, Map as MapIcon, SquarePlay, Trophy } from "lucide-react";
+import { useState } from "react";
+import { Card, IconButton, Link } from "../../components/ui";
 import type { Fps, Source } from "../../lib/api";
+import { getMapImageSources } from "../../lib/mapImages";
 import { mapDetailPath } from "../../lib/routing";
-import { getDifficultyLabel, getMapDifficulty, type PreparedMap } from "./mapDiscovery";
+import { getMapDifficulty, type PreparedMap } from "./mapDiscovery";
+import { getSafeMediaUrl } from "./mapDetailModel";
 
 export interface MapCardProps {
   item: PreparedMap;
@@ -13,6 +16,7 @@ export interface MapCardProps {
 }
 
 const numberFormatter = new Intl.NumberFormat("en");
+const DISPLAY_FPS_VALUES = ["43", "76", "125", "250", "333"] as const satisfies readonly Fps[];
 const dateFormatter = new Intl.DateTimeFormat("en", {
   day: "numeric",
   month: "short",
@@ -21,7 +25,14 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
 
 export function MapCard({ favorite, fps, item, onToggleFavorite, source }: MapCardProps) {
   const { map } = item;
-  const difficulty = getMapDifficulty(map, fps);
+  const imageSources = getMapImageSources(map.mapname);
+  const routeName = map.ender === null || map.ender === undefined ? "" : String(map.ender).trim();
+  const mediaUrl = getSafeMediaUrl(map.video);
+  const [failedImagePath, setFailedImagePath] = useState<string | null>(null);
+  const difficultyRatings = DISPLAY_FPS_VALUES.flatMap((ratingFps) => {
+    const value = getMapDifficulty(map, ratingFps);
+    return value === null ? [] : [{ fps: ratingFps, value }];
+  });
   const detailsPath = mapDetailPath(map.mapid, { source });
 
   return (
@@ -31,16 +42,45 @@ export function MapCard({ favorite, fps, item, onToggleFavorite, source }: MapCa
         href={detailsPath}
         aria-label={`View details for ${map.mapname}`}
       >
-        <span aria-hidden="true">{map.mapname.slice(0, 2).toUpperCase()}</span>
-        <MapIcon aria-hidden="true" size={32} />
+        {failedImagePath !== imageSources.card ? (
+          <img
+            className="cjs-map-card__image"
+            src={imageSources.card}
+            srcSet={imageSources.srcSet}
+            sizes="(max-width: 48rem) 100vw, 18rem"
+            alt=""
+            loading="lazy"
+            decoding="async"
+            onError={() => setFailedImagePath(imageSources.card)}
+          />
+        ) : (
+          <>
+            <span aria-hidden="true">{map.mapname.slice(0, 2).toUpperCase()}</span>
+            <MapIcon aria-hidden="true" size={32} />
+          </>
+        )}
       </Link>
 
       <div className="cjs-map-card__identity">
         <div className="cjs-map-card__heading">
           <div>
-            <Link href={detailsPath} variant="standalone">
-              {map.mapname}
-            </Link>
+            <div className="cjs-map-card__title-line">
+              <Link className="cjs-map-card__title-link" href={detailsPath} variant="standalone">
+                {map.mapname}
+              </Link>
+              {routeName && <span className="cjs-map-card__route-name">({routeName})</span>}
+              {mediaUrl && (
+                <Link
+                  className="cjs-map-card__video-link"
+                  href={mediaUrl}
+                  target="_blank"
+                  rel="noreferrer noopener"
+                  aria-label={`Watch YouTube video for ${map.mapname} (opens in a new tab)`}
+                >
+                  <SquarePlay aria-hidden="true" size={18} />
+                </Link>
+              )}
+            </div>
             <p>{map.author?.trim() ? `by ${map.author}` : "Author not available"}</p>
           </div>
           <IconButton
@@ -54,25 +94,31 @@ export function MapCard({ favorite, fps, item, onToggleFavorite, source }: MapCa
           </IconButton>
         </div>
 
-        <div className="cjs-map-card__badges">
-          <Badge icon={<Route size={14} />}>{map.type?.trim() || "Route type unavailable"}</Badge>
-          <Badge tone={item.hasMedia ? "information" : "neutral"} icon={<Film size={14} />}>
-            {item.hasMedia ? "Video available" : "No video listed"}
-          </Badge>
+        <div className="cjs-map-card__difficulty">
+          <span className="cjs-map-card__difficulty-label">
+            <Trophy aria-hidden="true" size={14} />
+            Difficulty by FPS
+          </span>
+          {difficultyRatings.length > 0 ? (
+            <ul className="cjs-map-card__difficulty-list" aria-label="Difficulty ratings by FPS">
+              {difficultyRatings.map((rating) => (
+                <li
+                  key={rating.fps}
+                  data-selected={rating.fps === fps || undefined}
+                  aria-label={`${rating.fps} FPS difficulty ${rating.value.toFixed(2)} out of 10`}
+                >
+                  <span>{rating.fps}</span>
+                  <strong>{rating.value.toFixed(2)}</strong>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <span className="cjs-map-card__difficulty-empty">No FPS ratings</span>
+          )}
         </div>
       </div>
 
       <dl className="cjs-map-card__metrics">
-        <div>
-          <dt>
-            <Trophy aria-hidden="true" size={15} />
-            {fps} FPS difficulty
-          </dt>
-          <dd>
-            <strong>{getDifficultyLabel(difficulty)}</strong>
-            <span>{difficulty === null ? "No rating" : `${difficulty.toFixed(1)} / 10`}</span>
-          </dd>
-        </div>
         <div>
           <dt>Completions</dt>
           <dd>

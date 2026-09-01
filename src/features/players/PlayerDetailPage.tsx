@@ -3,6 +3,8 @@ import {
   ArrowLeft,
   BarChart3,
   CalendarClock,
+  CheckCircle2,
+  Circle,
   Clock3,
   Footprints,
   Gauge,
@@ -11,9 +13,10 @@ import {
   Medal,
   RefreshCw,
   Route,
+  Search,
   Trophy,
 } from "lucide-react";
-import { useMemo, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Page } from "../../components";
 import {
   Badge,
@@ -24,16 +27,16 @@ import {
   EmptyState,
   ErrorState,
   IconButton,
+  Input,
   Link,
   Panel,
   SegmentedControl,
-  Select,
   SkeletonGroup,
   type DataTableColumn,
 } from "../../components/ui";
 import {
   FPS_VALUES,
-  PLAYER_LEADERBOARDS,
+  type GameMap,
   type Player,
   type PlayerActivitySummary,
   type PlayerJumpScores,
@@ -49,20 +52,28 @@ import { mapDetailPath, useQueryState, useSourceContext } from "../../lib/routin
 import { formatDate, timeAgo } from "../../lib/format";
 import {
   createPlayerProfileIdentity,
+  createPlayerRouteInventory,
+  filterPlayerRouteInventory,
   formatDistance,
   formatDuration,
+  formatFpsList,
   formatProfileDecimal,
   formatProfileNumber,
   formatProfilePercent,
   fpsLabel,
+  getRunAchievement,
   hasProfileIdentity,
   playerBoardLabel,
   playerProfileQuerySchema,
   playerSourceLabel,
+  summarizePlayerRouteInventory,
+  type PlayerRouteInventoryItem,
   type PlayerProfileView,
+  type RouteCompletionStatus,
 } from "./playerProfileModel";
 import { usePlayerProfile, type PlayerProfileApi, type ProfileResource } from "./usePlayerProfile";
 import { useFavoritePlayers } from "./useFavoritePlayers";
+import { PlayerRunProgression } from "./PlayerRunProgression";
 import "./playerProfile.css";
 
 export interface PlayerDetailPageProps {
@@ -106,13 +117,14 @@ function PlayerProfile({
   const [queryState, setQueryState] = useQueryState(playerProfileQuerySchema);
   const resources = usePlayerProfile({
     apiClient,
-    board: queryState.board,
     fps: queryState.fps,
+    mapId: queryState.map,
     playerId,
     source,
     view: queryState.view,
   });
   const identity = createPlayerProfileIdentity(playerId, {
+    directory: resources.directory.data,
     performance: resources.performance.data,
     positions: resources.positions.data,
     rank: resources.rank.data,
@@ -124,14 +136,16 @@ function PlayerProfile({
   const supportedResources =
     queryState.view === "runs"
       ? [resources.scores]
-      : queryState.view === "routes"
-        ? [resources.routes]
-        : [
-            resources.performance,
-            resources.positions,
-            ...(source === "j4l" ? [resources.rank, resources.activity] : []),
-          ];
-  const isSettling = supportedResources.some(
+      : queryState.view === "progress"
+        ? [resources.scores, ...(queryState.map > 0 ? [resources.mapRuns] : [])]
+        : queryState.view === "routes"
+          ? [resources.routes, resources.maps]
+          : [
+              resources.performance,
+              resources.positions,
+              ...(source === "j4l" ? [resources.rank, resources.activity] : []),
+            ];
+  const isSettling = [resources.directory, ...supportedResources].some(
     (resource) => resource.status === "loading" || resource.status === "refreshing",
   );
   const errorCount = supportedResources.filter((resource) => resource.status === "error").length;
@@ -186,8 +200,13 @@ function PlayerProfile({
                     : "Last seen unknown"}
                 </span>
               </p>
+              <ProfileStatusBadges performance={resources.performance.data} />
             </div>
           </div>
+          <ProfileHighlights
+            performance={resources.performance.data}
+            rank={source === "j4l" ? resources.rank.data : null}
+          />
           <IconButton
             className="cjs-player-profile__favorite"
             label={`${isFavorite ? "Remove" : "Add"} ${identity.name} ${isFavorite ? "from" : "to"} favorites`}
@@ -200,48 +219,48 @@ function PlayerProfile({
         </header>
 
         <ProfileNavigation
-          board={queryState.board}
           fps={queryState.fps}
+          mapId={queryState.map}
           playerId={playerId}
           source={source}
           view={queryState.view}
         />
 
         <div className="cjs-player-profile__source-note">
-          <div>
-            <strong>{playerSourceLabel(source)} profile</strong>
-            <span>Player IDs belong to one source and cannot be reused across communities.</span>
+          <span>
+            <strong>{playerSourceLabel(source)} profile.</strong> Player #{playerId} belongs to this
+            source only.
+          </span>
+          <div className="cjs-player-profile__source-actions">
+            <Link href={`/players?source=${source === "jh" ? "j4l" : "jh"}`} variant="muted">
+              Find this player in {playerSourceLabel(source === "jh" ? "j4l" : "jh")}
+            </Link>
+            <Button
+              className="cjs-player-profile__refresh"
+              isLoading={isSettling}
+              loadingLabel="Refreshing profile"
+              onClick={resources.reload}
+              variant="secondary"
+            >
+              <RefreshCw aria-hidden="true" size={17} />
+              Refresh profile
+            </Button>
           </div>
-          <Link href={`/players?source=${source === "jh" ? "j4l" : "jh"}`} variant="muted">
-            Find this player in {playerSourceLabel(source === "jh" ? "j4l" : "jh")}
-          </Link>
         </div>
 
-        <Panel className="cjs-player-profile__controls" variant="strong" aria-label="View filters">
-          {queryState.view === "overview" && (
-            <Select
-              label="Leaderboard"
-              helperText="Selects the position shown in Overview."
-              onChange={(event) => {
-                const board = event.target.value;
-                if (PLAYER_LEADERBOARDS.some((value) => value === board)) {
-                  setQueryState({ board: board as (typeof PLAYER_LEADERBOARDS)[number] });
-                }
-              }}
-              value={queryState.board}
-            >
-              {PLAYER_LEADERBOARDS.map((board) => (
-                <option key={board} value={board}>
-                  {playerBoardLabel(board)}
-                </option>
-              ))}
-            </Select>
-          )}
-          {queryState.view === "runs" && (
+        {(queryState.view === "runs" || queryState.view === "progress") && (
+          <Panel
+            className="cjs-player-profile__controls"
+            padding="small"
+            variant="strong"
+            aria-label={
+              queryState.view === "progress" ? "Run analytics filters" : "Best run filters"
+            }
+          >
             <fieldset className="cjs-player-profile__fps-filter">
               <legend>FPS</legend>
               <SegmentedControl
-                ariaLabel="Best runs FPS"
+                ariaLabel={queryState.view === "progress" ? "Run analytics FPS" : "Best runs FPS"}
                 className="cjs-player-profile__fps-options"
                 onChange={(fps) => setQueryState({ fps })}
                 options={FPS_VALUES.map((fps) => ({
@@ -251,20 +270,9 @@ function PlayerProfile({
                 }))}
                 value={queryState.fps}
               />
-              <p>Filters this player’s best runs.</p>
             </fieldset>
-          )}
-          <Button
-            className="cjs-player-profile__refresh"
-            isLoading={isSettling}
-            loadingLabel="Refreshing profile"
-            onClick={resources.reload}
-            variant="secondary"
-          >
-            <RefreshCw aria-hidden="true" size={17} />
-            Refresh profile
-          </Button>
-        </Panel>
+          </Panel>
+        )}
 
         {errorCount > 0 && !allFailed && !unavailable && (
           <div className="cjs-player-profile__partial-error" role="alert">
@@ -297,40 +305,43 @@ function PlayerProfile({
         )}
 
         {!unavailable && !allFailed && (
-          <div className="cjs-player-profile__sections">
+          <div className="cjs-player-profile__sections" data-view={queryState.view}>
             {queryState.view === "overview" && (
-              <>
-                <PerformanceSection resource={resources.performance} onRetry={resources.reload} />
-                <RecentActivitySection
-                  activity={resources.activity}
-                  performance={resources.performance}
-                  source={source}
-                  onRetry={resources.reload}
-                />
+              <div className="cjs-player-profile__overview-grid">
+                {source === "j4l" && (
+                  <ActivitySection resource={resources.activity} onRetry={resources.reload} />
+                )}
+                <div className="cjs-player-profile__overview-column cjs-player-profile__overview-column--summary">
+                  <PerformanceSection resource={resources.performance} onRetry={resources.reload} />
+                  {source === "j4l" ? (
+                    <RankSection resource={resources.rank} onRetry={resources.reload} />
+                  ) : (
+                    <aside className="cjs-player-profile__capability" role="note">
+                      <Badge tone="information">Source-specific data</Badge>
+                      <div>
+                        <h2>JumpersHeaven profile</h2>
+                        <p>
+                          JumpersHeaven publishes performance, placements, and recent records. XP
+                          rank and cumulative activity are Jump4Life-only and are not requested for
+                          this profile.
+                        </p>
+                      </div>
+                    </aside>
+                  )}
+                </div>
+                <div className="cjs-player-profile__overview-column cjs-player-profile__overview-column--recent">
+                  <RecentActivitySection
+                    performance={resources.performance}
+                    source={source}
+                    onRetry={resources.reload}
+                  />
+                </div>
                 <PositionSection
-                  board={queryState.board}
+                  fps={queryState.fps}
                   resource={resources.positions}
                   onRetry={resources.reload}
                 />
-                {source === "j4l" ? (
-                  <>
-                    <RankSection resource={resources.rank} onRetry={resources.reload} />
-                    <ActivitySection resource={resources.activity} onRetry={resources.reload} />
-                  </>
-                ) : (
-                  <Panel className="cjs-player-profile__capability" role="note">
-                    <Badge tone="information">Source-specific data</Badge>
-                    <div>
-                      <h2>JumpersHeaven profile</h2>
-                      <p>
-                        JumpersHeaven publishes performance, placements, and recent records. XP rank
-                        and cumulative activity are Jump4Life-only and are not requested for this
-                        profile.
-                      </p>
-                    </div>
-                  </Panel>
-                )}
-              </>
+              </div>
             )}
             {queryState.view === "runs" && (
               <BestRunsSection
@@ -340,10 +351,25 @@ function PlayerProfile({
                 onRetry={resources.reload}
               />
             )}
+            {queryState.view === "progress" && (
+              <PlayerRunProgression
+                fps={queryState.fps}
+                mapId={queryState.map}
+                onMapChange={(map) => setQueryState({ map })}
+                onRetry={resources.reload}
+                runs={resources.mapRuns}
+                scores={resources.scores}
+              />
+            )}
             {queryState.view === "routes" && (
               <RouteCompletionSection
+                maps={resources.maps}
+                onQueryChange={(query) => setQueryState({ q: query })}
                 resource={resources.routes}
                 source={source}
+                query={queryState.q}
+                status={queryState.status}
+                onStatusChange={(status) => setQueryState({ status })}
                 onRetry={resources.reload}
               />
             )}
@@ -351,6 +377,57 @@ function PlayerProfile({
         )}
       </div>
     </Page>
+  );
+}
+
+function ProfileHighlights({
+  performance,
+  rank,
+}: {
+  performance: PlayerPerformanceStats | null;
+  rank: PlayerRankInfo | null;
+}) {
+  if (!performance && !rank) return null;
+
+  return (
+    <dl className="cjs-player-profile__highlights" aria-label="Player highlights">
+      {performance && (
+        <>
+          <ProfileStat
+            label="Maps completed"
+            value={formatProfileNumber(performance.total_maps_completed)}
+          />
+          <ProfileStat
+            label="Top 10 records"
+            value={formatProfileNumber(performance.top10_count)}
+          />
+          <ProfileStat label="First places" value={formatProfileNumber(performance.top1_count)} />
+        </>
+      )}
+      <ProfileStat
+        label={rank ? "J4L level" : "Best rank"}
+        value={
+          rank
+            ? rank.level_display || String(rank.level)
+            : performance?.best_rank === null || performance?.best_rank === undefined
+              ? "—"
+              : `#${performance.best_rank}`
+        }
+      />
+    </dl>
+  );
+}
+
+function ProfileStatusBadges({ performance }: { performance: PlayerPerformanceStats | null }) {
+  if (!performance) return null;
+
+  return (
+    <div className="cjs-player-profile__badges" aria-label="Player status">
+      {performance.best_fps && <Badge>{fpsLabel(performance.best_fps)} best FPS</Badge>}
+      {performance.is_donator && <Badge tone="success">Supporter</Badge>}
+      {performance.admin_level > 0 && <Badge>Admin level {performance.admin_level}</Badge>}
+      {performance.is_banned && <Badge tone="danger">Banned</Badge>}
+    </div>
   );
 }
 
@@ -364,14 +441,14 @@ function BackToPlayers() {
 }
 
 function ProfileNavigation({
-  board,
   fps,
+  mapId,
   playerId,
   source,
   view,
 }: {
-  board: (typeof PLAYER_LEADERBOARDS)[number];
   fps: (typeof FPS_VALUES)[number];
+  mapId: number;
   playerId: number;
   source: Source;
   view: PlayerProfileView;
@@ -379,6 +456,7 @@ function ProfileNavigation({
   const views: ReadonlyArray<{ label: string; value: PlayerProfileView }> = [
     { label: "Overview", value: "overview" },
     { label: "Best runs", value: "runs" },
+    { label: "Run analytics", value: "progress" },
     { label: "Route completion", value: "routes" },
   ];
 
@@ -389,7 +467,7 @@ function ProfileNavigation({
           key={option.value}
           className="cjs-player-profile__tab"
           data-active={view === option.value || undefined}
-          href={profileViewHref(playerId, source, option.value, fps, board)}
+          href={profileViewHref(playerId, source, option.value, fps, mapId)}
           aria-current={view === option.value ? "page" : undefined}
         >
           {option.label}
@@ -400,21 +478,20 @@ function ProfileNavigation({
 }
 
 function RecentActivitySection({
-  activity,
   onRetry,
   performance,
   source,
 }: {
-  activity: ProfileResource<PlayerActivitySummary>;
   onRetry: () => void;
   performance: ProfileResource<PlayerPerformanceStats>;
   source: Source;
 }) {
   return (
     <ProfileSection
+      className="cjs-player-profile__section--recent"
       description={
         source === "j4l"
-          ? "Recent records plus Jump4Life's richer tracked activity timestamps."
+          ? "Recent records and last-seen signals; full tracking totals appear below."
           : "Recent records and last-seen signals published by JumpersHeaven."
       }
       icon={<CalendarClock size={19} />}
@@ -435,24 +512,19 @@ function RecentActivitySection({
                       : `${data.days_since_last_seen}d ago`
                 }
               />
-              <ProfileStat label="Activity" value={data.activity_level || "Not available"} />
-              {source === "j4l" && activity.data ? (
-                <ProfileStat
-                  label="Last tracked session"
-                  value={
-                    activity.data.last_activity_at
-                      ? timeAgo(activity.data.last_activity_at)
-                      : "Not available"
-                  }
-                />
-              ) : (
-                <ProfileStat
-                  label="Recent records"
-                  value={formatProfileNumber(data.recent_tops.length)}
-                />
-              )}
+              <ProfileStat
+                label="Recent records"
+                value={formatProfileNumber(data.recent_tops.length)}
+              />
             </dl>
-            <RecentRuns runs={data.recent_tops} source={source} />
+            <div
+              aria-label={`${formatProfileNumber(data.recent_tops.length)} recent records`}
+              className="cjs-player-profile__recent-scroll"
+              role="region"
+            >
+              <RecentRuns runs={data.recent_tops} source={source} />
+            </div>
+            {data.oldest_top && <OldestRecord run={data.oldest_top} source={source} />}
           </div>
         )}
       </ResourceState>
@@ -460,25 +532,42 @@ function RecentActivitySection({
   );
 }
 
+function OldestRecord({ run, source }: { run: SimpleTop; source: Source }) {
+  return (
+    <div className="cjs-player-profile__oldest-record">
+      <div>
+        <span>Oldest standing record</span>
+        <Link href={mapDetailPath(run.cpid, { lookup: "cpid", source })}>{run.map_name}</Link>
+      </div>
+      <div>
+        <RunRank rank={run.rank} />
+        <Badge>{fpsLabel(run.fps)}</Badge>
+        <span>{run.finish_date ? formatDate(run.finish_date) : "Date not provided"}</span>
+      </div>
+    </div>
+  );
+}
+
 function RecentRuns({ runs, source }: { runs: readonly SimpleTop[]; source: Source }) {
   if (runs.length === 0) {
     return (
       <p className="cjs-player-profile__recent-empty">
-        No recent personal records were returned for this player.
+        No recent leaderboard records yet. This is expected for new players and players without a
+        ranked run.
       </p>
     );
   }
 
   return (
     <ul className="cjs-player-profile__recent-list" aria-label="Recent personal records">
-      {runs.slice(0, 5).map((run) => (
+      {runs.map((run) => (
         <li key={run.runid}>
           <div>
             <Link href={mapDetailPath(run.cpid, { lookup: "cpid", source })}>{run.map_name}</Link>
             <span>{run.finish_date ? formatDate(run.finish_date) : "Date not provided"}</span>
           </div>
           <div>
-            <strong>#{run.rank}</strong>
+            <RunRank rank={run.rank} />
             <Badge>{fpsLabel(run.fps)}</Badge>
           </div>
         </li>
@@ -487,14 +576,32 @@ function RecentRuns({ runs, source }: { runs: readonly SimpleTop[]; source: Sour
   );
 }
 
+function RunRank({ rank }: { rank: number }) {
+  const achievement = getRunAchievement(rank);
+
+  if (!achievement) return <strong>#{rank}</strong>;
+
+  return (
+    <span
+      className="cjs-player-profile__rank-achievement"
+      data-achievement={achievement.tier}
+      title={`${achievement.label} achievement`}
+      aria-label={`Rank ${rank}, ${achievement.label}`}
+    >
+      <strong>#{rank}</strong>
+    </span>
+  );
+}
+
 function profileViewHref(
   playerId: number,
   source: Source,
   view: PlayerProfileView,
   fps: (typeof FPS_VALUES)[number],
-  board: (typeof PLAYER_LEADERBOARDS)[number],
+  mapId: number,
 ): string {
-  const search = new URLSearchParams({ board, fps, source, view });
+  const search = new URLSearchParams({ fps, source, view });
+  if (mapId > 0) search.set("map", String(mapId));
   return `/players/${playerId}?${search.toString()}`;
 }
 
@@ -507,7 +614,8 @@ function PerformanceSection({
 }) {
   return (
     <ProfileSection
-      description="Completion, placement, and recent-record signals from the profile performance endpoint."
+      className="cjs-player-profile__section--performance"
+      description="Completion quality and the FPS distribution behind this player's records."
       icon={<BarChart3 size={19} />}
       id="player-performance"
       title="Performance"
@@ -517,39 +625,23 @@ function PerformanceSection({
           <>
             <dl className="cjs-player-profile__stat-grid">
               <ProfileStat
-                label="Maps completed"
-                value={formatProfileNumber(performance.total_maps_completed)}
-              />
-              <ProfileStat
-                label="Completion ratio"
-                value={formatProfilePercent(performance.maps_completed_ratio)}
-              />
-              <ProfileStat
-                label="Top 10 records"
-                value={formatProfileNumber(performance.top10_count)}
-              />
-              <ProfileStat
-                label="First places"
-                value={formatProfileNumber(performance.top1_count)}
-              />
-              <ProfileStat
-                label="Best rank"
-                value={
-                  performance.best_rank === null ? "Not available" : `#${performance.best_rank}`
-                }
+                label="Route completion"
+                value={`${formatProfileNumber(performance.total_maps_completed)} completed · ${formatProfilePercent(performance.maps_completed_ratio)}`}
               />
               <ProfileStat
                 label="Average rank"
-                value={formatProfileDecimal(performance.average_rank)}
+                value={
+                  performance.average_rank === null
+                    ? "Not ranked yet"
+                    : formatProfileDecimal(performance.average_rank)
+                }
+              />
+              <ProfileStat
+                label="Best FPS"
+                value={performance.best_fps ? fpsLabel(performance.best_fps) : "Not ranked yet"}
               />
             </dl>
-            <div className="cjs-player-profile__badges" aria-label="Player status">
-              <Badge tone="information">{performance.activity_level || "Activity unknown"}</Badge>
-              {performance.best_fps && <Badge>{fpsLabel(performance.best_fps)} best FPS</Badge>}
-              {performance.is_donator && <Badge tone="success">Supporter</Badge>}
-              {performance.admin_level > 0 && <Badge>Admin level {performance.admin_level}</Badge>}
-              {performance.is_banned && <Badge tone="danger">Banned</Badge>}
-            </div>
+            <FpsRecordDistribution counts={performance.nb_tops_per_fps} />
           </>
         )}
       </ResourceState>
@@ -557,12 +649,29 @@ function PerformanceSection({
   );
 }
 
+function FpsRecordDistribution({ counts }: { counts: PlayerPerformanceStats["nb_tops_per_fps"] }) {
+  return (
+    <div className="cjs-player-profile__fps-breakdown">
+      <h3>Records by FPS</h3>
+      <dl aria-label="Records by FPS">
+        {FPS_VALUES.map((fps) => (
+          <ProfileStat
+            key={fps}
+            label={fps === "0" ? "Mix" : fps}
+            value={formatProfileNumber(counts[fps] ?? 0)}
+          />
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function PositionSection({
-  board,
+  fps,
   onRetry,
   resource,
 }: {
-  board: (typeof PLAYER_LEADERBOARDS)[number];
+  fps: (typeof FPS_VALUES)[number];
   onRetry: () => void;
   resource: ProfileResource<PlayerLeaderboardPosition[]>;
 }) {
@@ -603,24 +712,25 @@ function PositionSection({
 
   return (
     <ProfileSection
-      description={`Official ${playerBoardLabel(board).toLowerCase()} placement for the selected FPS.`}
+      className="cjs-player-profile__section--position"
+      description={`Official placements across every published leaderboard at ${fpsLabel(fps)}.`}
       icon={<Medal size={19} />}
       id="player-position"
-      title="Leaderboard position"
+      title="Leaderboard positions"
     >
       <ResourceState resource={resource} label="leaderboard position" onRetry={onRetry}>
         {(positions) =>
           positions.length ? (
             <DataTable
-              caption={`${playerBoardLabel(board)} positions`}
+              caption={`All leaderboard positions at ${fpsLabel(fps)}`}
               columns={columns}
               getRowKey={(position) => `${position.leaderboard_type}-${position.fps}`}
               rows={positions}
             />
           ) : (
             <EmptyState
-              description="No placement was returned for this leaderboard and FPS combination."
-              title="No leaderboard position"
+              description="The leaderboard hasn't learned this player's name yet. A few more runs should get its attention."
+              title="Not on the board… yet"
             />
           )
         }
@@ -645,7 +755,7 @@ function BestRunsSection({
       {
         id: "rank",
         header: "Rank",
-        cell: (run) => <strong>#{run.rank}</strong>,
+        cell: (run) => <RunRank rank={run.rank} />,
       },
       {
         id: "map",
@@ -671,6 +781,7 @@ function BestRunsSection({
 
   return (
     <ProfileSection
+      className="cjs-player-profile__section--wide"
       description={`The player's highest-value ${fpsLabel(fps)} maps from the jump-skill leaderboard, ordered by contributed skill points.`}
       icon={<Trophy size={19} />}
       id="player-top-runs"
@@ -697,8 +808,8 @@ function BestRunsSection({
             </div>
           ) : (
             <EmptyState
-              description={`No jump-skill map scores were returned for ${fpsLabel(fps)}.`}
-              title="No best runs"
+              description={`This player has not earned jump-skill points at ${fpsLabel(fps)} yet. New ranked runs will appear here.`}
+              title="No ranked runs yet"
             />
           )
         }
@@ -708,34 +819,88 @@ function BestRunsSection({
 }
 
 function RouteCompletionSection({
+  maps,
+  onQueryChange,
   onRetry,
+  onStatusChange,
+  query,
   resource,
   source,
+  status,
 }: {
+  maps: ProfileResource<GameMap[]>;
+  onQueryChange: (query: string) => void;
   onRetry: () => void;
+  onStatusChange: (status: RouteCompletionStatus) => void;
+  query: string;
   resource: ProfileResource<PlayerRouteCompletion[]>;
   source: Source;
+  status: RouteCompletionStatus;
 }) {
-  const columns = useMemo<readonly DataTableColumn<PlayerRouteCompletion>[]>(
+  const [visibleLimit, setVisibleLimit] = useState(100);
+  const inventory = useMemo(
+    () => createPlayerRouteInventory(maps.data ?? [], resource.data ?? []),
+    [maps.data, resource.data],
+  );
+  const summary = useMemo(() => summarizePlayerRouteInventory(inventory), [inventory]);
+  const catalogAvailable = maps.data !== null;
+  const effectiveStatus = !catalogAvailable && status === "remaining" ? "all" : status;
+  const filteredRoutes = useMemo(
+    () => filterPlayerRouteInventory(inventory, { query, status: effectiveStatus }),
+    [effectiveStatus, inventory, query],
+  );
+  const visibleRoutes = filteredRoutes.slice(0, visibleLimit);
+  const completionPercent = summary.completionRate * 100;
+  const completedWithHistory = summary.completed + summary.archivedCompleted;
+
+  useEffect(() => {
+    setVisibleLimit(100);
+  }, [effectiveStatus, inventory, query, source]);
+
+  const columns = useMemo<readonly DataTableColumn<PlayerRouteInventoryItem>[]>(
     () => [
       {
         id: "map",
         header: "Map",
         priority: "primary",
+        cell: (route) => <Link href={mapDetailPath(route.mapId, { source })}>{route.mapName}</Link>,
+      },
+      {
+        id: "status",
+        header: "Status",
         cell: (route) => (
-          <Link href={mapDetailPath(route.map_id, { source })}>{route.map_name}</Link>
+          <span className="cjs-player-profile__route-status">
+            <Badge
+              icon={
+                route.completed ? (
+                  <CheckCircle2 aria-hidden="true" size={13} />
+                ) : (
+                  <Circle aria-hidden="true" size={13} />
+                )
+              }
+              tone={route.completed ? "success" : undefined}
+            >
+              {route.completed ? "Completed" : "Remaining"}
+            </Badge>
+            {catalogAvailable && !route.published && <Badge>Historical</Badge>}
+          </span>
         ),
       },
       {
         id: "fps",
-        header: "Completed at",
-        cell: (route) => route.fps_list.map(fpsLabel).join(", "),
+        header: "Completed FPS",
+        cell: (route) => (route.completed ? formatFpsList(route.fpsList) : "Not completed"),
       },
       {
         id: "finishes",
         header: "Finishes",
         align: "end",
-        cell: (route) => formatProfileNumber(route.total_finishes),
+        cell: (route) => formatProfileNumber(route.totalFinishes),
+      },
+      {
+        id: "type",
+        header: "Route type",
+        cell: (route) => (route.routeType ? sentenceCase(route.routeType) : "Not provided"),
       },
       {
         id: "ender",
@@ -743,33 +908,220 @@ function RouteCompletionSection({
         cell: (route) => route.ender || "Not provided",
       },
     ],
-    [source],
+    [catalogAvailable, source],
   );
 
   return (
     <ProfileSection
-      description="Completed map routes across all published FPS values."
+      className="cjs-player-profile__section--wide"
+      description="Completed and remaining maps across this source's published route catalog."
       icon={<Route size={19} />}
       id="player-routes"
       title="Route completion"
     >
-      <ResourceState resource={resource} label="route completion" onRetry={onRetry}>
-        {(routes) =>
-          routes.length ? (
+      {resource.status === "loading" && resource.data === null ? (
+        <div className="cjs-player-profile__resource-state">
+          <SkeletonGroup count={4} label="Loading route completion" />
+        </div>
+      ) : resource.error && resource.data === null ? (
+        <div className="cjs-player-profile__resource-state">
+          <ErrorState
+            description={resource.error.message}
+            onRetry={onRetry}
+            title="Route completion unavailable"
+          />
+        </div>
+      ) : maps.status === "loading" && maps.data === null ? (
+        <div className="cjs-player-profile__resource-state">
+          <SkeletonGroup count={4} label="Loading route inventory" />
+        </div>
+      ) : (
+        <div className="cjs-player-profile__resource-content">
+          {(resource.status === "refreshing" || maps.status === "refreshing") && (
+            <p className="cjs-player-profile__resource-status" role="status" aria-live="polite">
+              Refreshing route inventory…
+            </p>
+          )}
+          {resource.error && (
+            <div className="cjs-player-profile__resource-error" role="alert">
+              <span>
+                Completion refresh failed: {resource.error.message} Previous completion data is
+                still shown.
+              </span>
+              <Button onClick={onRetry} size="small" variant="ghost">
+                Try again
+              </Button>
+            </div>
+          )}
+          {maps.error && (
+            <div className="cjs-player-profile__resource-error" role="alert">
+              <span>
+                Map catalog {maps.data === null ? "could not be loaded" : "refresh failed"}:{" "}
+                {maps.error.message}
+                {maps.data === null
+                  ? " Completed routes remain available, but remaining and total counts are unavailable."
+                  : " The previous catalog is still shown."}
+              </span>
+              <Button onClick={onRetry} size="small" variant="ghost">
+                Try again
+              </Button>
+            </div>
+          )}
+
+          <div className="cjs-player-profile__route-dashboard">
+            <dl
+              className="cjs-player-profile__stat-grid cjs-player-profile__route-summary"
+              aria-label="Route completion summary"
+            >
+              <ProfileStat label="Completed" value={formatProfileNumber(completedWithHistory)} />
+              <ProfileStat
+                label="Remaining"
+                value={catalogAvailable ? formatProfileNumber(summary.remaining) : "Unavailable"}
+              />
+              <ProfileStat
+                label="Published routes"
+                value={catalogAvailable ? formatProfileNumber(summary.total) : "Unavailable"}
+              />
+              <ProfileStat
+                label="Total finishes"
+                value={formatProfileNumber(summary.totalFinishes)}
+              />
+            </dl>
+            {catalogAvailable && summary.total > 0 && (
+              <div className="cjs-player-profile__progress cjs-player-profile__route-progress">
+                <div>
+                  <span>Published completion</span>
+                  <strong>{formatProfilePercent(summary.completionRate)}</strong>
+                </div>
+                <progress
+                  aria-label={`${formatProfilePercent(summary.completionRate)} of published routes completed`}
+                  max="100"
+                  value={completionPercent}
+                >
+                  {formatProfilePercent(summary.completionRate)}
+                </progress>
+              </div>
+            )}
+            {catalogAvailable && summary.archivedCompleted > 0 && (
+              <p
+                className="cjs-player-profile__resource-status cjs-player-profile__route-history-note"
+                role="note"
+              >
+                {formatProfileNumber(summary.archivedCompleted)} historical{" "}
+                {summary.archivedCompleted === 1 ? "completion is" : "completions are"} included in
+                the completed count and results, but excluded from the current published-route
+                progress.
+              </p>
+            )}
+          </div>
+
+          <div className="cjs-player-profile__route-filters">
+            <Input
+              containerClassName="cjs-player-profile__route-search"
+              label="Search routes"
+              leading={<Search size={16} />}
+              onChange={(event) => onQueryChange(event.target.value)}
+              placeholder="Map name"
+              type="search"
+              value={query}
+            />
+            <fieldset className="cjs-player-profile__fps-filter cjs-player-profile__route-status-filter">
+              <legend>Completion status</legend>
+              <SegmentedControl<RouteCompletionStatus>
+                ariaLabel="Route completion status"
+                className="cjs-player-profile__fps-options"
+                onChange={onStatusChange}
+                options={[
+                  {
+                    accessibleLabel: `All ${inventory.length} available routes`,
+                    label: `All ${inventory.length}`,
+                    value: "all",
+                  },
+                  {
+                    accessibleLabel: `${completedWithHistory} completed routes`,
+                    label: `Completed ${completedWithHistory}`,
+                    value: "completed",
+                  },
+                  {
+                    accessibleLabel: catalogAvailable
+                      ? `${summary.remaining} remaining routes`
+                      : "Remaining routes unavailable",
+                    disabled: !catalogAvailable,
+                    label: `Remaining ${catalogAvailable ? summary.remaining : "—"}`,
+                    value: "remaining",
+                  },
+                ]}
+                value={effectiveStatus}
+              />
+            </fieldset>
+          </div>
+
+          <div className="cjs-player-profile__route-results-header">
+            <p aria-live="polite" role="status">
+              Showing <strong>{formatProfileNumber(visibleRoutes.length)}</strong> of{" "}
+              <strong>{formatProfileNumber(filteredRoutes.length)}</strong> matching routes
+            </p>
+            {(query || effectiveStatus !== "all") && (
+              <Button
+                onClick={() => {
+                  onQueryChange("");
+                  onStatusChange("all");
+                }}
+                size="small"
+                variant="ghost"
+              >
+                Clear filters
+              </Button>
+            )}
+          </div>
+
+          {visibleRoutes.length > 0 ? (
             <DataTable
-              caption="Completed routes"
+              caption="Route completion inventory"
               columns={columns}
-              getRowKey={(route) => route.map_id}
-              rows={routes}
+              getRowKey={(route) => route.routeId}
+              rows={visibleRoutes}
             />
           ) : (
             <EmptyState
-              description="The API returned no completed routes for this player."
-              title="No routes completed"
+              action={
+                query || effectiveStatus !== "all" ? (
+                  <Button
+                    onClick={() => {
+                      onQueryChange("");
+                      onStatusChange("all");
+                    }}
+                    variant="secondary"
+                  >
+                    Clear route filters
+                  </Button>
+                ) : undefined
+              }
+              description={
+                query || effectiveStatus !== "all"
+                  ? "Try another map name or completion status."
+                  : "This source returned no maps for the route inventory."
+              }
+              title={
+                query || effectiveStatus !== "all"
+                  ? "No routes match these filters"
+                  : "No routes available"
+              }
             />
-          )
-        }
-      </ResourceState>
+          )}
+          {visibleRoutes.length < filteredRoutes.length && (
+            <div className="cjs-player-profile__route-load-more">
+              <Button onClick={() => setVisibleLimit((limit) => limit + 100)} variant="secondary">
+                Show more routes
+              </Button>
+              <p>
+                {formatProfileNumber(visibleRoutes.length)} of{" "}
+                {formatProfileNumber(filteredRoutes.length)} matching routes shown
+              </p>
+            </div>
+          )}
+        </div>
+      )}
     </ProfileSection>
   );
 }
@@ -783,6 +1135,7 @@ function RankSection({
 }) {
   return (
     <ProfileSection
+      className="cjs-player-profile__section--rank"
       description="Jump4Life level, prestige, title, and cumulative XP."
       icon={<Gauge size={19} />}
       id="player-rank"
@@ -797,14 +1150,13 @@ function RankSection({
           return (
             <>
               <dl className="cjs-player-profile__stat-grid">
-                <ProfileStat label="Level" value={rank.level_display || String(rank.level)} />
-                <ProfileStat label="Prestige" value={formatProfileNumber(rank.prestige)} />
                 <ProfileStat label="Title" value={rank.title || "Not provided"} />
+                <ProfileStat label="Prestige" value={formatProfileNumber(rank.prestige)} />
                 <ProfileStat label="Total XP" value={formatProfileNumber(rank.total_xp)} />
               </dl>
               <div className="cjs-player-profile__progress">
                 <div>
-                  <span>Level progress</span>
+                  <span>Level {rank.level_display || rank.level} progress</span>
                   <strong>
                     {rank.maxed
                       ? "Maximum level"
@@ -832,51 +1184,90 @@ function ActivitySection({
 }) {
   return (
     <ProfileSection
-      description="All-time cumulative Jump4Life activity. Durations include the API's separate active, spectating, and AFK totals."
+      className="cjs-player-profile__section--activity"
+      description="All-time Jump4Life movement, session, run, and checkpoint totals."
       icon={<Activity size={19} />}
       id="player-activity"
       title="Lifetime activity"
     >
       <ResourceState resource={resource} label="lifetime activity" onRetry={onRetry}>
         {(activity) => (
-          <dl className="cjs-player-profile__activity-grid">
-            <ActivityStat
-              icon={<Clock3 />}
-              label="Playing"
-              value={formatDuration(activity.playing_ms)}
-            />
-            <ActivityStat
-              icon={<Gauge />}
-              label="Run time"
-              value={formatDuration(activity.runtime_ms)}
-            />
-            <ActivityStat
-              icon={<Activity />}
-              label="Spectating"
-              value={formatDuration(activity.spectating_ms)}
-            />
-            <ActivityStat icon={<Clock3 />} label="AFK" value={formatDuration(activity.afk_ms)} />
-            <ActivityStat
-              icon={<Footprints />}
-              label="Jumps"
-              value={formatProfileNumber(activity.jump_count)}
-            />
-            <ActivityStat
-              icon={<Route />}
-              label="Distance"
-              value={formatDistance(activity.distance_travelled)}
-            />
-            <ActivityStat
-              icon={<MapPinned />}
-              label="Loads"
-              value={formatProfileNumber(activity.load_count)}
-            />
-            <ActivityStat
-              icon={<Trophy />}
-              label="Saves"
-              value={formatProfileNumber(activity.save_count)}
-            />
-          </dl>
+          <div className="cjs-player-profile__activity">
+            <dl className="cjs-player-profile__tracking-grid" aria-label="Activity tracking range">
+              <ProfileStat
+                label="First tracked"
+                value={activity.first_activity_at ? formatDate(activity.first_activity_at) : "—"}
+              />
+              <ProfileStat
+                label="Last tracked"
+                value={activity.last_activity_at ? formatDate(activity.last_activity_at) : "—"}
+              />
+              <ProfileStat label="Updated" value={formatDate(activity.updated_at)} />
+            </dl>
+            <dl className="cjs-player-profile__activity-grid">
+              <ActivityStat
+                icon={<Clock3 />}
+                label="Playing"
+                value={formatDuration(activity.playing_ms)}
+              />
+              <ActivityStat
+                icon={<Gauge />}
+                label="Run attempts"
+                value={formatDuration(activity.run_attempt_ms)}
+              />
+              <ActivityStat
+                icon={<Gauge />}
+                label="Run time"
+                value={formatDuration(activity.runtime_ms)}
+              />
+              <ActivityStat
+                icon={<Activity />}
+                label="Spectating"
+                value={formatDuration(activity.spectating_ms)}
+              />
+              <ActivityStat icon={<Clock3 />} label="AFK" value={formatDuration(activity.afk_ms)} />
+              <ActivityStat
+                icon={<Clock3 />}
+                label="Playing AFK"
+                value={formatDuration(activity.playing_afk_ms)}
+              />
+              <ActivityStat
+                icon={<Clock3 />}
+                label="Spectating AFK"
+                value={formatDuration(activity.spectating_afk_ms)}
+              />
+              <ActivityStat
+                icon={<Footprints />}
+                label="Jumps"
+                value={formatProfileNumber(activity.jump_count)}
+              />
+              <ActivityStat
+                icon={<Route />}
+                label="Nade throws"
+                value={formatProfileNumber(activity.nadethrows)}
+              />
+              <ActivityStat
+                icon={<Route />}
+                label="Nade jumps"
+                value={formatProfileNumber(activity.nadejumps)}
+              />
+              <ActivityStat
+                icon={<Route />}
+                label="Distance"
+                value={formatDistance(activity.distance_travelled)}
+              />
+              <ActivityStat
+                icon={<MapPinned />}
+                label="Loads"
+                value={formatProfileNumber(activity.load_count)}
+              />
+              <ActivityStat
+                icon={<Trophy />}
+                label="Saves"
+                value={formatProfileNumber(activity.save_count)}
+              />
+            </dl>
+          </div>
         )}
       </ResourceState>
     </ProfileSection>
@@ -885,27 +1276,34 @@ function ActivitySection({
 
 function ProfileSection({
   children,
+  className,
   description,
   icon,
   id,
   title,
 }: {
   children: ReactNode;
+  className?: string;
   description: string;
   icon: ReactNode;
   id: string;
   title: string;
 }) {
   return (
-    <section className="cjs-player-profile__section" aria-labelledby={`${id}-title`}>
-      <header className="cjs-player-profile__section-header">
-        <span aria-hidden="true">{icon}</span>
-        <div>
-          <h2 id={`${id}-title`}>{title}</h2>
-          <p>{description}</p>
-        </div>
-      </header>
-      <Panel padding="none">{children}</Panel>
+    <section
+      className={["cjs-player-profile__section", className].filter(Boolean).join(" ")}
+      aria-labelledby={`${id}-title`}
+    >
+      <Panel className="cjs-player-profile__section-panel" padding="none">
+        <header className="cjs-player-profile__section-header">
+          <span aria-hidden="true">{icon}</span>
+          <div>
+            <h2 id={`${id}-title`}>{title}</h2>
+            <p>{description}</p>
+          </div>
+        </header>
+        {children}
+      </Panel>
     </section>
   );
 }

@@ -10,6 +10,7 @@ import {
   ErrorState,
   SegmentedControl,
 } from "../../components/ui";
+import { getMapImageSources } from "../../lib/mapImages";
 import {
   booleanQueryParam,
   defineQuerySchema,
@@ -384,7 +385,8 @@ function ServerCard({ server, source }: { server: ServerViewModel; source: Sourc
   const [imageFailed, setImageFailed] = useState(false);
   const visiblePlayers = server.players?.slice(0, 5) ?? [];
   const country = getServerCountry(server.domain);
-  const imagePath = getMapImagePath(server.mapName);
+  const imageSources =
+    server.mapName === "Map unavailable" ? null : getMapImageSources(server.mapName);
 
   const copyAddress = async () => {
     if (!server.connectionAddress) return;
@@ -405,10 +407,12 @@ function ServerCard({ server, source }: { server: ServerViewModel; source: Sourc
       aria-labelledby={headingId}
     >
       <div className="server-card__visual">
-        {imagePath && !imageFailed && (
+        {imageSources && !imageFailed && (
           <img
             className="server-card__visual-image"
-            src={imagePath}
+            src={imageSources.card}
+            srcSet={imageSources.srcSet}
+            sizes="(max-width: 48rem) 100vw, 33vw"
             alt=""
             loading="lazy"
             decoding="async"
@@ -491,11 +495,6 @@ function getServerCountry(domain: string) {
   const country = serverCountries[regionKey];
   if (!country) return { code: null, name: "Server region unavailable" };
   return { code: country.code, name: country.name };
-}
-
-function getMapImagePath(mapName: string) {
-  if (mapName === "Map unavailable") return null;
-  return `/maps/cards/${encodeURIComponent(mapName)}.avif`;
 }
 
 function ServerRoster({

@@ -4,25 +4,31 @@ import {
   api,
   type CjsApi,
   type Fps,
+  type GameMap,
   type PlayerActivitySummary,
-  type PlayerLeaderboard,
+  type Player,
   type PlayerLeaderboardPosition,
   type PlayerJumpScores,
   type PlayerPerformanceStats,
   type PlayerRankInfo,
   type PlayerRouteCompletion,
   type Source,
+  type TopRun,
 } from "../../lib/api";
+import { loadPlayerDirectoryEntry } from "./playerDirectoryCache";
 import type { PlayerProfileView } from "./playerProfileModel";
 
 export type PlayerProfileApi = Pick<
   CjsApi,
+  | "maps"
   | "playerActivitySummary"
   | "playerLeaderboardPositions"
   | "playerJumpScores"
+  | "playerMapRuns"
   | "playerPerformance"
   | "playerRank"
   | "playerRoutes"
+  | "players"
 >;
 
 export type ProfileResourceStatus = "error" | "loading" | "refreshing" | "success" | "unsupported";
@@ -40,8 +46,11 @@ export interface ProfileResource<Data> {
 
 export interface PlayerProfileResources {
   activity: ProfileResource<PlayerActivitySummary>;
+  directory: ProfileResource<Player | null>;
+  maps: ProfileResource<GameMap[]>;
   performance: ProfileResource<PlayerPerformanceStats>;
   positions: ProfileResource<PlayerLeaderboardPosition[]>;
+  mapRuns: ProfileResource<TopRun[]>;
   rank: ProfileResource<PlayerRankInfo>;
   routes: ProfileResource<PlayerRouteCompletion[]>;
   scores: ProfileResource<PlayerJumpScores>;
@@ -49,8 +58,8 @@ export interface PlayerProfileResources {
 
 interface UsePlayerProfileOptions {
   apiClient?: PlayerProfileApi;
-  board: PlayerLeaderboard;
   fps: Fps;
+  mapId: number;
   playerId: number;
   source: Source;
   view: PlayerProfileView;
@@ -60,8 +69,11 @@ type ResourceKind = keyof PlayerProfileResources;
 
 interface ResourceDataMap {
   activity: PlayerActivitySummary;
+  directory: Player | null;
+  maps: GameMap[];
   performance: PlayerPerformanceStats;
   positions: PlayerLeaderboardPosition[];
+  mapRuns: TopRun[];
   rank: PlayerRankInfo;
   routes: PlayerRouteCompletion[];
   scores: PlayerJumpScores;
@@ -73,15 +85,24 @@ interface ResourceState<Data> extends ProfileResource<Data> {
 
 export function usePlayerProfile({
   apiClient = api,
-  board,
   fps,
+  mapId,
   playerId,
   source,
   view,
 }: UsePlayerProfileOptions): PlayerProfileResources & { reload: () => void } {
   const [reloadVersion, setReloadVersion] = useState(0);
   const baseKey = `${source}:${playerId}`;
-  const options = useMemo(() => ({ board, fps, playerId, source }), [board, fps, playerId, source]);
+  const options = useMemo(() => ({ fps, mapId, playerId, source }), [fps, mapId, playerId, source]);
+
+  const directory = useProfileResource(
+    "directory",
+    `${baseKey}:directory`,
+    true,
+    apiClient,
+    options,
+    reloadVersion,
+  );
 
   const performance = useProfileResource(
     "performance",
@@ -93,7 +114,7 @@ export function usePlayerProfile({
   );
   const positions = useProfileResource(
     "positions",
-    `${baseKey}:positions:${fps}:${board}`,
+    `${baseKey}:positions:${fps}`,
     view === "overview",
     apiClient,
     options,
@@ -102,7 +123,15 @@ export function usePlayerProfile({
   const scores = useProfileResource(
     "scores",
     `${baseKey}:scores:${fps}`,
-    view === "runs",
+    view === "runs" || view === "progress",
+    apiClient,
+    options,
+    reloadVersion,
+  );
+  const mapRuns = useProfileResource(
+    "mapRuns",
+    `${baseKey}:map-runs:${fps}:${mapId}`,
+    view === "progress" && mapId > 0,
     apiClient,
     options,
     reloadVersion,
@@ -110,6 +139,14 @@ export function usePlayerProfile({
   const routes = useProfileResource(
     "routes",
     `${baseKey}:routes`,
+    view === "routes",
+    apiClient,
+    options,
+    reloadVersion,
+  );
+  const maps = useProfileResource(
+    "maps",
+    `${source}:maps`,
     view === "routes",
     apiClient,
     options,
@@ -133,7 +170,18 @@ export function usePlayerProfile({
   );
   const reload = useCallback(() => setReloadVersion((version) => version + 1), []);
 
-  return { activity, performance, positions, rank, reload, routes, scores };
+  return {
+    activity,
+    directory,
+    maps,
+    mapRuns,
+    performance,
+    positions,
+    rank,
+    reload,
+    routes,
+    scores,
+  };
 }
 
 function useProfileResource<Kind extends ResourceKind>(
@@ -142,8 +190,8 @@ function useProfileResource<Kind extends ResourceKind>(
   enabled: boolean,
   apiClient: PlayerProfileApi,
   options: {
-    board: PlayerLeaderboard;
     fps: Fps;
+    mapId: number;
     playerId: number;
     source: Source;
   },
@@ -202,8 +250,8 @@ function loadResource<Kind extends ResourceKind>(
   kind: Kind,
   apiClient: PlayerProfileApi,
   options: {
-    board: PlayerLeaderboard;
     fps: Fps;
+    mapId: number;
     playerId: number;
     source: Source;
   },
@@ -218,13 +266,27 @@ function loadResource<Kind extends ResourceKind>(
   switch (kind) {
     case "activity":
       return apiClient.playerActivitySummary(context) as Promise<ResourceDataMap[Kind]>;
+    case "directory":
+      return loadPlayerDirectoryEntry(
+        apiClient.players,
+        options.source,
+        options.playerId,
+        signal,
+      ) as Promise<ResourceDataMap[Kind]>;
+    case "maps":
+      return apiClient.maps({ signal, source: options.source }) as Promise<ResourceDataMap[Kind]>;
     case "performance":
       return apiClient.playerPerformance(context) as Promise<ResourceDataMap[Kind]>;
     case "positions":
       return apiClient.playerLeaderboardPositions({
         ...context,
         fps: options.fps,
-        leaderboard: options.board,
+      }) as Promise<ResourceDataMap[Kind]>;
+    case "mapRuns":
+      return apiClient.playerMapRuns({
+        ...context,
+        checkpointId: options.mapId,
+        fps: options.fps,
       }) as Promise<ResourceDataMap[Kind]>;
     case "rank":
       return apiClient.playerRank(context) as Promise<ResourceDataMap[Kind]>;

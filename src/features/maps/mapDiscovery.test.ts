@@ -39,7 +39,7 @@ const maps: GameMap[] = [
     cp_id: 203,
     author: null,
     released: null,
-    type: null,
+    type: "Jump",
     difficulty: null,
   },
 ];
@@ -49,8 +49,7 @@ const defaultFilters: MapDiscoveryFilters = {
   route: "all",
   media: "all",
   fps: "125",
-  difficulty: "all",
-  sort: "completions",
+  sort: "released",
 };
 
 describe("map discovery state", () => {
@@ -66,21 +65,21 @@ describe("map discovery state", () => {
       media: "all",
       page: 1,
       view: "grid",
+      sort: "released",
     });
 
     expect(updateQuerySearch("?source=j4l&media=maybe", mapDiscoveryQuerySchema, state)).toBe(
-      "?source=j4l&q=beta&view=grid",
+      "?source=j4l&q=beta",
     );
   });
 
-  it("combines search, route, media, FPS rating, and sort filters deterministically", () => {
+  it("combines search, route, media, FPS, and sort selections deterministically", () => {
     const prepared = prepareMaps(maps);
     const result = filterAndSortMaps(prepared, {
       ...defaultFilters,
       q: "mapper",
       route: "surf",
       media: "with-media",
-      difficulty: "rated",
       sort: "difficulty",
     });
 
@@ -101,6 +100,13 @@ describe("map discovery state", () => {
         (item) => item.map.mapid,
       ),
     ).toEqual([2, 1, 3]);
+    expect(
+      filterAndSortMaps(prepared, {
+        ...defaultFilters,
+        route: "jump",
+        sort: "released",
+      }).map((item) => item.map.mapid),
+    ).toEqual([1, 3]);
     expect(
       filterAndSortMaps(prepared, { ...defaultFilters, sort: "difficulty" }).map(
         (item) => item.map.mapid,

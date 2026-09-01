@@ -22,6 +22,7 @@ import {
   playerDisplayName,
 } from "./playerDiscovery";
 import type { PlayerSearchStatus } from "./usePlayerSearch";
+import type { PlayerLevelsStatus } from "./usePlayerLevels";
 
 const sourceLabels: Readonly<Record<Source, string>> = {
   j4l: "Jump4Life",
@@ -31,9 +32,13 @@ const sourceLabels: Readonly<Record<Source, string>> = {
 interface PlayerResultsProps {
   error: string | null;
   favoriteIds: ReadonlySet<number>;
+  levelError: string | null;
+  levelStatus: PlayerLevelsStatus;
   players: Player[];
+  playerLevels: ReadonlyMap<number, string>;
   query: string;
   retry: () => void;
+  retryLevels: () => void;
   source: Source;
   status: PlayerSearchStatus;
   toggleFavorite: (player: Player) => void;
@@ -42,9 +47,13 @@ interface PlayerResultsProps {
 export function PlayerResults({
   error,
   favoriteIds,
+  levelError,
+  levelStatus,
   players,
+  playerLevels,
   query,
   retry,
+  retryLevels,
   source,
   status,
   toggleFavorite,
@@ -77,8 +86,8 @@ export function PlayerResults({
     return () => observer.disconnect();
   }, [hasMore, loadMore]);
 
-  const columns = useMemo<readonly DataTableColumn<Player>[]>(
-    () => [
+  const columns = useMemo<readonly DataTableColumn<Player>[]>(() => {
+    const result: DataTableColumn<Player>[] = [
       {
         id: "player",
         header: "Player",
@@ -86,26 +95,18 @@ export function PlayerResults({
         cell: (player) => <PlayerLink player={player} source={source} />,
       },
       {
-        id: "country",
-        header: "Country",
-        cell: (player) => {
-          const country = player.country?.trim();
-          return country ? (
-            <span className="cjs-player-country">
-              <CountryFlag code={country} label={country} size="small" />
-              <span>{country}</span>
-            </span>
-          ) : (
-            "Not provided"
-          );
-        },
-      },
-      {
         id: "visits",
         header: "Visits",
         align: "end",
         cell: (player) =>
           player.visits === undefined ? "Not provided" : formatNumber(player.visits),
+      },
+      {
+        id: "admin-level",
+        header: "Admin level",
+        align: "end",
+        cell: (player) =>
+          player.admin === undefined ? "Not provided" : formatNumber(player.admin),
       },
       {
         id: "last-seen",
@@ -137,9 +138,23 @@ export function PlayerResults({
           );
         },
       },
-    ],
-    [favoriteIds, source, toggleFavorite],
-  );
+    ];
+
+    if (source === "j4l") {
+      result.splice(3, 0, {
+        id: "player-level",
+        header: "Player level",
+        align: "end",
+        cell: (player) => {
+          if (levelStatus === "loading") return "Loading…";
+          if (levelStatus === "error") return "Unavailable";
+          return playerLevels.get(player.player_id) ?? "Not ranked";
+        },
+      });
+    }
+
+    return result;
+  }, [favoriteIds, levelStatus, playerLevels, source, toggleFavorite]);
 
   return (
     <section className="cjs-player-results" aria-labelledby="player-results-heading">
@@ -188,6 +203,18 @@ export function PlayerResults({
           <p>The latest refresh failed{error ? `: ${error}` : "."} Showing previous results.</p>
           <Button onClick={retry} size="small" variant="secondary">
             Try again
+          </Button>
+        </div>
+      )}
+
+      {source === "j4l" && levelStatus === "error" && (
+        <div className="cjs-player-results__metadata-error" role="status">
+          <p>
+            Player levels are unavailable{levelError ? `: ${levelError}.` : "."} The rest of the
+            directory is still current.
+          </p>
+          <Button onClick={retryLevels} size="small" variant="secondary">
+            Retry levels
           </Button>
         </div>
       )}
@@ -244,6 +271,7 @@ export function PlayerResults({
 function PlayerLink({ player, source }: { player: Player; source: Source }) {
   const parsedName = parseCodName(playerDisplayName(player));
   const initial = parsedName.plainText.slice(0, 1).toUpperCase() || "?";
+  const country = player.country?.trim();
 
   return (
     <Link
@@ -251,14 +279,26 @@ function PlayerLink({ player, source }: { player: Player; source: Source }) {
       href={playerDetailPath(player.player_id, source)}
       variant="player"
     >
-      <span className="cjs-player-link__avatar" aria-hidden="true">
-        {initial}
-      </span>
+      {country ? (
+        <CountryFlag code={country} label={country} size="large" />
+      ) : (
+        <span className="cjs-player-link__avatar" aria-hidden="true">
+          {initial}
+        </span>
+      )}
       <span className="cjs-player-link__identity">
         <strong>
           <CodPlayerName value={playerDisplayName(player)} />
         </strong>
-        <small>Player #{player.player_id}</small>
+        <small>
+          {country && (
+            <>
+              <span className="cjs-player-link__country">{country}</span>
+              <span aria-hidden="true"> · </span>
+            </>
+          )}
+          Player #{player.player_id}
+        </small>
       </span>
     </Link>
   );

@@ -88,6 +88,11 @@ describe("ServersPage", () => {
 
     const mapImage = container.querySelector<HTMLImageElement>(".server-card__visual-image");
     expect(mapImage).toHaveAttribute("src", "/maps/cards/mp_cjs_training.avif");
+    expect(mapImage).toHaveAttribute(
+      "srcset",
+      "/maps/thumbs/mp_cjs_training.avif 480w, /maps/cards/mp_cjs_training.avif 960w",
+    );
+    expect(mapImage).toHaveAttribute("sizes", "(max-width: 48rem) 100vw, 33vw");
     fireEvent.error(mapImage as HTMLImageElement);
     expect(
       container.querySelector('[src="/maps/cards/mp_cjs_training.avif"]'),

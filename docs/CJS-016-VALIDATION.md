@@ -11,11 +11,14 @@ Date: 2026-08-15
   the owner's custom-domain decision.
 - Private vulnerability reporting, secret scanning, push protection, and Dependabot security
   updates are enabled.
-- The repository does not currently publish a license. `CONTRIBUTING.md` and the release runbook
-  prohibit accepting outside code until the owner chooses one.
+- At validation time, the repository did not publish a license and prohibited accepting outside
+  code until the owner chose one.
 
 No production workflow was dispatched, no Cloudflare route/domain/binding was changed, and no
 credential was retrieved during this work.
+
+Post-validation update (2026-08-30): the owner selected the MIT License. The root `LICENSE`, package
+metadata, README, contribution guide, and release runbook now publish that decision.
 
 ## Automated validation
 
@@ -46,7 +49,8 @@ tests; the CJS-016 changes do not alter application behavior.
 
 ## Owner actions before first public release
 
-1. Select and publish a repository license before accepting outside contributions.
+1. Resolved 2026-08-30: publish the repository under the MIT License before accepting outside
+   contributions.
 2. Choose the final HTTPS custom domain in Cloudflare and set `CJS_PRODUCTION_URL` to its origin.
 3. Confirm the least-privilege Cloudflare production secrets and, if desired, add a production
    environment reviewer.

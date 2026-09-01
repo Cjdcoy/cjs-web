@@ -108,8 +108,14 @@ export function normalizeTopRuns(value: unknown, path: string): TopRun[] {
   });
 }
 
+export function normalizePlayerMapRuns(value: unknown, path: string): TopRun[] {
+  return value === null ? [] : normalizeTopRuns(value, path);
+}
+
 export function normalizePlayerPerformance(value: unknown, path: string): PlayerPerformanceStats {
   const object = record(value, path, "$response");
+  const bestRank = nullableNumber(object, "best_rank", path);
+  const averageRank = nullableNumber(object, "average_rank", path);
   const recent =
     object.recent_tops === undefined || object.recent_tops === null
       ? []
@@ -128,10 +134,10 @@ export function normalizePlayerPerformance(value: unknown, path: string): Player
   return {
     total_maps_completed: optionalNumber(object, "total_maps_completed", path) ?? 0,
     maps_completed_ratio: optionalNumber(object, "maps_completed_ratio", path) ?? 0,
-    best_rank: nullableNumber(object, "best_rank", path),
+    best_rank: bestRank !== null && bestRank > 0 ? bestRank : null,
     top10_count: optionalNumber(object, "top10_count", path) ?? 0,
     top1_count: optionalNumber(object, "top1_count", path) ?? 0,
-    average_rank: nullableNumber(object, "average_rank", path),
+    average_rank: averageRank !== null && averageRank > 0 ? averageRank : null,
     recent_tops: recent,
     oldest_top: oldest,
     days_since_last_seen: nullableNumber(object, "days_since_last_seen", path),
@@ -141,7 +147,9 @@ export function normalizePlayerPerformance(value: unknown, path: string): Player
     admin_level: optionalNumber(object, "admin_level", path) ?? 0,
     nb_tops_per_fps: optionalFpsNumberRecord(object, "nb_tops_per_fps", path),
     best_fps:
-      object.best_fps === undefined || object.best_fps === null
+      object.best_fps === undefined ||
+      object.best_fps === null ||
+      (typeof object.best_fps === "string" && object.best_fps.trim() === "")
         ? null
         : fps(object.best_fps, path, "best_fps"),
     ...(rank ? { rank } : {}),
@@ -152,6 +160,8 @@ export function normalizePlayerPositions(
   value: unknown,
   path: string,
 ): PlayerLeaderboardPosition[] {
+  if (value === null) return [];
+
   return array(value, path, "$response").map((position, index) => {
     const at = `$response[${index}]`;
     const object = record(position, path, at);
@@ -172,6 +182,11 @@ export function normalizePlayerPositions(
 
 export function normalizePlayerJumpScores(value: unknown, path: string): PlayerJumpScores {
   const object = record(value, path, "$response");
+  const mapScores =
+    object.map_scores === undefined || object.map_scores === null
+      ? []
+      : array(object.map_scores, path, "$response.map_scores");
+
   return {
     player_id: requiredNumber(object, "player_id", path, "$response"),
     player_name: requiredString(object, "player_name", path, "$response"),
@@ -183,7 +198,7 @@ export function normalizePlayerJumpScores(value: unknown, path: string): PlayerJ
     region: optionalString(object, "region", path),
     last_seen: optionalString(object, "last_seen", path),
     top_list: optionalNumberRecord(object, "top_list", path) ?? {},
-    map_scores: array(object.map_scores, path, "$response.map_scores").map((entry, index) => {
+    map_scores: mapScores.map((entry, index) => {
       const at = `$response.map_scores[${index}]`;
       const score = record(entry, path, at);
       return {
@@ -334,9 +349,9 @@ function normalizePlayerRankAt(value: unknown, path: string, at: string): Player
     xp_for_level: requiredNumber(object, "xp_for_level", path, at),
     xp_to_next: requiredNumber(object, "xp_to_next", path, at),
     maxed: requiredBoolean(object, "maxed", path, at),
-    country: requiredString(object, "country", path, at),
-    country_code: requiredString(object, "country_code", path, at),
-    region: requiredString(object, "region", path, at),
+    country: optionalString(object, "country", path),
+    country_code: optionalString(object, "country_code", path),
+    region: optionalString(object, "region", path),
     last_seen: requiredString(object, "last_seen", path, at),
   };
 }

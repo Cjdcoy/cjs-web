@@ -132,3 +132,9 @@ done
 ```
 
 Stop the foreground container with <kbd>Ctrl</kbd>+<kbd>C</kbd> after the check.
+
+## License
+
+CJS is available under the [MIT License](LICENSE). The map-card screenshots in
+`public/maps/cards` were captured and prepared by Cjdcoy and are included under the same license.
+Third-party dependencies and underlying game or map content retain their respective rights.
