@@ -31,16 +31,16 @@
   --cjs-color-information-surface: rgb(143 184 232 / 0.13);
   --cjs-color-selection: rgb(97 214 157 / 0.28);
   --cjs-color-backdrop: rgb(0 0 0 / 0.68);
-  --cjs-color-cod-0: #000;
-  --cjs-color-cod-1: #da0120;
+  --cjs-color-cod-0: #aeb8b2;
+  --cjs-color-cod-1: #ff6674;
   --cjs-color-cod-2: #00b906;
   --cjs-color-cod-3: #e8ff19;
-  --cjs-color-cod-4: #170bdb;
+  --cjs-color-cod-4: #7d8cff;
   --cjs-color-cod-5: #23c2c6;
-  --cjs-color-cod-6: #e201db;
+  --cjs-color-cod-6: #ff60fa;
   --cjs-color-cod-7: #eee;
   --cjs-color-cod-8: #8080fe;
-  --cjs-color-cod-9: #757575;
+  --cjs-color-cod-9: #9ca9a1;
 
   /* Type */
   --cjs-font-sans:

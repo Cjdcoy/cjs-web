@@ -1,4 +1,4 @@
-import { CalendarDays, Heart, Map as MapIcon, SquarePlay, Trophy } from "lucide-react";
+import { CalendarDays, Heart, Map as MapIcon, Play, Trophy } from "lucide-react";
 import { useState } from "react";
 import { Card, IconButton, Link } from "../../components/ui";
 import type { Fps, Source } from "../../lib/api";
@@ -6,6 +6,7 @@ import { getMapImageSources } from "../../lib/mapImages";
 import { mapDetailPath } from "../../lib/routing";
 import { getMapDifficulty, type PreparedMap } from "./mapDiscovery";
 import { getSafeMediaUrl } from "./mapDetailModel";
+import { getMapVideos } from "./mapVideos";
 
 export interface MapCardProps {
   item: PreparedMap;
@@ -28,6 +29,7 @@ export function MapCard({ favorite, fps, item, onToggleFavorite, source }: MapCa
   const imageSources = getMapImageSources(map.mapname);
   const routeName = map.ender === null || map.ender === undefined ? "" : String(map.ender).trim();
   const mediaUrl = getSafeMediaUrl(map.video);
+  const mapVideos = getMapVideos(map.mapname, map.video);
   const [failedImagePath, setFailedImagePath] = useState<string | null>(null);
   const difficultyRatings = DISPLAY_FPS_VALUES.flatMap((ratingFps) => {
     const value = getMapDifficulty(map, ratingFps);
@@ -69,7 +71,17 @@ export function MapCard({ favorite, fps, item, onToggleFavorite, source }: MapCa
                 {map.mapname}
               </Link>
               {routeName && <span className="cjs-map-card__route-name">({routeName})</span>}
-              {mediaUrl && (
+              {mapVideos.length > 0 ? (
+                <Link
+                  className="cjs-map-card__video-link"
+                  href={`${detailsPath}#map-videos`}
+                  aria-label={`View ${mapVideos.length === 1 ? "one video" : `${mapVideos.length} videos`} for ${map.mapname}`}
+                >
+                  <span className="cjs-map-card__youtube-mark" aria-hidden="true">
+                    <Play size={10} fill="currentColor" />
+                  </span>
+                </Link>
+              ) : mediaUrl ? (
                 <Link
                   className="cjs-map-card__video-link"
                   href={mediaUrl}
@@ -77,9 +89,11 @@ export function MapCard({ favorite, fps, item, onToggleFavorite, source }: MapCa
                   rel="noreferrer noopener"
                   aria-label={`Watch YouTube video for ${map.mapname} (opens in a new tab)`}
                 >
-                  <SquarePlay aria-hidden="true" size={18} />
+                  <span className="cjs-map-card__youtube-mark" aria-hidden="true">
+                    <Play size={10} fill="currentColor" />
+                  </span>
                 </Link>
-              )}
+              ) : null}
             </div>
             <p>{map.author?.trim() ? `by ${map.author}` : "Author not available"}</p>
           </div>

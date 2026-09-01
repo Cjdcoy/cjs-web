@@ -15,6 +15,8 @@ import {
   type PlayerRankInfo,
   type PlayerRouteCompletion,
   type RankLeaderboardEntry,
+  type ReplayWatchAggregate,
+  type ReplayWatchRankingEntry,
   type ServerPlayer,
   type ServerResponse,
   type SimpleTop,
@@ -249,6 +251,50 @@ export function normalizePlayerActivity(value: unknown, path: string): PlayerAct
   return normalizePlayerActivityAt(value, path, "$response");
 }
 
+export function normalizeReplayWatchAggregate(value: unknown, path: string): ReplayWatchAggregate {
+  const object = record(value, path, "$response");
+  const ownerPlayerId = optionalNumber(object, "owner_player_id", path);
+  const mapId = optionalNumber(object, "mapid", path);
+
+  return {
+    ...(ownerPlayerId === undefined ? {} : { owner_player_id: ownerPlayerId }),
+    ...(mapId === undefined ? {} : { mapid: mapId }),
+    replay_count: requiredNumber(object, "replay_count", path, "$response"),
+    watch_count: requiredNumber(object, "watch_count", path, "$response"),
+    unique_viewer_count: requiredNumber(object, "unique_viewer_count", path, "$response"),
+    total_watch_ms: requiredNumber(object, "total_watch_ms", path, "$response"),
+    first_watched_at: nullableString(object, "first_watched_at", path),
+    last_watched_at: nullableString(object, "last_watched_at", path),
+    updated_at: nullableString(object, "updated_at", path),
+  };
+}
+
+export function normalizeReplayWatchRankings(
+  value: unknown,
+  path: string,
+): ReplayWatchRankingEntry[] {
+  return array(value, path, "$response").map((entry, index) => {
+    const at = `$response[${index}]`;
+    const object = record(entry, path, at);
+    return {
+      rank: requiredNumber(object, "rank", path, at),
+      run_id: requiredNumber(object, "run_id", path, at),
+      fps: nullableFps(object.fps, path, `${at}.fps`),
+      mapid: requiredNumber(object, "mapid", path, at),
+      owner_player_id: requiredNumber(object, "owner_player_id", path, at),
+      mapname: nullableString(object, "mapname", path),
+      owner_playername: nullableString(object, "owner_playername", path),
+      country: nullableString(object, "country", path),
+      watch_count: requiredNumber(object, "watch_count", path, at),
+      unique_viewer_count: requiredNumber(object, "unique_viewer_count", path, at),
+      total_watch_ms: requiredNumber(object, "total_watch_ms", path, at),
+      first_watched_at: nullableString(object, "first_watched_at", path),
+      last_watched_at: nullableString(object, "last_watched_at", path),
+      updated_at: nullableString(object, "updated_at", path),
+    };
+  });
+}
+
 function normalizeServer(value: unknown, path: string, at: string): GameServer {
   const object = record(value, path, at);
   const players =
@@ -463,6 +509,10 @@ function fps(value: unknown, path: string, field: string): Fps {
     return value as Fps;
   }
   throw invalidResponse(path, field);
+}
+
+function nullableFps(value: unknown, path: string, field: string): Fps | null {
+  return value === undefined || value === null ? null : fps(value, path, field);
 }
 
 function playerLeaderboard(value: unknown, path: string, field: string): PlayerLeaderboard {

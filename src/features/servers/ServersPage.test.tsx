@@ -28,11 +28,11 @@ const serverPayload: unknown = {
       game_type: "jump",
       players: [],
       player_count: 0,
-      online: true,
+      online: false,
     },
   ],
   total_players: 1,
-  online_servers: 2,
+  online_servers: 1,
 };
 
 const emptyServerPayload: unknown = {
@@ -61,11 +61,15 @@ describe("ServersPage", () => {
     const loader = loadJ4l();
     const { container } = renderPage({ loadServers: loader });
 
+    const pageHeading = screen.getByRole("heading", { level: 1, name: "Live servers" });
+    expect(pageHeading).toBeVisible();
+    expect(pageHeading.closest(".cjs-page-heading")).not.toBeNull();
+    expect(screen.getByText(/current JumpersHeaven and Jump4Life servers/i)).toBeVisible();
     expect(screen.getByText("Loading live server data.")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "cod2.example.invalid" })).toBeVisible();
     expect(screen.getByRole("link", { name: "mp_cjs_training" })).toHaveAttribute(
       "href",
-      "/maps/101?source=j4l",
+      "/maps/101?source=j4l&lookup=cpid",
     );
     expect(screen.getByText("Runner")).toBeVisible();
     expect(container.querySelector('[data-cod-color="2"]')).toHaveTextContent("Runner");
@@ -73,17 +77,30 @@ describe("ServersPage", () => {
     expect(screen.queryByLabelText("Live server summary")).not.toBeInTheDocument();
     expect(screen.queryByText("COD2 live data")).not.toBeInTheDocument();
     expect(screen.queryByText(/Current server, map, and player activity/)).not.toBeInTheDocument();
-    const addressControls = screen.getAllByRole("button", { name: /Copy server address/ });
+    const addressControls = screen.getAllByRole("button", { name: /^Copy / });
     expect(addressControls).toHaveLength(2);
-    expect(screen.queryByRole("button", { name: "Copy address" })).not.toBeInTheDocument();
     expect(screen.getByRole("radiogroup", { name: "Game version" })).toBeVisible();
     expect(loader).toHaveBeenCalledWith("j4l", expect.any(AbortSignal));
     expect(loader).toHaveBeenCalledWith("jh", expect.any(AbortSignal));
-    expect(screen.getAllByText("Server address")).toHaveLength(2);
+    expect(screen.queryByText("Server address")).not.toBeInTheDocument();
+    expect(screen.queryByText("Current map")).not.toBeInTheDocument();
+    expect(screen.queryByText("Connected players")).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Players" })).toBeVisible();
+    expect(screen.getByRole("img", { name: "Server online" })).toHaveAttribute(
+      "data-tooltip",
+      "Online",
+    );
+    expect(screen.getByRole("img", { name: "Server offline" })).toHaveAttribute(
+      "data-tooltip",
+      "Offline",
+    );
+    expect(screen.getByRole("img", { name: "Server online" })).not.toHaveAttribute("title");
     expect(screen.getByText("cod2.example.invalid:28960")).toBeVisible();
     await user.click(addressControls[0]);
     expect(clipboardSpy).toHaveBeenCalledWith("cod2.example.invalid:28960");
-    expect(addressControls[0]).toHaveTextContent("Copied");
+    expect(addressControls[0]).toHaveAccessibleName("cod2.example.invalid:28960 copied");
+    expect(addressControls[0]).toHaveAttribute("title", "Copied");
+    expect(addressControls[0]).toHaveTextContent("");
     expect(screen.queryByText("Mode", { selector: "dt" })).not.toBeInTheDocument();
 
     const mapImage = container.querySelector<HTMLImageElement>(".server-card__visual-image");
@@ -195,7 +212,11 @@ describe("ServersPage", () => {
     renderPage({ loadServers: loader });
 
     expect(await screen.findByRole("heading", { name: "cod2.example.invalid" })).toBeVisible();
-    await user.click(screen.getByRole("button", { name: "Refresh" }));
+    const refreshButton = screen.getByRole("button", { name: "Refresh" });
+    expect(refreshButton).toHaveAttribute("title", "Refresh");
+    expect(refreshButton).toHaveAttribute("data-variant", "ghost");
+    expect(refreshButton).toHaveTextContent("");
+    await user.click(refreshButton);
 
     expect(await screen.findByText("Jump4Life refresh failed.")).toBeVisible();
     expect(screen.getByRole("heading", { name: "cod2.example.invalid" })).toBeVisible();
@@ -222,7 +243,45 @@ describe("ServersPage", () => {
     );
   });
 
-  it("filters JumpersHeaven COD2 and COD4 servers through the URL", async () => {
+  it("folds each server source independently from its heading", async () => {
+    const user = userEvent.setup();
+    const loader = vi.fn<ServerLoader>(async (source) => ({
+      servers: [
+        {
+          domain: source === "j4l" ? "visible-j4l.invalid" : "visible-jh.invalid",
+          map: source === "j4l" ? "mp_j4l" : "mp_jh",
+          player_count: 0,
+          online: true,
+        },
+      ],
+    }));
+    renderPage({ loadServers: loader });
+
+    expect(await screen.findByRole("heading", { name: "visible-j4l.invalid" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "visible-jh.invalid" })).toBeVisible();
+
+    const j4lToggle = screen.getByRole("button", { name: "Jump4Life" });
+    const jhToggle = screen.getByRole("button", { name: "JumpersHeaven" });
+    expect(j4lToggle).toHaveAttribute("aria-expanded", "true");
+    expect(jhToggle).toHaveAttribute("aria-expanded", "true");
+
+    await user.click(j4lToggle);
+    expect(j4lToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("heading", { name: "visible-j4l.invalid" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "visible-jh.invalid" })).toBeVisible();
+
+    await user.click(j4lToggle);
+    expect(j4lToggle).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("heading", { name: "visible-j4l.invalid" })).toBeVisible();
+
+    await user.click(jhToggle);
+    expect(jhToggle).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByRole("heading", { name: "visible-jh.invalid" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "visible-j4l.invalid" })).toBeVisible();
+    expect(window.location.search).toBe("");
+  });
+
+  it("shows JumpersHeaven COD4 servers through a URL-backed game control", async () => {
     const loader = vi.fn<ServerLoader>(async (source) => ({
       servers:
         source === "jh"
@@ -241,7 +300,20 @@ describe("ServersPage", () => {
                 player_count: 2,
               },
             ]
-          : [],
+          : [
+              {
+                domain: "cod2.jump4life.invalid",
+                map: "mp_j4l_cod2",
+                game_type: "COD2",
+                player_count: 1,
+              },
+              {
+                domain: "cod4.jump4life.invalid",
+                map: "mp_j4l_cod4",
+                game_type: "COD4",
+                player_count: 1,
+              },
+            ],
     }));
     const user = userEvent.setup();
     renderPage({ loadServers: loader });
@@ -249,6 +321,7 @@ describe("ServersPage", () => {
     expect(
       await screen.findByRole("heading", { name: "cod2.jumpersheaven.invalid" }),
     ).toBeVisible();
+    expect(screen.getByRole("heading", { name: "cod2.jump4life.invalid" })).toBeVisible();
     expect(
       screen.queryByRole("heading", { name: "cod4.jumpersheaven.invalid" }),
     ).not.toBeInTheDocument();
@@ -262,8 +335,20 @@ describe("ServersPage", () => {
       screen.queryByRole("heading", { name: "cod2.jumpersheaven.invalid" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Jump4Life" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "cod4.jump4life.invalid" }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "mp_jh_cod4" })).not.toBeInTheDocument();
     expect(window.location.search).toBe("?game=cod4");
+  });
+
+  it("falls back to COD2 for an invalid game URL", async () => {
+    window.history.replaceState(null, "", "/?game=unsupported");
+    renderPage({ loadServers: loadJ4l() });
+
+    expect(await screen.findByRole("heading", { name: "cod2.example.invalid" })).toBeVisible();
+    expect(screen.getByRole("radio", { name: "COD2" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "COD4" })).not.toBeChecked();
   });
 
   it("loads both sources, renders Jump4Life first, and keeps map links source-correct", async () => {
@@ -290,11 +375,11 @@ describe("ServersPage", () => {
     expect(loader).toHaveBeenCalledWith("jh", expect.any(AbortSignal));
     expect(screen.getByRole("link", { name: "mp_j4l" })).toHaveAttribute(
       "href",
-      "/maps/201?source=j4l",
+      "/maps/201?source=j4l&lookup=cpid",
     );
     expect(screen.getByRole("link", { name: "mp_jh" })).toHaveAttribute(
       "href",
-      "/maps/202?source=jh",
+      "/maps/202?source=jh&lookup=cpid",
     );
     const sourceHeadings = screen.getAllByRole("heading", {
       name: /Jump4Life|JumpersHeaven/,
@@ -329,7 +414,7 @@ describe("ServersPage", () => {
     });
 
     expect(await screen.findByText("Connection address unavailable")).toBeVisible();
-    expect(screen.queryByRole("button", { name: /Copy server address/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Copy / })).not.toBeInTheDocument();
   });
 
   it("turns malformed transport data into an error state instead of crashing", async () => {

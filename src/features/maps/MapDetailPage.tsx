@@ -5,12 +5,10 @@ import {
   Film,
   Heart,
   Map as MapIcon,
-  Route,
   Trophy,
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import {
-  Badge,
   CodPlayerName,
   DataTable,
   EmptyState,
@@ -51,6 +49,9 @@ import {
   type MapProfileFps,
 } from "./mapDetailModel";
 import { useMapRecord, useMapTopRuns } from "./useMapDetail";
+import { ReplayAnalyticsPanel } from "../replay";
+import { MapVideos } from "./MapVideos";
+import { getMapVideos } from "./mapVideos";
 import "./maps.css";
 
 const numberFormatter = new Intl.NumberFormat();
@@ -73,7 +74,12 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
     fps: selectedFps,
     source,
   });
+  const liveTopCount =
+    runsRequest.status === "success"
+      ? (runsRequest.data?.[0]?.totalNr ?? runsRequest.data?.length ?? null)
+      : null;
   const runColumns = useRunColumns(source);
+  const mapVideos = selectedMap ? getMapVideos(selectedMap.mapname, selectedMap.video) : [];
 
   useEffect(() => {
     if (selectedMap && selection.fps !== selectedFps) {
@@ -158,17 +164,7 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
                   {formatReleaseDate(selectedMap.released)}
                 </span>
               </div>
-              <div className="cjs-map-detail__badges">
-                <Badge icon={<Route size={14} />}>
-                  {selectedMap.type?.trim() || "Route type unavailable"}
-                </Badge>
-                {mapRequest.data.checkpoints.length > 1 && (
-                  <Badge>
-                    {selectedRouteLabel(mapRequest.data.checkpoints, selectedMap.cp_id)}
-                  </Badge>
-                )}
-                <Badge tone="information">{sourceLabel(source)}</Badge>
-              </div>
+              <MapSummary map={selectedMap} fps={selectedFps} topCount={liveTopCount} />
             </div>
             <div className="cjs-map-detail__hero-actions">
               <IconButton
@@ -184,7 +180,7 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
               >
                 <Heart aria-hidden="true" size={19} fill={isFavorite ? "currentColor" : "none"} />
               </IconButton>
-              <MapMediaLink value={selectedMap.video} />
+              <MapMediaLink value={selectedMap.video} videoCount={mapVideos.length} />
             </div>
           </header>
 
@@ -246,45 +242,73 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
             </fieldset>
           </Panel>
 
-          <MapSummary map={selectedMap} fps={selectedFps} />
-
-          <section className="cjs-map-detail__runs" aria-labelledby="map-top-runs-heading">
-            <div className="cjs-map-detail__section-heading">
-              <div>
-                {mapRequest.data.checkpoints.length > 1 && (
-                  <p className="cjs-map-detail__eyebrow">
-                    {selectedRouteLabel(mapRequest.data.checkpoints, selectedMap.cp_id)}
-                  </p>
+          <div
+            className="cjs-map-detail__results-layout"
+            data-has-replay={source === "j4l" || undefined}
+            data-has-sidebar={source === "j4l" || mapVideos.length > 0 || undefined}
+          >
+            {(source === "j4l" || mapVideos.length > 0) && (
+              <aside className="cjs-map-detail__insights cjs-stack" aria-label="Map insights">
+                {source === "j4l" && (
+                  <ReplayAnalyticsPanel scope={{ mapId: selectedMap.mapid }} source={source} />
                 )}
-                <h2 id="map-top-runs-heading">Top runs at {fpsLabel(selectedFps)}</h2>
-              </div>
-              {runsRequest.status === "loading" && <span role="status">Loading selected runs</span>}
-            </div>
+                {mapVideos.length > 0 && (
+                  <MapVideos
+                    key={selectedMap.mapname}
+                    mapName={selectedMap.mapname}
+                    videos={mapVideos}
+                  />
+                )}
+              </aside>
+            )}
 
-            {runsRequest.status === "loading" && (
-              <SkeletonGroup count={5} label="Loading top runs" />
-            )}
-            {(!selectedFpsHasTops ||
-              runsRequest.status === "error" ||
-              (runsRequest.status === "success" && runsRequest.data?.length === 0)) && (
-              <EmptyState
-                icon={Trophy}
-                title={`No tops available for ${fpsLabel(selectedFps)} on ${selectedMap.mapname}`}
-                description="Choose another available FPS to view recorded runs."
-              />
-            )}
-            {runsRequest.status === "success" &&
-              runsRequest.data &&
-              runsRequest.data.length > 0 && (
-                <DataTable
-                  caption={`Top runs for ${selectedMap.mapname} at ${fpsLabel(selectedFps)}`}
-                  columns={runColumns}
-                  rows={runsRequest.data}
-                  getRowKey={(run) => run.run_id ?? `${run.player_id}-${run.cpid}-${run.rank}`}
-                  getRowLabel={(run) => `Rank ${run.rank}, ${getPlainPlayerName(run.playername)}`}
+            <section className="cjs-map-detail__runs" aria-labelledby="map-top-runs-heading">
+              <div className="cjs-map-detail__section-heading">
+                <div>
+                  {mapRequest.data.checkpoints.length > 1 && (
+                    <p className="cjs-map-detail__eyebrow">
+                      {selectedRouteLabel(mapRequest.data.checkpoints, selectedMap.cp_id)}
+                    </p>
+                  )}
+                  <h2 id="map-top-runs-heading">Top runs at {fpsLabel(selectedFps)}</h2>
+                </div>
+                {runsRequest.status === "loading" && (
+                  <span role="status">Loading selected runs</span>
+                )}
+              </div>
+
+              {runsRequest.status === "loading" && (
+                <SkeletonGroup count={5} label="Loading top runs" />
+              )}
+              {runsRequest.status === "error" && (
+                <ErrorState
+                  title={`Top runs could not be loaded for ${fpsLabel(selectedFps)} on ${selectedMap.mapname}`}
+                  description="The map profile is still available. Try loading these records again."
+                  retryLabel="Retry top runs"
+                  onRetry={runsRequest.reload}
                 />
               )}
-          </section>
+              {(!selectedFpsHasTops ||
+                (runsRequest.status === "success" && runsRequest.data?.length === 0)) && (
+                <EmptyState
+                  icon={Trophy}
+                  title={`No tops available for ${fpsLabel(selectedFps)} on ${selectedMap.mapname}`}
+                  description="Choose another available FPS to view recorded runs."
+                />
+              )}
+              {runsRequest.status === "success" &&
+                runsRequest.data &&
+                runsRequest.data.length > 0 && (
+                  <DataTable
+                    caption={`Top runs for ${selectedMap.mapname} at ${fpsLabel(selectedFps)}`}
+                    columns={runColumns}
+                    rows={runsRequest.data}
+                    getRowKey={(run) => run.run_id ?? `${run.player_id}-${run.cpid}-${run.rank}`}
+                    getRowLabel={(run) => `Rank ${run.rank}, ${getPlainPlayerName(run.playername)}`}
+                  />
+                )}
+            </section>
+          </div>
         </>
       )}
     </div>
@@ -294,9 +318,11 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
 function MapSummary({
   map,
   fps,
+  topCount,
 }: {
   map: NonNullable<ReturnType<typeof selectCheckpoint>>;
   fps: Fps;
+  topCount: number | null;
 }) {
   const difficulty = map.difficulty?.[fps];
 
@@ -316,13 +342,34 @@ function MapSummary({
       </div>
       <div>
         <dt>Recorded tops</dt>
-        <dd>{difficulty ? formatCount(difficulty.nb_tops) : "Not available"}</dd>
+        <dd>
+          {topCount !== null
+            ? formatCount(topCount)
+            : difficulty
+              ? formatCount(difficulty.nb_tops)
+              : "Not available"}
+        </dd>
       </div>
     </dl>
   );
 }
 
-function MapMediaLink({ value }: { value: string | null | undefined }) {
+function MapMediaLink({
+  value,
+  videoCount,
+}: {
+  value: string | null | undefined;
+  videoCount: number;
+}) {
+  if (videoCount > 0) {
+    return (
+      <Link href="#map-videos" variant="standalone">
+        <Film aria-hidden="true" size={17} />
+        {videoCount === 1 ? "1 map video" : `${videoCount} map videos`}
+      </Link>
+    );
+  }
+
   const href = getSafeMediaUrl(value);
   if (!href) {
     return (
@@ -421,8 +468,4 @@ function selectedRouteLabel(
 
 function mapsPath(source: SourceId): string {
   return source === "jh" ? appPaths.maps : `${appPaths.maps}?source=${source}`;
-}
-
-function sourceLabel(source: SourceId): string {
-  return sourceOptions.find((option) => option.value === source)?.label ?? source;
 }

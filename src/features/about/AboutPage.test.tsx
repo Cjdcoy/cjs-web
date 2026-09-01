@@ -7,13 +7,18 @@ describe("AboutPage", () => {
   it("explains provenance, limitations, and browser-local favorites", () => {
     render(<AboutPage />);
 
-    expect(
-      screen.getByRole("heading", { name: "Jump statistics, clearly sourced." }),
-    ).toBeInTheDocument();
+    const pageHeading = screen.getByRole("heading", { name: "Jump statistics, clearly sourced." });
+    expect(pageHeading).toBeInTheDocument();
+    expect(pageHeading.closest(".cjs-page-heading")).not.toBeNull();
     expect(screen.getByText(/independent public frontend/i)).toBeInTheDocument();
     expect(screen.getByText(/stored in this browser's local storage/i)).toBeInTheDocument();
     expect(screen.getByText(/does not write them to the stats API/i)).toBeInTheDocument();
     expect(screen.getByText(/Call of Duty 4 is future work/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", {
+        name: "CJS mascot holding a faceted gold star above the CJS initials",
+      }),
+    ).toHaveAttribute("src", "/cjs-logo.png");
   });
 
   it("links safely to the public project, API, and source communities", () => {

@@ -1,13 +1,22 @@
-import { Clipboard, Grid2X2, List, MapPin, RefreshCw } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  CircleAlert,
+  Clipboard,
+  Grid2X2,
+  List,
+  RefreshCw,
+  Server,
+} from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import {
-  Badge,
   Button,
   Card,
   CodPlayerName,
   CountryFlag,
   EmptyState,
   ErrorState,
+  IconButton,
   SegmentedControl,
 } from "../../components/ui";
 import { getMapImageSources } from "../../lib/mapImages";
@@ -81,8 +90,8 @@ export function ServersPage({ loadServers, pollIntervalMs, staleAfterMs }: Serve
     staleAfterMs,
   });
   const j4lServers = useMemo(
-    () => filterServers(j4lState.data?.servers ?? [], filters.populated, filters.game),
-    [filters.game, filters.populated, j4lState.data?.servers],
+    () => filterServers(j4lState.data?.servers ?? [], filters.populated, "cod2"),
+    [filters.populated, j4lState.data?.servers],
   );
   const jhServers = useMemo(
     () => filterServers(jhState.data?.servers ?? [], filters.populated, filters.game),
@@ -121,7 +130,17 @@ export function ServersPage({ loadServers, pollIntervalMs, staleAfterMs }: Serve
 
   return (
     <div className="servers-page">
-      <h1 className="cjs-visually-hidden">Live servers</h1>
+      <header className="servers-page__header cjs-page-heading">
+        <div className="servers-page__eyebrow cjs-page-heading__eyebrow">
+          <Server aria-hidden="true" size={18} />
+          <span>Live activity</span>
+        </div>
+        <h1>Live servers</h1>
+        <p className="cjs-page-heading__description">
+          See current JumpersHeaven and Jump4Life servers, maps, player counts, and connection
+          details.
+        </p>
+      </header>
 
       <section className="servers-toolbar" aria-label="Server display controls">
         <div className="servers-toolbar__toggles">
@@ -155,6 +174,7 @@ export function ServersPage({ loadServers, pollIntervalMs, staleAfterMs }: Serve
         <div className="servers-toolbar__actions">
           <SegmentedControl<ServerView>
             ariaLabel="Server layout"
+            className="servers-view-switch"
             value={filters.view}
             onChange={(view) => setFilters({ view })}
             options={[
@@ -170,17 +190,16 @@ export function ServersPage({ loadServers, pollIntervalMs, staleAfterMs }: Serve
               },
             ]}
           />
-          <Button
-            variant="secondary"
+          <IconButton
+            label={refreshing ? "Refreshing" : "Refresh"}
+            variant="ghost"
             size="small"
             onClick={refresh}
             isLoading={refreshing}
-            loadingLabel="Refreshing"
             disabled={initialLoading}
           >
             <RefreshCw size={17} aria-hidden="true" />
-            Refresh
-          </Button>
+          </IconButton>
         </div>
       </section>
 
@@ -282,13 +301,25 @@ function ServerSourceGroup({
   servers: readonly ServerViewModel[];
   view: ServerView;
 }) {
+  const [expanded, setExpanded] = useState(true);
+  const contentId = `servers-${source}-content`;
+
   return (
     <section className="server-source-group" aria-labelledby={`servers-${source}`}>
       <header className="server-source-group__header">
-        <div>
-          <Badge tone={source === "j4l" ? "success" : "neutral"}>{source.toUpperCase()}</Badge>
-          <h2 id={`servers-${source}`}>{sourceNames[source]}</h2>
-        </div>
+        <h2 id={`servers-${source}`}>
+          <button
+            type="button"
+            className="server-source-group__toggle"
+            aria-controls={contentId}
+            aria-expanded={expanded}
+            onClick={() => setExpanded((current) => !current)}
+          >
+            <span className="server-source-group__marker" data-source={source} aria-hidden="true" />
+            <span>{sourceNames[source]}</span>
+            <ChevronDown size={18} strokeWidth={2} aria-hidden="true" />
+          </button>
+        </h2>
         {state.data && (
           <span>
             {servers.length} {servers.length === 1 ? "server" : "servers"}
@@ -296,40 +327,42 @@ function ServerSourceGroup({
         )}
       </header>
 
-      {!state.data && state.initialLoading && <ServerSkeleton count={2} />}
+      <div id={contentId} className="server-source-group__content" hidden={!expanded}>
+        {!state.data && state.initialLoading && <ServerSkeleton count={2} />}
 
-      {!state.data && !state.initialLoading && state.error && (
-        <ErrorState
-          title={`${sourceNames[source]} is unavailable`}
-          description={state.error}
-          retryLabel={`Retry ${sourceNames[source]}`}
-          onRetry={state.refresh}
-        />
-      )}
+        {!state.data && !state.initialLoading && state.error && (
+          <ErrorState
+            title={`${sourceNames[source]} is unavailable`}
+            description={state.error}
+            retryLabel={`Retry ${sourceNames[source]}`}
+            onRetry={state.refresh}
+          />
+        )}
 
-      {state.data && state.error && (
-        <div className="servers-page__notice" data-tone="warning" role="alert">
-          <div>
-            <strong>{sourceNames[source]} refresh failed.</strong>
-            <span>{state.error} Showing the last successful update.</span>
+        {state.data && state.error && (
+          <div className="servers-page__notice" data-tone="warning" role="alert">
+            <div>
+              <strong>{sourceNames[source]} refresh failed.</strong>
+              <span>{state.error} Showing the last successful update.</span>
+            </div>
+            <Button variant="ghost" size="small" onClick={state.refresh}>
+              Try again
+            </Button>
           </div>
-          <Button variant="ghost" size="small" onClick={state.refresh}>
-            Try again
-          </Button>
-        </div>
-      )}
+        )}
 
-      {state.data && servers.length > 0 && (
-        <div
-          className="servers-grid"
-          data-view={view}
-          aria-label={`${sourceNames[source]}: ${servers.length} matching live servers`}
-        >
-          {servers.map((server) => (
-            <ServerCard server={server} source={source} key={server.id} />
-          ))}
-        </div>
-      )}
+        {state.data && servers.length > 0 && (
+          <div
+            className="servers-grid"
+            data-view={view}
+            aria-label={`${sourceNames[source]}: ${servers.length} matching live servers`}
+          >
+            {servers.map((server) => (
+              <ServerCard server={server} source={source} key={server.id} />
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -387,6 +420,16 @@ function ServerCard({ server, source }: { server: ServerViewModel; source: Sourc
   const country = getServerCountry(server.domain);
   const imageSources =
     server.mapName === "Map unavailable" ? null : getMapImageSources(server.mapName);
+  const statusLabel = server.online ? "Online" : "Offline";
+  const copyLabel = server.connectionAddress
+    ? copyState === "copied"
+      ? `${server.connectionAddress} copied`
+      : copyState === "failed"
+        ? `Retry copying ${server.connectionAddress}`
+        : `Copy ${server.connectionAddress}`
+    : "Copy server address";
+  const copyTitle =
+    copyState === "copied" ? "Copied" : copyState === "failed" ? "Copy failed" : "Copy address";
 
   const copyAddress = async () => {
     if (!server.connectionAddress) return;
@@ -427,17 +470,18 @@ function ServerCard({ server, source }: { server: ServerViewModel; source: Sourc
             size="large"
           />
           <h3 id={headingId}>{server.domain}</h3>
-          <Badge tone={server.online ? "success" : "neutral"}>
-            {server.online ? "Online" : "Offline"}
-          </Badge>
+          <span
+            className="server-card__status"
+            data-state={server.online ? "online" : "offline"}
+            data-tooltip={statusLabel}
+            role="img"
+            aria-label={`Server ${statusLabel.toLowerCase()}`}
+          />
         </header>
 
         <div className="server-card__map">
-          <span>
-            <MapPin size={15} aria-hidden="true" /> Current map
-          </span>
           {server.mapId !== null && server.game === "cod2" ? (
-            <a href={mapDetailPath(server.mapId, { source })}>
+            <a href={mapDetailPath(server.mapId, { lookup: "cpid", source })}>
               <span>{server.mapName}</span>
             </a>
           ) : (
@@ -449,24 +493,24 @@ function ServerCard({ server, source }: { server: ServerViewModel; source: Sourc
       <div className="server-card__body">
         {server.connectionAddress ? (
           <div className="server-card__address">
-            <span>Server address</span>
-            <button
-              className="server-card__address-copy"
-              type="button"
-              aria-label={`Copy server address ${server.connectionAddress}`}
+            <code>{server.connectionAddress}</code>
+            <IconButton
+              className="server-card__copy"
+              label={copyLabel}
+              title={copyTitle}
+              size="small"
+              variant="ghost"
               data-copy-state={copyState}
               onClick={copyAddress}
             >
-              <code>{server.connectionAddress}</code>
-              <small>
-                <Clipboard size={14} aria-hidden="true" />
-                {copyState === "copied"
-                  ? "Copied"
-                  : copyState === "failed"
-                    ? "Copy failed"
-                    : "Click to copy"}
-              </small>
-            </button>
+              {copyState === "copied" ? (
+                <Check size={16} aria-hidden="true" />
+              ) : copyState === "failed" ? (
+                <CircleAlert size={16} aria-hidden="true" />
+              ) : (
+                <Clipboard size={16} aria-hidden="true" />
+              )}
+            </IconButton>
           </div>
         ) : (
           <span className="server-card__unavailable">Connection address unavailable</span>
@@ -512,7 +556,7 @@ function ServerRoster({
 
   return (
     <div className="server-card__roster">
-      <h3>Connected players</h3>
+      <h3>Players</h3>
       <ul>
         {players.map((player, index) => (
           <li key={`${player.id ?? player.name}:${index}`}>

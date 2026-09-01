@@ -85,13 +85,13 @@ export function FavoritesPage() {
   return (
     <div className="cjs-favorites cjs-stack">
       <header className="cjs-favorites__header">
-        <div>
-          <p className="cjs-favorites__eyebrow">
+        <div className="cjs-page-heading">
+          <p className="cjs-favorites__eyebrow cjs-page-heading__eyebrow">
             <Heart aria-hidden="true" size={16} />
             Browser-local collection
           </p>
           <h1>Your favorites</h1>
-          <p>
+          <p className="cjs-page-heading__description">
             Keep useful maps and players together. Every favorite is separated by data source, so
             matching IDs from JumpersHeaven and Jump4Life stay distinct.
           </p>

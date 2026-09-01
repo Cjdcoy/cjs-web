@@ -11,6 +11,8 @@ import {
   playerRoutesFixture,
   playersFixture,
   rankLeaderboardFixture,
+  replayWatchAggregateFixture,
+  replayWatchRankingsFixture,
   topRunsFixture,
   trackerServersFixture,
 } from "./__fixtures__/responses";
@@ -77,6 +79,18 @@ describe("typed CJS API endpoints", () => {
     await expect(
       api.playerActivitySummary({ source: "j4l", playerId: 501 }),
     ).resolves.toMatchObject({ jump_count: 2400 });
+    await expect(
+      api.replayWatchAggregate({ source: "j4l", ownerPlayerId: 501 }),
+    ).resolves.toMatchObject({ replay_count: 2, watch_count: 18 });
+    await expect(
+      api.replayWatchRankings({
+        source: "j4l",
+        mapId: 101,
+        metric: "watch_count",
+        limit: 5,
+        offset: 0,
+      }),
+    ).resolves.toHaveLength(1);
 
     expect(urls).toEqual([
       "https://example.test/proxy/api/v1/tracker/servers?source=jh",
@@ -94,7 +108,73 @@ describe("typed CJS API endpoints", () => {
       "https://example.test/proxy/api/v1/player/routes-completion?source=jh&playerid=501",
       "https://example.test/proxy/api/v1/player/rank?source=j4l&playerid=501",
       "https://example.test/proxy/api/v1/player/activity-summary?source=j4l&playerid=501",
+      "https://example.test/proxy/api/v1/replay/watch-aggregate?source=j4l&owner_playerid=501",
+      "https://example.test/proxy/api/v1/replay/watch-rankings?source=j4l&metric=watch_count&mapid=101&limit=5&offset=0",
     ]);
+  });
+
+  it("composes owner and map replay filters in one request", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(replayWatchRankingsFixture));
+    const api = createCjsApi(
+      createJsonClient({ baseUrl: "https://example.test", fetch: fetchMock as typeof fetch }),
+    );
+
+    await api.replayWatchRankings({
+      source: "j4l",
+      ownerPlayerId: 501,
+      mapId: 101,
+      metric: "unique_viewer_count",
+      limit: 10,
+      offset: 20,
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://example.test/api/v1/replay/watch-rankings?source=j4l&metric=unique_viewer_count&owner_playerid=501&mapid=101&limit=10&offset=20",
+    );
+  });
+
+  it("requests global replay watch rankings without an owner or map filter", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(Response.json(replayWatchRankingsFixture));
+    const api = createCjsApi(
+      createJsonClient({ baseUrl: "https://example.test", fetch: fetchMock as typeof fetch }),
+    );
+
+    await api.replayWatchRankings({
+      source: "j4l",
+      metric: "last_watched_at",
+      limit: 25,
+      offset: 0,
+    });
+
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://example.test/api/v1/replay/watch-rankings?source=j4l&metric=last_watched_at&limit=25&offset=0",
+    );
+  });
+
+  it("rejects replay responses that do not match the requested scope", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({
+          ...(replayWatchAggregateFixture as Record<string, unknown>),
+          mapid: 999,
+        }),
+      )
+      .mockResolvedValueOnce(Response.json(replayWatchRankingsFixture));
+    const api = createCjsApi(
+      createJsonClient({ baseUrl: "https://example.test", fetch: fetchMock as typeof fetch }),
+    );
+
+    await expect(api.replayWatchAggregate({ source: "j4l", mapId: 101 })).rejects.toMatchObject({
+      kind: "invalid-response",
+    });
+    await expect(
+      api.replayWatchRankings({
+        source: "j4l",
+        mapId: 999,
+        metric: "watch_count",
+      }),
+    ).rejects.toMatchObject({ kind: "invalid-response" });
   });
 
   it("omits FPS for the howmany leaderboard because the API does not support it", async () => {
@@ -124,6 +204,12 @@ describe("typed CJS API endpoints", () => {
     await expect(api.rankXpLeaderboard({ source: "jh" })).rejects.toBeInstanceOf(
       UnsupportedCapabilityError,
     );
+    await expect(
+      api.replayWatchAggregate({ source: "jh", ownerPlayerId: 501 }),
+    ).rejects.toBeInstanceOf(UnsupportedCapabilityError);
+    await expect(
+      api.replayWatchRankings({ source: "jh", metric: "watch_count" }),
+    ).rejects.toBeInstanceOf(UnsupportedCapabilityError);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -141,6 +227,20 @@ describe("typed CJS API endpoints", () => {
     });
     await expect(
       api.playerMapRuns({ source: "jh", playerId: 501, checkpointId: "", fps: "125" }),
+    ).rejects.toMatchObject({ kind: "invalid-argument" });
+    await expect(
+      api.replayWatchAggregate({ source: "j4l", ownerPlayerId: 0 }),
+    ).rejects.toMatchObject({ kind: "invalid-argument" });
+    await expect(
+      // @ts-expect-error The runtime boundary must also reject untyped aggregate callers without a scope.
+      api.replayWatchAggregate({ source: "j4l" }),
+    ).rejects.toMatchObject({ kind: "invalid-argument" });
+    await expect(
+      api.replayWatchRankings({
+        source: "j4l",
+        mapId: -1,
+        metric: "watch_count",
+      }),
     ).rejects.toMatchObject({ kind: "invalid-argument" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -163,5 +263,7 @@ function responseFor(pathname: string): unknown {
   if (pathname.endsWith("/player/routes-completion")) return playerRoutesFixture;
   if (pathname.endsWith("/player/rank")) return playerRankFixture;
   if (pathname.endsWith("/player/activity-summary")) return playerActivityFixture;
+  if (pathname.endsWith("/replay/watch-aggregate")) return replayWatchAggregateFixture;
+  if (pathname.endsWith("/replay/watch-rankings")) return replayWatchRankingsFixture;
   throw new Error(`Unhandled fixture path: ${pathname}`);
 }

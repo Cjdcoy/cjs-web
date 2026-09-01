@@ -73,7 +73,26 @@ describe("LeaderboardsPage", () => {
 
     renderPage();
 
+    const pageHeading = screen.getByRole("heading", {
+      level: 1,
+      name: "Jump4Life leaderboards",
+    });
+    expect(pageHeading).toBeVisible();
+    expect(pageHeading.closest(".cjs-page-heading")).not.toBeNull();
+    expect(
+      screen.getByText(/Compare official Jump4Life player rankings.*including Rank XP/),
+    ).toBeVisible();
+    const sourceControl = screen.getByRole("radiogroup", { name: "Leaderboard data source" });
+    const sourceField = sourceControl.closest("fieldset");
+    expect(sourceControl).toBeVisible();
+    expect(sourceControl).not.toHaveClass("cjs-leaderboards__choice-control");
+    expect(sourceField?.parentElement?.firstElementChild).toBe(sourceField);
+    expect(screen.getByRole("radio", { name: "Jump4Life" })).toBeChecked();
+    expect(document.querySelector(".cjs-leaderboards__eyebrow")).not.toHaveTextContent("Jump4Life");
     expect(await screen.findByText("XP Runner 1")).toBeInTheDocument();
+    const refreshButton = screen.getByRole("button", { name: "Refresh" });
+    expect(refreshButton).toHaveAttribute("data-variant", "ghost");
+    expect(refreshButton).toHaveTextContent("Refresh");
     expect(screen.getByText("XP Runner 11")).toBeInTheDocument();
     expect(screen.getByText("XP Runner 12")).toBeInTheDocument();
     expect(screen.getByText("Showing 12 of 12 matching players.")).toBeVisible();
@@ -93,6 +112,33 @@ describe("LeaderboardsPage", () => {
     expect(rankXpLeaderboard).toHaveBeenCalledWith(
       expect.objectContaining({ source: "j4l", signal: expect.any(AbortSignal) }),
     );
+  });
+
+  it("keeps refresh context visible and announces refresh progress", async () => {
+    let finishRefresh: (() => void) | undefined;
+    vi.spyOn(api, "leaderboard")
+      .mockResolvedValueOnce([standardEntry(1)])
+      .mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finishRefresh = () => resolve([standardEntry(1)]);
+          }),
+      );
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("Runner 1")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Refresh" }));
+
+    const refreshingButton = await screen.findByRole("button", { name: "Refreshing" });
+    expect(refreshingButton).toBeDisabled();
+    expect(refreshingButton).toHaveTextContent("Refreshing");
+    expect(screen.getByRole("status")).toHaveTextContent("Refreshing leaderboard results.");
+
+    act(() => finishRefresh?.());
+
+    expect(await screen.findByRole("button", { name: "Refresh" })).toBeEnabled();
+    expect(screen.getByRole("status")).toHaveTextContent("");
   });
 
   it("normalizes invalid and unsupported URL combinations before requesting data", async () => {
@@ -130,13 +176,23 @@ describe("LeaderboardsPage", () => {
     renderPage();
     await screen.findByText("speed-skill Alpha");
 
+    expect(
+      screen.getByRole("heading", { level: 1, name: "JumpersHeaven leaderboards" }),
+    ).toBeVisible();
+    expect(screen.getByText(/Compare official JumpersHeaven player rankings/)).toBeVisible();
+    expect(document.querySelector(".cjs-leaderboards__eyebrow")).not.toHaveTextContent(
+      "JumpersHeaven",
+    );
     expect(screen.getByRole("radiogroup", { name: "Board" })).toBeVisible();
     expect(screen.getByRole("radiogroup", { name: "FPS" })).toBeVisible();
+    expect(screen.queryByText(/uses the API's official ranking/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Reset filters" })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("radio", { name: "Jump" }));
     await user.click(screen.getByRole("radio", { name: "333" }));
     expect(await screen.findByText("jump-skill Alpha")).toBeInTheDocument();
     expect(window.location.search).toBe("?board=jump-skill&fps=333");
+    expect(screen.getByRole("button", { name: "Reset filters" })).toBeVisible();
 
     await user.click(screen.getByRole("radio", { name: "Completions" }));
     expect(await screen.findByText("howmany Alpha")).toBeInTheDocument();
@@ -154,6 +210,28 @@ describe("LeaderboardsPage", () => {
     expect(screen.getByRole("columnheader", { name: /maps completed/i })).toHaveAttribute(
       "aria-sort",
       "descending",
+    );
+
+    await user.click(screen.getByRole("button", { name: "Reset filters" }));
+    await waitFor(() => expect(window.location.search).toBe(""));
+    expect(screen.getByRole("radio", { name: "Speed" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "125" })).toBeChecked();
+    expect(screen.getByRole("searchbox", { name: "Find a player or country" })).toHaveValue("");
+    expect(screen.queryByRole("button", { name: "Reset filters" })).not.toBeInTheDocument();
+  });
+
+  it("switches source from an explicit feature filter", async () => {
+    const leaderboard = vi.spyOn(api, "leaderboard").mockResolvedValue([standardEntry(1)]);
+    const user = userEvent.setup();
+    renderPage();
+
+    expect(await screen.findByText("Runner 1")).toBeInTheDocument();
+    await user.click(screen.getByRole("radio", { name: "Jump4Life" }));
+
+    await waitFor(() => expect(window.location.search).toBe("?source=j4l"));
+    expect(screen.getByRole("heading", { level: 1, name: "Jump4Life leaderboards" })).toBeVisible();
+    expect(leaderboard).toHaveBeenLastCalledWith(
+      expect.objectContaining({ source: "j4l", signal: expect.any(AbortSignal) }),
     );
   });
 

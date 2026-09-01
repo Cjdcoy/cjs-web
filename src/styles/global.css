@@ -36,6 +36,37 @@ a:focus-visible {
   max-width: var(--cjs-reading-width);
 }
 
+.cjs-page-heading {
+  max-width: var(--cjs-reading-width);
+}
+
+.cjs-page-heading > h1,
+.cjs-page-heading > p {
+  margin: 0;
+}
+
+.cjs-page-heading > h1 {
+  margin-block: var(--cjs-space-2) var(--cjs-space-3);
+  font-size: var(--cjs-font-size-2xl);
+  line-height: var(--cjs-line-height-tight);
+}
+
+.cjs-page-heading__eyebrow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--cjs-space-2);
+  color: var(--cjs-color-accent-strong);
+  font-size: var(--cjs-font-size-sm);
+  font-weight: var(--cjs-font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cjs-page-heading__description {
+  color: var(--cjs-color-text-muted);
+}
+
 .cjs-stack {
   display: flex;
   flex-direction: column;

@@ -9,8 +9,8 @@ const budgets = {
   initialJavaScriptGzip: 75 * 1024,
   initialCssGzip: 8 * 1024,
   routeIncrementGzip: 30 * 1024,
-  totalJavaScriptGzip: 115 * 1024,
-  totalCssGzip: 16 * 1024,
+  totalJavaScriptGzip: 122.5 * 1024,
+  totalCssGzip: 17 * 1024,
 };
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));

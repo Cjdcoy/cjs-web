@@ -4,6 +4,7 @@ import {
   isGame,
   isLeaderboardKind,
   isPlayerLeaderboard,
+  isReplayWatchMetric,
   isSource,
 } from "./capabilities";
 import type { ApiRetryListener, JsonClient } from "./client";
@@ -23,11 +24,16 @@ import type {
   PlayerRouteCompletion,
   PlayerSort,
   RankLeaderboardEntry,
+  ReplayWatchAggregate,
+  ReplayWatchFilters,
+  ReplayWatchMetric,
+  ReplayWatchRankingEntry,
+  ReplayWatchScope,
   ServerResponse,
   Source,
   TopRun,
 } from "./domain";
-import { invalidArgument } from "./errors";
+import { invalidArgument, invalidResponse } from "./errors";
 import {
   normalizeLeaderboard,
   normalizeMaps,
@@ -40,6 +46,8 @@ import {
   normalizePlayerRoutes,
   normalizePlayers,
   normalizeRankLeaderboard,
+  normalizeReplayWatchAggregate,
+  normalizeReplayWatchRankings,
   normalizeServerResponse,
   normalizeTopRuns,
 } from "./normalizers";
@@ -59,6 +67,8 @@ const PATHS = {
   playerRank: "/api/v1/player/rank",
   playerActivity: "/api/v1/player/activity-summary",
   rankXpLeaderboard: "/api/v1/leaderboard/rank-xp",
+  replayWatchAggregate: "/api/v1/replay/watch-aggregate",
+  replayWatchRankings: "/api/v1/replay/watch-rankings",
 } as const;
 
 export interface RequestContext {
@@ -104,9 +114,14 @@ export interface CjsApi {
   playerActivitySummary(
     options: RequestContext & { playerId: number },
   ): Promise<PlayerActivitySummary>;
+  replayWatchAggregate(options: RequestContext & ReplayWatchScope): Promise<ReplayWatchAggregate>;
+  replayWatchRankings(
+    options: RequestContext &
+      ReplayWatchFilters & { metric: ReplayWatchMetric; limit?: number; offset?: number },
+  ): Promise<ReplayWatchRankingEntry[]>;
 }
 
-export function createCjsApi(client: JsonClient): CjsApi {
+export function createCjsApi(client: JsonClient, replayClient: JsonClient = client): CjsApi {
   return {
     async trackerServers(options) {
       const game = context(options, PATHS.trackerServers);
@@ -321,6 +336,44 @@ export function createCjsApi(client: JsonClient): CjsApi {
         PATHS.playerActivity,
       );
     },
+
+    async replayWatchAggregate(options) {
+      const game = replayContext(options, PATHS.replayWatchAggregate);
+      assertCapability("replay-analytics", options.source, game);
+      const aggregate = normalizeReplayWatchAggregate(
+        await get(replayClient, PATHS.replayWatchAggregate, options, {
+          source: options.source,
+          owner_playerid: options.ownerPlayerId,
+          mapid: options.mapId,
+        }),
+        PATHS.replayWatchAggregate,
+      );
+      assertReplayAggregateScope(aggregate, options, PATHS.replayWatchAggregate);
+      return aggregate;
+    },
+
+    async replayWatchRankings(options) {
+      const game = replayFiltersContext(options, PATHS.replayWatchRankings);
+      assertCapability("replay-analytics", options.source, game);
+      if (!isReplayWatchMetric(options.metric)) {
+        throw invalidArgument(PATHS.replayWatchRankings, "metric");
+      }
+      limit(options.limit, PATHS.replayWatchRankings);
+      offset(options.offset, PATHS.replayWatchRankings);
+      const rankings = normalizeReplayWatchRankings(
+        await get(replayClient, PATHS.replayWatchRankings, options, {
+          source: options.source,
+          metric: options.metric,
+          owner_playerid: options.ownerPlayerId,
+          mapid: options.mapId,
+          limit: options.limit,
+          offset: options.offset,
+        }),
+        PATHS.replayWatchRankings,
+      );
+      assertReplayRankingScope(rankings, options, PATHS.replayWatchRankings);
+      return rankings;
+    },
   };
 }
 
@@ -339,6 +392,57 @@ function playerContext(options: RequestContext & { playerId: number }, path: str
   return game;
 }
 
+function replayContext(options: RequestContext & ReplayWatchScope, path: string): Game {
+  const game = replayFiltersContext(options, path);
+  const ownerPlayerId = options.ownerPlayerId;
+  const mapId = options.mapId;
+  if (ownerPlayerId === undefined && mapId === undefined) {
+    throw invalidArgument(path, "scope");
+  }
+  return game;
+}
+
+function replayFiltersContext(options: RequestContext & ReplayWatchFilters, path: string): Game {
+  const game = context(options, path);
+  const ownerPlayerId = options.ownerPlayerId;
+  const mapId = options.mapId;
+  if (ownerPlayerId !== undefined && (!Number.isInteger(ownerPlayerId) || ownerPlayerId <= 0)) {
+    throw invalidArgument(path, "ownerPlayerId");
+  }
+  if (mapId !== undefined && (!Number.isInteger(mapId) || mapId <= 0)) {
+    throw invalidArgument(path, "mapId");
+  }
+  return game;
+}
+
+function assertReplayAggregateScope(
+  aggregate: ReplayWatchAggregate,
+  filters: ReplayWatchFilters,
+  path: string,
+): void {
+  if (filters.ownerPlayerId !== undefined && aggregate.owner_player_id !== filters.ownerPlayerId) {
+    throw invalidResponse(path, "$response.owner_player_id.scope");
+  }
+  if (filters.mapId !== undefined && aggregate.mapid !== filters.mapId) {
+    throw invalidResponse(path, "$response.mapid.scope");
+  }
+}
+
+function assertReplayRankingScope(
+  rankings: readonly ReplayWatchRankingEntry[],
+  filters: ReplayWatchFilters,
+  path: string,
+): void {
+  const mismatchedIndex = rankings.findIndex(
+    (entry) =>
+      (filters.ownerPlayerId !== undefined && entry.owner_player_id !== filters.ownerPlayerId) ||
+      (filters.mapId !== undefined && entry.mapid !== filters.mapId),
+  );
+  if (mismatchedIndex >= 0) {
+    throw invalidResponse(path, `$response[${mismatchedIndex}].scope`);
+  }
+}
+
 function requireFps(value: unknown, path: string): asserts value is Fps {
   if (!isFps(value)) throw invalidArgument(path, "fps");
 }
@@ -352,6 +456,12 @@ function requireCheckpointId(value: unknown, path: string): asserts value is num
 function limit(value: number | undefined, path: string): void {
   if (value !== undefined && (!Number.isInteger(value) || value < 1)) {
     throw invalidArgument(path, "limit");
+  }
+}
+
+function offset(value: number | undefined, path: string): void {
+  if (value !== undefined && (!Number.isInteger(value) || value < 0)) {
+    throw invalidArgument(path, "offset");
   }
 }
 

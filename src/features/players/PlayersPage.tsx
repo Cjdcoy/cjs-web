@@ -1,9 +1,9 @@
 import { Search } from "lucide-react";
 import { useMemo } from "react";
 import { Page } from "../../components";
-import { Badge, Input, Panel, Select } from "../../components/ui";
-import { api, type Source } from "../../lib/api";
-import { sourceOptions, useQueryState, useSourceContext } from "../../lib/routing";
+import { Input, Panel, SegmentedControl, Select } from "../../components/ui";
+import { api } from "../../lib/api";
+import { sourceOptions, useQueryState, useSourceContext, type SourceId } from "../../lib/routing";
 import { PlayerResults } from "./PlayerResults";
 import {
   PLAYER_SEARCH_LIMIT,
@@ -15,11 +15,6 @@ import { useFavoritePlayers } from "./useFavoritePlayers";
 import { usePlayerLevels } from "./usePlayerLevels";
 import { usePlayerSearch } from "./usePlayerSearch";
 import "./players.css";
-
-const sourceLabels: Readonly<Record<Source, string>> = {
-  j4l: "Jump4Life",
-  jh: "JumpersHeaven",
-};
 
 export function PlayersPage({
   listPlayerRanks,
@@ -56,15 +51,31 @@ export function PlayersPage({
     <Page active="/players" accent="teal">
       <div className="cjs-player-discovery">
         <header className="cjs-player-discovery__header">
-          <div>
-            <p className="cjs-player-discovery__eyebrow">Player directory</p>
+          <div className="cjs-page-heading">
+            <p className="cjs-player-discovery__eyebrow cjs-page-heading__eyebrow">
+              Player directory
+            </p>
             <h1>Find a player</h1>
-            <p>Browse recently seen players or search the public directory by name.</p>
+            <p className="cjs-page-heading__description">
+              Browse recently seen players or search the public directory by name.
+            </p>
           </div>
-          <Badge tone="information">{sourceLabels[source]} data</Badge>
         </header>
 
-        <Panel className="cjs-player-search" padding="large" variant="strong">
+        <Panel className="cjs-player-search">
+          <fieldset className="cjs-player-source">
+            <legend>Data source</legend>
+            <SegmentedControl<SourceId>
+              ariaLabel="Player data source"
+              value={source}
+              onChange={setSource}
+              options={sourceOptions.map((option) => ({
+                accessibleLabel: option.label,
+                label: option.shortLabel,
+                value: option.value,
+              }))}
+            />
+          </fieldset>
           <Input
             autoComplete="off"
             enterKeyHint="search"
@@ -78,20 +89,6 @@ export function PlayersPage({
             type="search"
             value={queryState.q}
           />
-          <Select
-            label="Data source"
-            onChange={(event) => {
-              const nextSource = event.target.value;
-              if (nextSource === "jh" || nextSource === "j4l") setSource(nextSource);
-            }}
-            value={source}
-          >
-            {sourceOptions.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </Select>
           <Select
             label="Sort results"
             onChange={(event) => {

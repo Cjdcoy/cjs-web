@@ -85,6 +85,14 @@ describe("MapsPage", () => {
 
     const { container } = renderMapsPage();
 
+    const pageHeading = screen.getByRole("heading", { level: 1, name: "Browse maps" });
+    expect(pageHeading).toBeVisible();
+    expect(pageHeading.closest(".cjs-page-heading")).not.toBeNull();
+    expect(
+      screen.getByText(
+        "Search by map or author, compare route types and FPS difficulty, and open a map to view its records.",
+      ),
+    ).toBeVisible();
     const results = await screen.findByRole("region", { name: "Map results" });
     expect(mapsRequest).toHaveBeenCalledWith({ source: "j4l", signal: expect.any(AbortSignal) });
     expect(results).toHaveAttribute("data-view", "grid");
@@ -94,11 +102,13 @@ describe("MapsPage", () => {
     );
     expect(within(results).queryByRole("link", { name: "mp_alpha" })).not.toBeInTheDocument();
     expect(within(results).getByText("(125(hard))")).toBeVisible();
+    const externalVideoLink = within(results).getByRole("link", {
+      name: "Watch YouTube video for mp_beta (opens in a new tab)",
+    });
+    expect(externalVideoLink).toHaveAttribute("href", "https://example.invalid/mp_beta");
     expect(
-      within(results).getByRole("link", {
-        name: "Watch YouTube video for mp_beta (opens in a new tab)",
-      }),
-    ).toHaveAttribute("href", "https://example.invalid/mp_beta");
+      externalVideoLink.querySelector(".cjs-map-card__youtube-mark .lucide-play"),
+    ).toBeInTheDocument();
     expect(within(results).queryByText("surf")).not.toBeInTheDocument();
     const mapImage = container.querySelector<HTMLImageElement>(
       '.cjs-map-card__image[src="/maps/cards/mp_beta.avif"]',
@@ -197,6 +207,26 @@ describe("MapsPage", () => {
     expect(await screen.findByText("(125(hard))")).toBeVisible();
     expect(screen.getByText("(250(easy))")).toBeVisible();
     expect(screen.getAllByRole("link", { name: "mp_12" })).toHaveLength(2);
+  });
+
+  it("links catalog-backed map videos through the source-stable map profile", async () => {
+    vi.spyOn(api, "maps").mockResolvedValue([
+      { ...response[0], mapname: "mp_chilli", video: null },
+    ]);
+    window.history.replaceState(null, "", "/maps?source=j4l&media=with-media");
+
+    renderMapsPage();
+
+    const catalogVideoLink = await screen.findByRole("link", {
+      name: "View 2 videos for mp_chilli",
+    });
+    expect(catalogVideoLink).toHaveAttribute("href", "/maps/1?source=j4l#map-videos");
+    expect(
+      catalogVideoLink.querySelector(".cjs-map-card__youtube-mark .lucide-play"),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Map result count" })).toHaveTextContent(
+      "1 matching maps",
+    );
   });
 
   it("updates filters in the URL and announces deterministic result counts", async () => {

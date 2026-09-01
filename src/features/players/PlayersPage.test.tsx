@@ -64,6 +64,14 @@ describe("PlayersPage", () => {
     expect(listPlayers).toHaveBeenCalledWith(
       expect.objectContaining({ sort: "last-seen", source: "jh" }),
     );
+    const pageHeading = screen.getByRole("heading", { level: 1, name: "Find a player" });
+    const sourceControl = screen.getByRole("radiogroup", { name: "Player data source" });
+    const sourceField = sourceControl.closest("fieldset");
+    expect(pageHeading.closest(".cjs-page-heading")).not.toBeNull();
+    expect(sourceControl).toBeVisible();
+    expect(sourceField?.parentElement?.firstElementChild).toBe(sourceField);
+    expect(screen.getByRole("radio", { name: "JumpersHeaven" })).toBeChecked();
+    expect(screen.queryByText("JumpersHeaven data")).not.toBeInTheDocument();
     expect(searchPlayers).not.toHaveBeenCalled();
     expect(screen.queryByRole("columnheader", { name: "Player level" })).not.toBeInTheDocument();
     expect(screen.queryByRole("columnheader", { name: "Country" })).not.toBeInTheDocument();
@@ -239,7 +247,7 @@ describe("PlayersPage", () => {
     await waitFor(() => expect(rankSignal).toBeDefined());
     expect(rankSignal?.aborted).toBe(false);
 
-    await user.selectOptions(screen.getByLabelText("Data source"), "jh");
+    await user.click(screen.getByRole("radio", { name: "JumpersHeaven" }));
 
     await waitFor(() => expect(rankSignal?.aborted).toBe(true));
     expect(screen.queryByRole("columnheader", { name: "Player level" })).not.toBeInTheDocument();

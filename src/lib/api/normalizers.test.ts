@@ -12,6 +12,8 @@ import {
   playerRoutesFixture,
   playersFixture,
   rankLeaderboardFixture,
+  replayWatchAggregateFixture,
+  replayWatchRankingsFixture,
   topRunsFixture,
   trackerServersFixture,
 } from "./__fixtures__/responses";
@@ -27,6 +29,8 @@ import {
   normalizePlayerRoutes,
   normalizePlayers,
   normalizeRankLeaderboard,
+  normalizeReplayWatchAggregate,
+  normalizeReplayWatchRankings,
   normalizeServerResponse,
   normalizeTopRuns,
 } from "./normalizers";
@@ -208,6 +212,35 @@ describe("API response normalizers", () => {
     });
   });
 
+  it("normalizes replay aggregates and per-run rankings", () => {
+    expect(normalizeReplayWatchAggregate(replayWatchAggregateFixture, path)).toMatchObject({
+      owner_player_id: 501,
+      replay_count: 2,
+      unique_viewer_count: 11,
+    });
+    expect(normalizeReplayWatchRankings(replayWatchRankingsFixture, path)[0]).toMatchObject({
+      rank: 1,
+      run_id: 7001,
+      fps: "125",
+      mapname: "mp_cjs_training",
+      watch_count: 12,
+    });
+    expect(
+      normalizeReplayWatchAggregate(
+        {
+          replay_count: 0,
+          watch_count: 0,
+          unique_viewer_count: 0,
+          total_watch_ms: 0,
+          first_watched_at: null,
+          last_watched_at: null,
+          updated_at: null,
+        },
+        path,
+      ),
+    ).toMatchObject({ updated_at: null });
+  });
+
   it("keeps J4L rank rows when optional country metadata is absent", () => {
     const [rank] = rankLeaderboardFixture as Record<string, unknown>[];
     const [normalized] = normalizeRankLeaderboard(
@@ -235,6 +268,8 @@ describe("API response normalizers", () => {
     ["routes", () => normalizePlayerRoutes([{ map_id: 1 }], path)],
     ["rank", () => normalizePlayerRank({ player_id: 1 }, path)],
     ["activity", () => normalizePlayerActivity({ player_id: 1 }, path)],
+    ["replay aggregate", () => normalizeReplayWatchAggregate({ replay_count: "many" }, path)],
+    ["replay rankings", () => normalizeReplayWatchRankings([{ rank: 1 }], path)],
   ])("returns a safe structured error for malformed %s payloads", (_label, normalize) => {
     expect(normalize).toThrowError(
       expect.objectContaining({ kind: "invalid-response", path: "/api/v1/fixture" }),

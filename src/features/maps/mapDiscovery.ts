@@ -6,6 +6,8 @@ import {
   integerQueryParam,
   stringQueryParam,
 } from "../../lib/routing";
+import { getSafeMediaUrl } from "./mapDetailModel";
+import { hasMapVideos } from "./mapVideos";
 
 export const MAP_MEDIA_FILTERS = ["all", "with-media", "without-media"] as const;
 export const MAP_SORTS = ["completions", "released", "difficulty", "name"] as const;
@@ -58,7 +60,7 @@ export function prepareMaps(maps: readonly GameMap[]): PreparedMap[] {
       normalizedName,
       routeType: normalizeText(map.type ?? ""),
       searchText: `${normalizedName}\u0000${normalizedAuthor}`,
-      hasMedia: Boolean(map.video?.trim()),
+      hasMedia: hasMapVideos(map.mapname, map.video) || Boolean(getSafeMediaUrl(map.video)),
       completionCount: finiteNumber(map.individual_finish_count) ?? 0,
       releaseTime: parseReleaseTime(map.released),
     };

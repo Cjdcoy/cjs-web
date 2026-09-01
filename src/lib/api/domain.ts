@@ -21,6 +21,51 @@ export type PlayerLeaderboard = (typeof PLAYER_LEADERBOARDS)[number];
 
 export type PlayerSort = "last-seen" | "visits";
 
+export const REPLAY_WATCH_METRICS = [
+  "watch_count",
+  "unique_viewer_count",
+  "total_watch_ms",
+  "last_watched_at",
+] as const;
+export type ReplayWatchMetric = (typeof REPLAY_WATCH_METRICS)[number];
+
+export type ReplayWatchScope =
+  { ownerPlayerId: number; mapId?: number } | { mapId: number; ownerPlayerId?: number };
+
+export interface ReplayWatchFilters {
+  ownerPlayerId?: number;
+  mapId?: number;
+}
+
+export interface ReplayWatchAggregate {
+  owner_player_id?: number;
+  mapid?: number;
+  replay_count: number;
+  watch_count: number;
+  unique_viewer_count: number;
+  total_watch_ms: number;
+  first_watched_at: string | null;
+  last_watched_at: string | null;
+  updated_at: string | null;
+}
+
+export interface ReplayWatchRankingEntry {
+  rank: number;
+  run_id: number;
+  fps: Fps | null;
+  mapid: number;
+  owner_player_id: number;
+  mapname: string | null;
+  owner_playername: string | null;
+  country: string | null;
+  watch_count: number;
+  unique_viewer_count: number;
+  total_watch_ms: number;
+  first_watched_at: string | null;
+  last_watched_at: string | null;
+  updated_at: string | null;
+}
+
 export interface ServerPlayer {
   playername: string;
   playerid: number;
