@@ -5,10 +5,8 @@ Thank you for helping improve CodJumper Stats. Keep changes focused on a task in
 
 ## Before contributing code
 
-The repository owner has not yet selected a public software license. Bug reports and design
-discussion are welcome, but maintainers must not merge outside code contributions until a license
-and contribution terms are published. Do not assume that a public repository grants permission to
-reuse its code or assets.
+The project is available under the [MIT License](LICENSE). By submitting a contribution, you agree
+that your contribution may be distributed under those terms.
 
 Never copy private implementation, proprietary assets, personal contact information, or attribution
 from the reference site or another project. Only submit work you have the right to contribute.

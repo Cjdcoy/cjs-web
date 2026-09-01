@@ -6,7 +6,8 @@ back production without explicit repository-owner authorization.
 
 ## One-time owner configuration
 
-1. Choose and publish a project license before accepting outside code contributions.
+1. Confirm the repository continues to publish the MIT terms in `LICENSE` before accepting outside
+   code contributions.
 2. Configure the final HTTPS custom domain and route for `cjs-web` in the Cloudflare dashboard.
 3. Add the repository variable `CJS_PRODUCTION_URL` as the custom-domain origin with no trailing path.
 4. Add `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` to the GitHub `production` environment.

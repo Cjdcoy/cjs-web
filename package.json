@@ -1,6 +1,7 @@
 {
   "name": "cjs-web-frontend",
   "private": true,
+  "license": "MIT",
   "version": "0.1.0",
   "type": "module",
   "packageManager": "npm@11.16.0",
