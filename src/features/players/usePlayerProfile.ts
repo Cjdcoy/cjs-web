@@ -27,6 +27,8 @@ export type PlayerProfileApi = Pick<
   | "playerMapRuns"
   | "playerPerformance"
   | "playerRank"
+  | "replayWatchAggregate"
+  | "replayWatchRankings"
   | "playerRoutes"
   | "players"
 >;

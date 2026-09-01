@@ -47,6 +47,11 @@ describe("FavoritesPage", () => {
 
     render(<FavoritesPage />);
 
+    expect(
+      screen
+        .getByRole("heading", { level: 1, name: "Your favorites" })
+        .closest(".cjs-page-heading"),
+    ).not.toBeNull();
     expect(screen.getByRole("link", { name: "mp_favorite" })).toHaveAttribute(
       "href",
       "/maps/41?source=jh",

@@ -154,39 +154,11 @@
   background: currentColor;
 }
 
-.cjs-site-header__actions,
-.cjs-source-switcher {
+.cjs-site-header__actions {
   display: flex;
   align-items: center;
-}
-
-.cjs-site-header__actions {
   flex: none;
   gap: var(--cjs-space-2);
-}
-
-.cjs-source-switcher {
-  gap: var(--cjs-space-2);
-}
-
-.cjs-source-switcher__label {
-  color: var(--cjs-color-text-subtle);
-  font-size: var(--cjs-font-size-xs);
-  font-weight: var(--cjs-font-weight-bold);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-}
-
-.cjs-source-switcher .cjs-segmented-control {
-  width: auto;
-  padding: 2px;
-  border-radius: var(--cjs-radius-sm);
-}
-
-.cjs-source-switcher .cjs-segmented-control__option {
-  min-height: 2rem;
-  padding-inline: var(--cjs-space-2);
-  font-size: var(--cjs-font-size-xs);
 }
 
 .cjs-mobile-navigation__toggle,
@@ -311,18 +283,6 @@
   .cjs-brand img {
     width: 2.5rem;
     height: 2.5rem;
-  }
-
-  .cjs-source-switcher__label {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    padding: 0;
-    margin: -1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
-    border: 0;
   }
 
   .cjs-mobile-navigation {

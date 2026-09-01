@@ -3,11 +3,13 @@ import {
   GAMES,
   LEADERBOARD_KINDS,
   PLAYER_LEADERBOARDS,
+  REPLAY_WATCH_METRICS,
   SOURCES,
   type Fps,
   type Game,
   type LeaderboardKind,
   type PlayerLeaderboard,
+  type ReplayWatchMetric,
   type Source,
 } from "./domain";
 import { UnsupportedCapabilityError } from "./errors";
@@ -19,11 +21,12 @@ export const CAPABILITIES = [
   "players",
   "player-rank",
   "player-activity",
+  "replay-analytics",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
 
-const J4L_ONLY = new Set<Capability>(["player-rank", "player-activity"]);
+const J4L_ONLY = new Set<Capability>(["player-rank", "player-activity", "replay-analytics"]);
 
 export function isSource(value: unknown): value is Source {
   return typeof value === "string" && SOURCES.some((source) => source === value);
@@ -45,6 +48,10 @@ export function isPlayerLeaderboard(value: unknown): value is PlayerLeaderboard 
   return (
     typeof value === "string" && PLAYER_LEADERBOARDS.some((leaderboard) => leaderboard === value)
   );
+}
+
+export function isReplayWatchMetric(value: unknown): value is ReplayWatchMetric {
+  return typeof value === "string" && REPLAY_WATCH_METRICS.some((metric) => metric === value);
 }
 
 export function supportsCapability(

@@ -1,14 +1,7 @@
 import { Menu, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { IconButton, SegmentedControl, VisuallyHidden } from "../../components/ui";
-import {
-  navigate,
-  sourceOptions,
-  useNavigationPending,
-  useSourceContext,
-  type RouteMatch,
-  type SourceId,
-} from "../../lib/routing";
+import { IconButton, VisuallyHidden } from "../../components/ui";
+import { useNavigationPending, type RouteMatch } from "../../lib/routing";
 import { primaryNavigation, type PrimaryNavigationItem } from "./navigation";
 
 export function AppShell({ children, route }: { children: ReactNode; route: RouteMatch }) {
@@ -47,8 +40,8 @@ export function AppShell({ children, route }: { children: ReactNode; route: Rout
       <RoutePendingIndicator pending={navigationPending} />
       <header className="cjs-site-header">
         <div className="cjs-site-header__inner cjs-page">
-          <a className="cjs-brand" href="/" aria-label="CodJumper Stats home">
-            <img src="/logo.svg" alt="" width="48" height="48" />
+          <a className="cjs-brand" href="/">
+            <img src="/cjs-logo.png" alt="" width="48" height="48" />
             <span>
               <strong>CodJumper</strong>
               <small>Stats</small>
@@ -62,7 +55,6 @@ export function AppShell({ children, route }: { children: ReactNode; route: Rout
           </nav>
 
           <div className="cjs-site-header__actions">
-            <SourceSwitcher route={route} />
             <IconButton
               ref={mobileNavigationButton}
               className="cjs-mobile-navigation__toggle"
@@ -107,7 +99,7 @@ export function AppShell({ children, route }: { children: ReactNode; route: Rout
       <footer className="cjs-site-footer">
         <div className="cjs-site-footer__inner cjs-page">
           <div className="cjs-site-footer__identity">
-            <img src="/logo.svg" alt="" width="40" height="40" />
+            <img src="/cjs-logo.png" alt="" width="40" height="40" />
             <p>
               <strong>CodJumper Stats</strong>
               <span>An independent interface for public jump statistics.</span>
@@ -150,34 +142,6 @@ function NavigationLink({
       <span>{item.label}</span>
       {active && <span className="cjs-navigation-link__marker" aria-hidden="true" />}
     </a>
-  );
-}
-
-function SourceSwitcher({ route }: { route: RouteMatch }) {
-  const { source, setSource } = useSourceContext();
-
-  const changeSource = (nextSource: SourceId) => {
-    if (route.id === "player-detail") {
-      navigate(`/players?source=${nextSource}`);
-      return;
-    }
-    setSource(nextSource);
-  };
-
-  return (
-    <div className="cjs-source-switcher">
-      <span className="cjs-source-switcher__label">Source</span>
-      <SegmentedControl<SourceId>
-        ariaLabel="Data source"
-        value={source}
-        onChange={changeSource}
-        options={sourceOptions.map((option) => ({
-          accessibleLabel: option.label,
-          label: option.shortLabel,
-          value: option.value,
-        }))}
-      />
-    </div>
   );
 }
 

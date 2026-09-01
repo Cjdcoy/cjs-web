@@ -13,6 +13,8 @@ import {
   type PlayerPerformanceStats,
   type PlayerRankInfo,
   type PlayerRouteCompletion,
+  type ReplayWatchAggregate,
+  type ReplayWatchRankingEntry,
   type TopRun,
 } from "../../lib/api";
 import { SourceProvider } from "../../lib/routing";
@@ -41,14 +43,18 @@ describe("PlayerDetailPage", () => {
       playerLeaderboardPositions: vi
         .fn()
         .mockResolvedValue([position, { ...position, leaderboard_type: "speed", rank: 8 }]),
+      playerPerformance: vi.fn().mockResolvedValue({ ...performance, admin_level: 101 }),
     });
 
     const { container } = renderProfile(apiClient);
 
     expect(await screen.findByRole("heading", { level: 1, name: "RunnerOne" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Testland" }).querySelector("img")).toHaveAttribute(
-      "src",
-      "/country-flags/tl.svg",
+    const profileFlag = screen.getByRole("img", { name: "Testland" });
+    expect(profileFlag).toHaveClass("cjs-player-profile__avatar");
+    expect(profileFlag).toHaveAttribute("data-size", "large");
+    expect(profileFlag.querySelector("img")).toHaveAttribute("src", "/country-flags/tl.svg");
+    expect(screen.getByText("Testland").closest(".cjs-player-profile__meta")).not.toContainElement(
+      profileFlag,
     );
     expect(apiClient.playerLeaderboardPositions).toHaveBeenCalledWith(
       expect.objectContaining({ fps: "250", playerId: 42, source: "j4l" }),
@@ -60,15 +66,37 @@ describe("PlayerDetailPage", () => {
     expect(apiClient.playerRoutes).not.toHaveBeenCalled();
     expect(apiClient.playerRank).toHaveBeenCalledOnce();
     expect(apiClient.playerActivitySummary).toHaveBeenCalledOnce();
-    const performance = screen.getByRole("heading", { level: 2, name: "Performance" });
+    expect(apiClient.replayWatchAggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerPlayerId: 42, source: "j4l" }),
+    );
+    expect(apiClient.replayWatchRankings).toHaveBeenCalledWith(
+      expect.objectContaining({ ownerPlayerId: 42, metric: "watch_count", source: "j4l" }),
+    );
+    expect(await screen.findByRole("heading", { name: "Replay reach" })).toBeInTheDocument();
+    const refreshButton = screen.getByRole("button", { name: "Refresh profile" });
+    expect(refreshButton).toHaveAttribute("title", "Refresh profile");
+    expect(refreshButton).toHaveAttribute("data-variant", "ghost");
+    expect(refreshButton).toHaveTextContent("");
+    const performanceHeading = screen.getByRole("heading", { level: 2, name: "Performance" });
     const recentActivity = screen.getByRole("heading", { level: 2, name: "Recent activity" });
-    expect(performance).toBeInTheDocument();
+    expect(performanceHeading).toBeInTheDocument();
     expect(recentActivity).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 2, name: "Leaderboard positions" }),
     ).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Jump4Life rank" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Player highlights")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Player highlights")).not.toBeInTheDocument();
+    const accountDetails = screen.getByLabelText("Account details");
+    expect(accountDetails).toHaveTextContent("SupporterAdministrator · Level 101");
+    expect(accountDetails.querySelector(".cjs-badge")).toBeNull();
+    expect(accountDetails).not.toHaveTextContent("best FPS");
+    const performanceSummary = screen.getByLabelText("Performance summary");
+    expect(performanceSummary).toHaveTextContent("Route completion20 completed · 50%");
+    expect(performanceSummary).toHaveTextContent("Best leaderboard placement#1");
+    expect(performanceSummary).toHaveTextContent("Top-10 leaderboard placements5");
+    expect(performanceSummary).toHaveTextContent("#1 leaderboard placements1");
+    expect(performanceSummary).toHaveTextContent("Average leaderboard placement4.5");
+    expect(performanceSummary).toHaveTextContent("Best record FPS250 FPS");
     expect(screen.getByRole("heading", { level: 3, name: "Records by FPS" })).toBeInTheDocument();
     expect(screen.getByText("Run attempts")).toBeInTheDocument();
     expect(screen.getByText("Playing AFK")).toBeInTheDocument();
@@ -102,7 +130,8 @@ describe("PlayerDetailPage", () => {
     const lifetimeActivity = screen.getByRole("heading", { name: "Lifetime activity" });
     const leaderboardPositions = screen.getByRole("heading", { name: "Leaderboard positions" });
     expect(
-      lifetimeActivity.compareDocumentPosition(performance) & Node.DOCUMENT_POSITION_FOLLOWING,
+      lifetimeActivity.compareDocumentPosition(performanceHeading) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
       lifetimeActivity.compareDocumentPosition(recentActivity) & Node.DOCUMENT_POSITION_FOLLOWING,
@@ -152,6 +181,8 @@ describe("PlayerDetailPage", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "RunnerOne" })).toBeInTheDocument();
     expect(apiClient.playerRank).not.toHaveBeenCalled();
     expect(apiClient.playerActivitySummary).not.toHaveBeenCalled();
+    expect(apiClient.replayWatchAggregate).not.toHaveBeenCalled();
+    expect(apiClient.replayWatchRankings).not.toHaveBeenCalled();
     expect(
       screen.getByRole("heading", { level: 2, name: "JumpersHeaven profile" }),
     ).toBeInTheDocument();
@@ -210,7 +241,7 @@ describe("PlayerDetailPage", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "RunnerOne" })).toBeInTheDocument();
     expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /unavailable/i })).not.toBeInTheDocument();
-    expect(screen.getAllByText("Not ranked yet")).toHaveLength(2);
+    expect(screen.getAllByText("Not ranked yet")).toHaveLength(3);
     expect(screen.getByText("3 completed · 0.47%")).toBeInTheDocument();
     expect(screen.getByText("Today")).toBeInTheDocument();
     expect(screen.getByText(/expected for new players/i)).toBeInTheDocument();
@@ -317,6 +348,26 @@ describe("PlayerDetailPage", () => {
     expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
   });
 
+  it("keeps the combined run-analytics filters available when the map list fails", async () => {
+    window.history.replaceState(null, "", "/players/42?source=jh&view=progress&fps=125");
+    const apiClient = createProfileApi({
+      playerJumpScores: vi.fn().mockRejectedValue(new Error("Map list offline")),
+    });
+
+    const { container } = renderProfile(apiClient);
+
+    const analyticsFilters = await screen.findByRole("group", { name: "Run analytics filters" });
+    expect(
+      within(analyticsFilters).getByRole("radiogroup", { name: "Run analytics FPS" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Analytics maps unavailable" })).toBeInTheDocument();
+    expect(container.querySelector(".cjs-run-progress")).toHaveAttribute(
+      "data-map-selected",
+      "false",
+    );
+    expect(screen.queryByRole("heading", { name: "Profile unavailable" })).not.toBeInTheDocument();
+  });
+
   it("charts a deep-linked map history with a complete run ledger and selectable details", async () => {
     const user = userEvent.setup();
     window.history.replaceState(null, "", "/players/42?source=jh&view=progress&fps=125&map=321");
@@ -346,6 +397,18 @@ describe("PlayerDetailPage", () => {
     expect(
       await screen.findByRole("heading", { level: 2, name: "mp_jump progression" }),
     ).toBeInTheDocument();
+    expect(container.querySelector(".cjs-run-progress")).toHaveAttribute(
+      "data-map-selected",
+      "true",
+    );
+    const analyticsFilters = screen.getByRole("group", { name: "Run analytics filters" });
+    expect(
+      within(analyticsFilters).getByRole("radiogroup", { name: "Run analytics FPS" }),
+    ).toBeInTheDocument();
+    expect(
+      within(analyticsFilters).getByRole("searchbox", { name: "Find a ranked map" }),
+    ).toBeInTheDocument();
+    expect(within(analyticsFilters).getByRole("combobox", { name: "Map" })).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 2, name: "Finish-time trend" }),
     ).toBeInTheDocument();
@@ -494,11 +557,41 @@ function createProfileApi(overrides: Partial<PlayerProfileApi> = {}): PlayerProf
     playerMapRuns: vi.fn().mockResolvedValue(mapRuns),
     playerPerformance: vi.fn().mockResolvedValue(performance),
     playerRank: vi.fn().mockResolvedValue(rank),
+    replayWatchAggregate: vi.fn().mockResolvedValue(replayAggregate),
+    replayWatchRankings: vi.fn().mockResolvedValue([replayRanking]),
     playerRoutes: vi.fn().mockResolvedValue([route]),
     players: vi.fn().mockResolvedValue([directoryPlayer]),
     ...overrides,
   };
 }
+
+const replayAggregate: ReplayWatchAggregate = {
+  owner_player_id: 42,
+  replay_count: 2,
+  watch_count: 18,
+  unique_viewer_count: 11,
+  total_watch_ms: 420_000,
+  first_watched_at: "2026-07-01T10:00:00Z",
+  last_watched_at: "2026-08-01T11:00:00Z",
+  updated_at: "2026-08-01T11:05:00Z",
+};
+
+const replayRanking: ReplayWatchRankingEntry = {
+  rank: 1,
+  run_id: 7001,
+  fps: "125",
+  mapid: 101,
+  owner_player_id: 42,
+  mapname: "mp_cjs_training",
+  owner_playername: "^2Runner^7One",
+  country: "Testland",
+  watch_count: 12,
+  unique_viewer_count: 8,
+  total_watch_ms: 300_000,
+  first_watched_at: "2026-07-01T10:00:00Z",
+  last_watched_at: "2026-08-01T11:00:00Z",
+  updated_at: "2026-08-01T11:05:00Z",
+};
 
 const mapRuns: TopRun[] = [
   {

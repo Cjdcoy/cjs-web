@@ -126,4 +126,14 @@ describe("map discovery state", () => {
       ),
     ).toBeNull();
   });
+
+  it("treats source-neutral catalog videos as media without an API video field", () => {
+    const [prepared] = prepareMaps([{ ...maps[1], mapname: "mp_chilli", video: null }]);
+
+    if (!prepared) throw new Error("Expected a prepared map.");
+    expect(prepared.hasMedia).toBe(true);
+    expect(filterAndSortMaps([prepared], { ...defaultFilters, media: "with-media" })).toHaveLength(
+      1,
+    );
+  });
 });

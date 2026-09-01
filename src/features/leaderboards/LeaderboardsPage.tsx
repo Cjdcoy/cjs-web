@@ -1,7 +1,6 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, Globe2, RefreshCw, Search, Trophy } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
-  Badge,
   Button,
   CodPlayerName,
   EmptyState,
@@ -14,8 +13,15 @@ import {
   SkeletonGroup,
 } from "../../components/ui";
 import { stripCodColorCodes } from "../../lib/codName";
-import { playerDetailPath } from "../../lib/routing";
-import { navigate, useBrowserLocation, useQueryState, useSourceContext } from "../../lib/routing";
+import {
+  navigate,
+  playerDetailPath,
+  sourceOptions,
+  useBrowserLocation,
+  useQueryState,
+  useSourceContext,
+  type SourceId,
+} from "../../lib/routing";
 import {
   LEADERBOARD_BOARDS,
   boardLabel,
@@ -63,10 +69,18 @@ const decimalFormatter = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 2,
   minimumFractionDigits: 2,
 });
+const DEFAULT_LEADERBOARD_VIEW = {
+  board: "speed-skill",
+  fps: "125",
+  order: "asc",
+  query: "",
+  sort: "rank",
+} satisfies LeaderboardQueryState;
 
 export function LeaderboardsPage() {
   const location = useBrowserLocation();
-  const { source } = useSourceContext();
+  const { source, setSource } = useSourceContext();
+  const sourceName = source === "j4l" ? "Jump4Life" : "JumpersHeaven";
   const [rawState, setQueryState] = useQueryState(leaderboardQuerySchema);
   const state = useMemo(() => normalizeLeaderboardState(rawState, source), [rawState, source]);
   const canonicalSearch = useMemo(
@@ -95,6 +109,12 @@ export function LeaderboardsPage() {
   const visibleRows = rankedRows.slice(0, visiblePlayerCount);
   const remainingPlayerCount = Math.max(rankedRows.length - visibleRows.length, 0);
   const hasMorePlayers = remainingPlayerCount > 0;
+  const hasCustomizedView =
+    state.board !== DEFAULT_LEADERBOARD_VIEW.board ||
+    state.fps !== DEFAULT_LEADERBOARD_VIEW.fps ||
+    state.order !== DEFAULT_LEADERBOARD_VIEW.order ||
+    state.query !== DEFAULT_LEADERBOARD_VIEW.query ||
+    state.sort !== DEFAULT_LEADERBOARD_VIEW.sort;
 
   useEffect(() => {
     setVisiblePlayerCount(PLAYER_BATCH_SIZE);
@@ -135,38 +155,40 @@ export function LeaderboardsPage() {
   };
 
   const resetFilters = () => {
-    setQueryState({
-      board: "speed-skill",
-      fps: "125",
-      order: "asc",
-      query: "",
-      sort: "rank",
-    });
+    setQueryState(DEFAULT_LEADERBOARD_VIEW);
   };
 
   return (
     <section className="cjs-leaderboards cjs-stack" aria-labelledby="leaderboards-title">
-      <header className="cjs-leaderboards__hero">
-        <div className="cjs-leaderboards__eyebrow">
+      <header className="cjs-leaderboards__hero cjs-page-heading">
+        <div className="cjs-leaderboards__eyebrow cjs-page-heading__eyebrow">
           <Trophy size={18} aria-hidden="true" />
           <span>Competitive records</span>
-          <Badge tone={source === "j4l" ? "success" : "information"}>
-            {source === "j4l" ? "Jump4Life" : "JumpersHeaven"}
-          </Badge>
         </div>
-        <h1 id="leaderboards-title">Leaderboards</h1>
-        <p>
-          Compare official ranks across the supported skill, completion, and J4L XP boards. Filters
-          and presentation choices stay in the URL for direct sharing.
+        <h1 id="leaderboards-title">{sourceName} leaderboards</h1>
+        <p className="cjs-page-heading__description">
+          Compare official {sourceName} player rankings across skill and completion boards
+          {source === "j4l" ? ", including Rank XP" : ""}. Filters and presentation choices stay in
+          the URL for direct sharing.
         </p>
       </header>
 
-      <Panel
-        className="cjs-leaderboards__filters"
-        variant="strong"
-        aria-label="Leaderboard filters"
-      >
+      <Panel className="cjs-leaderboards__filters" aria-label="Leaderboard filters">
         <div className="cjs-leaderboards__primary-filters">
+          <fieldset className="cjs-leaderboards__source-field">
+            <legend>Data source</legend>
+            <SegmentedControl<SourceId>
+              ariaLabel="Leaderboard data source"
+              value={source}
+              onChange={setSource}
+              options={sourceOptions.map((option) => ({
+                accessibleLabel: option.label,
+                label: option.shortLabel,
+                value: option.value,
+              }))}
+            />
+          </fieldset>
+
           <div className="cjs-leaderboards__choice-group">
             <h2>Board</h2>
             <SegmentedControl
@@ -212,16 +234,16 @@ export function LeaderboardsPage() {
           />
         </div>
 
-        <div className="cjs-leaderboards__filter-actions">
-          <p>
-            {state.board === "rank-xp"
-              ? "Rank XP is published for Jump4Life only."
-              : `${boardLabel(state.board)} uses the API's official ranking.`}
-          </p>
-          <Button variant="ghost" size="small" onClick={resetFilters}>
-            Reset view
-          </Button>
-        </div>
+        {(state.board === "rank-xp" || hasCustomizedView) && (
+          <div className="cjs-leaderboards__filter-actions">
+            {state.board === "rank-xp" && <p>Rank XP is published for Jump4Life only.</p>}
+            {hasCustomizedView && (
+              <Button variant="ghost" size="small" onClick={resetFilters}>
+                Reset filters
+              </Button>
+            )}
+          </div>
+        )}
       </Panel>
 
       <section className="cjs-leaderboards__results" aria-labelledby="leaderboard-results-title">
@@ -236,16 +258,21 @@ export function LeaderboardsPage() {
                   : "No matching players to show."}
             </p>
           </div>
-          <Button
-            variant="secondary"
-            size="small"
-            isLoading={isRefreshing}
-            loadingLabel="Refreshing"
-            onClick={reload}
-          >
-            <RefreshCw size={16} aria-hidden="true" />
-            Refresh
-          </Button>
+          <div className="cjs-leaderboards__refresh-action">
+            <Button
+              variant="ghost"
+              size="small"
+              isLoading={isRefreshing}
+              loadingLabel="Refreshing"
+              onClick={reload}
+            >
+              <RefreshCw size={16} aria-hidden="true" />
+              Refresh
+            </Button>
+            <span className="cjs-visually-hidden" role="status" aria-live="polite">
+              {isRefreshing ? "Refreshing leaderboard results." : ""}
+            </span>
+          </div>
         </header>
 
         {isInitialLoading && (

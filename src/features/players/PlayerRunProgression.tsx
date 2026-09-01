@@ -24,6 +24,7 @@ import type { ProfileResource } from "./usePlayerProfile";
 
 interface PlayerRunProgressionProps {
   fps: Fps;
+  fpsFilter: ReactNode;
   mapId: number;
   onMapChange: (mapId: number) => void;
   onRetry: () => void;
@@ -33,6 +34,7 @@ interface PlayerRunProgressionProps {
 
 export function PlayerRunProgression({
   fps,
+  fpsFilter,
   mapId,
   onMapChange,
   onRetry,
@@ -42,70 +44,81 @@ export function PlayerRunProgression({
   const [mapFilter, setMapFilter] = useState("");
   const maps = useMemo(() => scores.data?.map_scores ?? [], [scores.data]);
   const filteredMaps = useMemo(() => filterMaps(maps, mapFilter), [mapFilter, maps]);
+  const mapSelected = mapId > 0;
   const selectedMap = maps.find((map) => map.map_id === mapId) ?? null;
   const displayedMaps =
     selectedMap && !filteredMaps.some((map) => map.map_id === selectedMap.map_id)
       ? [selectedMap, ...filteredMaps]
       : filteredMaps;
+  const filters = (
+    <Panel
+      aria-label="Run analytics filters"
+      className="cjs-run-progress__filters"
+      padding="small"
+      role="group"
+      variant="strong"
+    >
+      {fpsFilter}
+      {(maps.length > 0 || mapId > 0) && (
+        <MapPicker
+          displayedMaps={displayedMaps}
+          filteredCount={filteredMaps.length}
+          fps={fps}
+          mapFilter={mapFilter}
+          mapId={mapId}
+          onFilterChange={setMapFilter}
+          onMapChange={onMapChange}
+          selectedMap={selectedMap}
+          totalCount={maps.length}
+        />
+      )}
+    </Panel>
+  );
 
   if (scores.status === "loading" && mapId === 0) {
-    return <SkeletonGroup count={5} label="Loading analytics maps" />;
+    return (
+      <div className="cjs-run-progress" data-map-selected={mapSelected}>
+        {filters}
+        <SkeletonGroup count={5} label="Loading analytics maps" />
+      </div>
+    );
   }
 
   if (scores.status === "error" && scores.data === null && mapId === 0) {
     return (
-      <ErrorState
-        description="The map list could not be loaded, so run analytics cannot be selected yet."
-        onRetry={onRetry}
-        title="Analytics maps unavailable"
-      />
+      <div className="cjs-run-progress" data-map-selected={mapSelected}>
+        {filters}
+        <ErrorState
+          description="The map list could not be loaded, so run analytics cannot be selected yet."
+          onRetry={onRetry}
+          title="Analytics maps unavailable"
+        />
+      </div>
     );
   }
 
   if (maps.length === 0 && mapId === 0) {
     return (
-      <EmptyState
-        description={`No ranked ${fpsLabel(fps)} maps are published for this player. Try another FPS.`}
-        title="No maps to chart"
-      />
+      <div className="cjs-run-progress" data-map-selected={mapSelected}>
+        {filters}
+        <EmptyState
+          description={`No ranked ${fpsLabel(fps)} maps are published for this player. Try another FPS.`}
+          title="No maps to chart"
+        />
+      </div>
     );
   }
 
   return (
-    <div className="cjs-run-progress">
+    <div className="cjs-run-progress" data-map-selected={mapSelected}>
+      {filters}
       {mapId === 0 ? (
-        <>
-          <MapPicker
-            displayedMaps={displayedMaps}
-            filteredCount={filteredMaps.length}
-            fps={fps}
-            mapFilter={mapFilter}
-            mapId={mapId}
-            onFilterChange={setMapFilter}
-            onMapChange={onMapChange}
-            selectedMap={selectedMap}
-            totalCount={maps.length}
-          />
-          <EmptyState
-            description="Choose a map to compare every recorded finish in chronological order."
-            title="Pick a map"
-          />
-        </>
+        <EmptyState
+          description="Choose a map to compare every recorded finish in chronological order."
+          title="Pick a map"
+        />
       ) : (
         <RunHistory
-          controls={
-            <MapPicker
-              displayedMaps={displayedMaps}
-              filteredCount={filteredMaps.length}
-              fps={fps}
-              mapFilter={mapFilter}
-              mapId={mapId}
-              onFilterChange={setMapFilter}
-              onMapChange={onMapChange}
-              selectedMap={selectedMap}
-              totalCount={maps.length}
-            />
-          }
           mapName={selectedMap?.map_name ?? runs.data?.[0]?.mapname ?? `Map #${mapId}`}
           onRetry={onRetry}
           resource={runs}
@@ -137,7 +150,7 @@ function MapPicker({
   totalCount: number;
 }) {
   return (
-    <Panel className="cjs-run-progress__map-picker" padding="small" variant="strong">
+    <div className="cjs-run-progress__map-picker">
       <Input
         label="Find a ranked map"
         leading={<Search size={17} />}
@@ -163,17 +176,15 @@ function MapPicker({
           </option>
         ))}
       </Select>
-    </Panel>
+    </div>
   );
 }
 
 function RunHistory({
-  controls,
   mapName,
   onRetry,
   resource,
 }: {
-  controls: ReactNode;
   mapName: string;
   onRetry: () => void;
   resource: ProfileResource<TopRun[]>;
@@ -187,36 +198,25 @@ function RunHistory({
     null;
 
   if (resource.status === "loading" || resource.status === "unsupported") {
-    return (
-      <div className="cjs-run-progress__state-layout">
-        <div>{controls}</div>
-        <SkeletonGroup count={7} label={`Loading ${mapName} run analytics`} />
-      </div>
-    );
+    return <SkeletonGroup count={7} label={`Loading ${mapName} run analytics`} />;
   }
 
   if (resource.status === "error" && resource.data === null) {
     return (
-      <div className="cjs-run-progress__state-layout">
-        <div>{controls}</div>
-        <ErrorState
-          description={`The recorded finishes for ${mapName} could not be loaded.`}
-          onRetry={onRetry}
-          title="Run analytics unavailable"
-        />
-      </div>
+      <ErrorState
+        description={`The recorded finishes for ${mapName} could not be loaded.`}
+        onRetry={onRetry}
+        title="Run analytics unavailable"
+      />
     );
   }
 
   if (!progression.summary) {
     return (
-      <div className="cjs-run-progress__state-layout">
-        <div>{controls}</div>
-        <EmptyState
-          description="This map has no recorded finishes for the selected player and FPS."
-          title="No run history yet"
-        />
-      </div>
+      <EmptyState
+        description="This map has no recorded finishes for the selected player and FPS."
+        title="No run history yet"
+      />
     );
   }
 
@@ -286,8 +286,6 @@ function RunHistory({
       )}
 
       <div className="cjs-run-progress__analytics">
-        <div className="cjs-run-progress__analytics-controls">{controls}</div>
-
         <RunProgressChart
           onSelect={setSelectedKey}
           points={progression.points}

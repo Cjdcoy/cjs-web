@@ -66,7 +66,7 @@ describe("AppRouter", () => {
     await screen.findByRole("heading", { name: "Jump statistics, clearly sourced." });
     await user.click(screen.getByRole("link", { name: "Maps" }));
 
-    await screen.findByRole("heading", { name: "Find your next route" });
+    await screen.findByRole("heading", { name: "Browse maps" });
     await waitFor(() => expect(screen.getByRole("main")).toHaveFocus());
     expect(screen.getByText("Maps page loaded.")).toBeInTheDocument();
   });

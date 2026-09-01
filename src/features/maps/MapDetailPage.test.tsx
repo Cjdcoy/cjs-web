@@ -2,7 +2,13 @@ import { act, fireEvent, render, screen, waitFor, within } from "@testing-librar
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppRouter } from "../../app/AppRouter";
-import { api, type GameMap, type TopRun } from "../../lib/api";
+import {
+  api,
+  type GameMap,
+  type ReplayWatchAggregate,
+  type ReplayWatchRankingEntry,
+  type TopRun,
+} from "../../lib/api";
 import { SourceProvider } from "../../lib/routing";
 import { MapDetailPage } from "./MapDetailPage";
 
@@ -89,6 +95,8 @@ describe("MapDetailPage", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     vi.stubGlobal("localStorage", localStorageMock);
+    vi.spyOn(api, "replayWatchAggregate").mockResolvedValue(replayAggregate);
+    vi.spyOn(api, "replayWatchRankings").mockResolvedValue([replayRanking]);
     localStorage.clear();
     window.history.replaceState(null, "", "/maps/1");
   });
@@ -101,6 +109,12 @@ describe("MapDetailPage", () => {
     renderMapDetail();
 
     expect(await screen.findByRole("heading", { name: "mp_alpha", level: 1 })).toBeVisible();
+    expect(document.querySelector(".cjs-map-detail__badges")).not.toBeInTheDocument();
+    const mapHero = document.querySelector(".cjs-map-detail__hero");
+    expect(mapHero?.querySelector(".cjs-map-detail__summary")).toBeInTheDocument();
+    expect(
+      document.querySelector(".cjs-map-detail__controls + .cjs-map-detail__summary"),
+    ).not.toBeInTheDocument();
     expect(mapsRequest).toHaveBeenCalledWith({
       source: "j4l",
       signal: expect.any(AbortSignal),
@@ -137,11 +151,76 @@ describe("MapDetailPage", () => {
       "href",
       "https://media.example.invalid/maps/mp_alpha",
     );
+    expect(await screen.findByRole("heading", { name: "In-game Replay views" })).toBeVisible();
+    expect(api.replayWatchAggregate).toHaveBeenCalledWith(
+      expect.objectContaining({ mapId: 1, source: "j4l" }),
+    );
+    expect(api.replayWatchRankings).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 1, mapId: 1, metric: "watch_count", source: "j4l" }),
+    );
+    const resultsLayout = document.querySelector(".cjs-map-detail__results-layout");
+    expect(resultsLayout).toHaveAttribute("data-has-replay", "true");
+    expect(resultsLayout).toHaveAttribute("data-has-sidebar", "true");
+    expect(resultsLayout?.children).toHaveLength(2);
+    expect(resultsLayout?.firstElementChild).toHaveClass("cjs-map-detail__insights");
+    expect(
+      within(screen.getByRole("complementary", { name: "Map insights" })).getByRole("heading", {
+        name: "In-game Replay views",
+      }),
+    ).toBeVisible();
+    expect(resultsLayout?.lastElementChild).toHaveClass("cjs-map-detail__runs");
+    expect(screen.getByText("Most watched replay")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Replay Runner" })).toBeVisible();
 
     if (!mapImage) throw new Error("Expected the map profile image to render.");
     fireEvent.error(mapImage);
     expect(document.querySelector(".cjs-map-detail__art img")).not.toBeInTheDocument();
     expect(screen.getByText("MP")).toBeVisible();
+  });
+
+  it("shows the same map-name video catalog for JumpersHeaven and Jump4Life", async () => {
+    const chilliMap = { ...alphaCheckpoints[0], mapname: "mp_chilli", video: null };
+    const mapsRequest = vi.spyOn(api, "maps").mockResolvedValue([chilliMap]);
+    vi.spyOn(api, "mapTops").mockResolvedValue([alphaRun]);
+    const user = userEvent.setup();
+    window.history.replaceState(null, "", "/maps/1?source=j4l");
+
+    renderMapDetail();
+
+    expect(await screen.findByRole("heading", { name: "Map videos" })).toBeVisible();
+    expect(screen.queryByText(/videos available for mp_chilli/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "2 map videos" })).toHaveAttribute(
+      "href",
+      "#map-videos",
+    );
+    const j4lInsights = screen.getByRole("complementary", { name: "Map insights" });
+    expect(j4lInsights.children).toHaveLength(2);
+    expect(j4lInsights.firstElementChild).toHaveAttribute("data-scope", "map");
+    expect(j4lInsights.lastElementChild).toHaveClass("cjs-map-videos");
+
+    await user.click(
+      within(screen.getByRole("radiogroup", { name: "Map data source" })).getByRole("radio", {
+        name: "JumpersHeaven",
+      }),
+    );
+
+    await waitFor(() =>
+      expect(mapsRequest).toHaveBeenLastCalledWith({
+        source: "jh",
+        signal: expect.any(AbortSignal),
+      }),
+    );
+    expect(screen.getByRole("heading", { name: "Map videos" })).toBeVisible();
+    expect(screen.queryByText(/videos available for mp_chilli/i)).not.toBeInTheDocument();
+    const jhResultsLayout = document.querySelector(".cjs-map-detail__results-layout");
+    expect(jhResultsLayout).not.toHaveAttribute("data-has-replay");
+    expect(jhResultsLayout).toHaveAttribute("data-has-sidebar", "true");
+    expect(jhResultsLayout?.children).toHaveLength(2);
+    const jhInsights = screen.getByRole("complementary", { name: "Map insights" });
+    expect(jhResultsLayout?.firstElementChild).toBe(jhInsights);
+    expect(jhInsights.children).toHaveLength(1);
+    expect(jhInsights.firstElementChild).toHaveClass("cjs-map-videos");
+    expect(jhResultsLayout?.lastElementChild).toHaveClass("cjs-map-detail__runs");
   });
 
   it("renders through the application router on a direct nested-route load", async () => {
@@ -254,18 +333,35 @@ describe("MapDetailPage", () => {
 
   it("keeps map metadata usable when the top-runs request fails", async () => {
     vi.spyOn(api, "maps").mockResolvedValue([alphaCheckpoints[0]]);
-    vi.spyOn(api, "mapTops").mockRejectedValue(new Error("Runs unavailable"));
+    vi.spyOn(api, "mapTops")
+      .mockRejectedValueOnce(new Error("Runs unavailable"))
+      .mockResolvedValueOnce([alphaRun]);
+    const user = userEvent.setup();
 
     renderMapDetail();
 
     expect(await screen.findByRole("heading", { name: "mp_alpha", level: 1 })).toBeVisible();
     expect(
       await screen.findByRole("heading", {
-        name: "No tops available for 125 FPS on mp_alpha",
+        name: "Top runs could not be loaded for 125 FPS on mp_alpha",
       }),
     ).toBeVisible();
     expect(screen.queryByText("Runs unavailable")).not.toBeInTheDocument();
     expect(screen.getByText("30")).toBeVisible();
+    expect(screen.getByText("Recorded tops").nextElementSibling).toHaveTextContent("15");
+
+    await user.click(screen.getByRole("button", { name: "Retry top runs" }));
+    expect(await screen.findByRole("link", { name: "Alpha Runner" })).toBeVisible();
+  });
+
+  it("prefers the live leaderboard total over stale map metadata", async () => {
+    vi.spyOn(api, "maps").mockResolvedValue([alphaCheckpoints[0]]);
+    vi.spyOn(api, "mapTops").mockResolvedValue([{ ...alphaRun, fps: "125", totalNr: 29 }]);
+
+    renderMapDetail();
+
+    expect(await screen.findByRole("link", { name: "Alpha Runner" })).toBeVisible();
+    expect(screen.getByText("Recorded tops").nextElementSibling).toHaveTextContent("29");
   });
 
   it("disables FPS values without tops and falls back from 125 to the first available FPS", async () => {
@@ -345,6 +441,34 @@ describe("MapDetailPage", () => {
     expect(topsRequest).not.toHaveBeenCalled();
   });
 });
+
+const replayAggregate: ReplayWatchAggregate = {
+  mapid: 1,
+  replay_count: 1,
+  watch_count: 12,
+  unique_viewer_count: 8,
+  total_watch_ms: 300_000,
+  first_watched_at: "2026-07-01T10:00:00Z",
+  last_watched_at: "2026-08-01T11:00:00Z",
+  updated_at: "2026-08-01T11:05:00Z",
+};
+
+const replayRanking: ReplayWatchRankingEntry = {
+  rank: 1,
+  run_id: 700,
+  fps: "125",
+  mapid: 1,
+  owner_player_id: 7,
+  mapname: "mp_alpha",
+  owner_playername: "Replay Runner",
+  country: "Exampleland",
+  watch_count: 12,
+  unique_viewer_count: 8,
+  total_watch_ms: 300_000,
+  first_watched_at: "2026-07-01T10:00:00Z",
+  last_watched_at: "2026-08-01T11:00:00Z",
+  updated_at: "2026-08-01T11:05:00Z",
+};
 
 function topRun(overrides: Partial<TopRun>): TopRun {
   return {

@@ -121,17 +121,20 @@ export function MapsPage() {
   return (
     <div className="cjs-maps cjs-stack">
       <header className="cjs-maps__header">
-        <div className="cjs-maps__heading">
-          <span className="cjs-maps__eyebrow">
+        <div className="cjs-maps__heading cjs-page-heading">
+          <span className="cjs-maps__eyebrow cjs-page-heading__eyebrow">
             <MapIcon aria-hidden="true" size={16} />
             Map discovery
           </span>
-          <h1>Find your next route</h1>
+          <h1>Browse maps</h1>
+          <p className="cjs-page-heading__description">
+            Search by map or author, compare route types and FPS difficulty, and open a map to view
+            its records.
+          </p>
         </div>
-        <p>Search maps, compare FPS difficulty, and open the route that fits your next run.</p>
       </header>
 
-      <Panel className="cjs-maps__filters" padding="small" variant="strong">
+      <Panel className="cjs-maps__filters" padding="small">
         <div className="cjs-maps__filter-grid">
           <fieldset className="cjs-maps__source-field">
             <legend>Data source</legend>

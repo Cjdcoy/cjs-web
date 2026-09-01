@@ -94,6 +94,36 @@ export const topRunsFixture: unknown = [
   },
 ];
 
+export const replayWatchAggregateFixture: unknown = {
+  owner_player_id: 501,
+  replay_count: 2,
+  watch_count: 18,
+  unique_viewer_count: 11,
+  total_watch_ms: 420_000,
+  first_watched_at: "2026-07-01T10:00:00Z",
+  last_watched_at: "2026-08-01T11:00:00Z",
+  updated_at: "2026-08-01T11:05:00Z",
+};
+
+export const replayWatchRankingsFixture: unknown = [
+  {
+    rank: 1,
+    run_id: 7001,
+    fps: "125",
+    mapid: 101,
+    owner_player_id: 501,
+    mapname: "mp_cjs_training",
+    owner_playername: "^2Runner",
+    country: "Exampleland",
+    watch_count: 12,
+    unique_viewer_count: 8,
+    total_watch_ms: 300_000,
+    first_watched_at: "2026-07-01T10:00:00Z",
+    last_watched_at: "2026-08-01T11:00:00Z",
+    updated_at: "2026-08-01T11:05:00Z",
+  },
+];
+
 export const playerPerformanceFixture: unknown = {
   total_maps_completed: 18,
   maps_completed_ratio: 0.75,

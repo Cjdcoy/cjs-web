@@ -50,7 +50,18 @@ Copy the example environment file to override that default:
 cp .env.example .env
 ```
 
-The supported setting is `VITE_API_BASE_URL`.
+The supported setting is `VITE_API_BASE_URL`. To exercise only locally developed
+replay routes while keeping the rest of the site on the live API, use:
+
+```sh
+VITE_REPLAY_API_BASE_URL=http://127.0.0.1:8080 npm run dev
+```
+
+Replay values in that mode come from the local backend's configured database.
+Refresh its Jump4Life snapshot before comparing totals with production.
+
+Vite reads these variables when the development server or production build
+starts, so restart the process after changing them.
 
 ## Product routes
 
@@ -64,6 +75,12 @@ The supported setting is `VITE_API_BASE_URL`.
 Shareable filters are represented in the URL, and JumpersHeaven and Jump4Life
 remain explicit data sources. COD4 is a future capability and is not advertised
 until the API contract supports it.
+
+Map video references are source-neutral metadata curated from the public
+[Open CJ Stats map catalog](https://cjstats.sicmundus.ovh/maps). CJS stores only
+the map association, label, YouTube video ID, and optional route start time; the
+linked videos remain hosted by and subject to YouTube and their respective
+creators.
 
 ## Validation and deployment
 

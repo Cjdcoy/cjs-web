@@ -507,7 +507,7 @@ public exports rather than editing another feature.
 
 ### CJS-010A — Refine map profile routes and top-run selection
 
-- **Status:** in progress
+- **Status:** done
 - **Owner:** Codex / map-profile refinement follow-up
 - **Dependencies:** CJS-010, CJS-009A
 - **Primary boundary:** map detail files within `src/features/maps`, shared map
@@ -518,8 +518,9 @@ public exports rather than editing another feature.
   metadata sits with the author; route controls and labels replace checkpoint
   language and appear only for multi-route maps; 125/250/333/mix are individual
   URL-backed buttons, FPS values without tops are disabled, and default selection
-  falls back through 125, 250, 333, then mix; failed or empty top-run requests
-  present a map/FPS-specific no-tops state rather than an API error.
+  falls back through 125, 250, 333, then mix; empty top-run requests present a
+  map/FPS-specific no-tops state, while failed requests preserve the profile and
+  offer a safe retry without exposing raw API errors.
 - **Validation:** focused model/component tests, mobile and desktop inspection,
   `npm run build`, and `npm run verify`.
 
@@ -1393,7 +1394,8 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
 
 ### CJS-017 — Replay, activity, and historical analytics
 
-- **Status:** ready
+- **Status:** done
+- **Owner/handoff:** Codex / replay analytics frontend vertical slice
 - **Dependencies:** CJS-016
 - **Primary boundary:** new feature modules and their API extensions
 - **Goal:** expose the remaining documented Replay/Historical/J4L activity value
@@ -1405,6 +1407,42 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   textual/table equivalent; large histories are bounded and cancellable.
 - **Validation:** API tests, feature tests, E2E route smoke tests, performance and
   accessibility checks.
+- **Frontend replay handoff (2026-09-01):** Added the typed J4L-only replay
+  aggregate/ranking boundary and integrated replay reach on player overviews and
+  replay activity on map details. The shared lazy replay module measures 2.16 KiB
+  gzip; the total-JavaScript budget was raised narrowly from 115 to 117 KiB after
+  the complete build measured 116.2 KiB. Initial JS/CSS, route-increment, and
+  total-CSS budgets are unchanged. The replay slice is complete; historical and
+  remaining activity analytics keep the parent task in progress.
+- **Frontend replay validation:** 65 focused API, player, map, and replay tests
+  pass. The complete `npm run verify` gate passes strict TypeScript, tests, lint,
+  formatting, Vite production compilation, performance budgets at 116.3/117 KiB
+  total JavaScript and 15.9/16 KiB total CSS, and the release-artifact policy. A
+  production-mode browser run against the
+  rebuilt local backend passed player and map scopes at 1440×1000 and 390×844:
+  each page made one aggregate and one ranking request, both returned HTTP 200,
+  expected replay content rendered, and there were no console errors, page
+  errors, or horizontal overflow. Backend owner, map, combined, and global
+  ranking calls plus invalid-scope/source responses were also exercised locally.
+- **Map replay refinement (2026-09-01):** Moved the map-scoped replay analytics
+  into a compact sidebar beside Top runs, replaced the nested summary grid with
+  four plain metrics and one most-watched replay, and retained a stacked mobile
+  reading order. The API boundary rejects aggregate or ranking payloads whose
+  map/player IDs do not match the requested scope, preventing an older backend
+  from presenting global rankings as map data. Local integration can now set
+  `VITE_REPLAY_API_BASE_URL` independently, so only the unreleased replay routes
+  use localhost while ordinary map data remains on the configured main API. The
+  focused API/replay/map suite passes 26 tests. A hybrid production preview for
+  map 57026 (`jm_sky_revisited_pro`) returned HTTP 200 for live map/all and
+  map/tops requests and local scoped replay aggregate/ranking requests. It
+  rendered the live difficulty and three top runs alongside the local snapshot's
+  1 viewed replay, 1 view, 1 viewer, and 2 minutes watched at 1440×1000 and
+  390×844, with no overflow, console errors, or page errors. A subsequent
+  read-only check against the Jump4Life production MySQL database confirmed that
+  the local clone is stale: the production scope contains 7 watched replays, 24
+  watches, 4 distinct viewers, and 2,167,300 ms watched. The backend aggregate
+  query matches those production summary/session totals exactly; deployment will
+  expose them through the new route without changing its calculation.
 
 ### CJS-018 — COD4 capability implementation
 
@@ -1424,6 +1462,736 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   gaps are communicated honestly.
 - **Validation:** contract/unit/integration/E2E matrix for COD2 and COD4;
   `npm run verify`.
+
+### CJS-039 — Chrome DevTools runtime hardening
+
+- **Status:** done
+- **Owner:** Codex / Chrome DevTools runtime-audit session
+- **Dependencies:** CJS-015, CJS-016
+- **Primary boundary:** verified cross-feature browser defects, focused tests, and
+  browser-validation evidence; no new product capabilities
+- **Goal:** use the Chrome DevTools MCP to find and fix reproducible functional,
+  responsive, accessibility, and runtime regressions in the current application.
+- **Work:** audit representative server, map, and player flows at mobile and
+  desktop widths; inspect console/network behavior and Lighthouse findings;
+  correct tracker checkpoint links and live leaderboard counts; remove the
+  uncontracted COD4 server selector while CJS-018 remains blocked; resolve
+  reproduced accessible-name and COD-color contrast failures; publish a valid
+  crawler policy; distinguish unavailable record requests from empty data; add
+  focused regression coverage for every code change.
+- **Acceptance:** every code change maps to reproduced browser evidence; unsupported
+  COD4 controls are absent and stale `game=cod4` URLs recover to COD2; corrected
+  flows have focused automated coverage; no new console errors, accessibility
+  regressions, or horizontal overflow are introduced.
+- **Validation:** focused unit/integration tests, Chrome mobile/desktop checks,
+  Lighthouse accessibility/best-practices review, `npm run verify`.
+- **Outcome:** Chrome DevTools passes now resolve tracker checkpoint links,
+  reconcile live leaderboard totals, keep COD4 capability-gated, distinguish
+  upstream failures from empty data, and remove the reproduced contrast,
+  label-in-name, and robots-policy failures. Fresh mobile Lighthouse scores are
+  100 for accessibility, best practices, and SEO; corrected routes have a clean
+  application console baseline.
+- **Validated:** 32 focused integration tests passed; the full `npm run verify`
+  gate passed with 216 tests, the production build, bundle budgets, and release
+  artifact checks.
+
+### CJS-040 — Align player run-analytics filter widths
+
+- **Status:** done
+- **Owner:** Codex / player run-analytics filter-width session
+- **Dependencies:** CJS-012, CJS-017
+- **Primary boundary:** player-profile run-analytics layout styles and focused
+  responsive validation
+- **Goal:** keep the ranked-map filter panel and unselected state aligned with
+  the FPS selector while preserving the wider canvas needed by the progression
+  chart and run details.
+- **Work:** place the FPS filter, ranked-map search, and map selector in one
+  responsive filter panel without reducing the run-analytics content width.
+- **Acceptance:** run analytics exposes one filter panel containing all three
+  controls; the unselected state matches that panel's width; mobile controls
+  remain fluid and stacked; selecting a map expands the chart and details.
+- **Validation:** focused player-profile tests, mobile and desktop layout
+  inspection, `npm run build`.
+- **Outcome:** run analytics now composes the FPS selector, ranked-map search,
+  and map selector inside one content-width filter panel, with the search and
+  map fields sharing the available row equally. The unselected `Pick a map`
+  state stays at the same width; choosing a map alone enables the wider desktop
+  analytics canvas.
+- **Validated:** 15 focused player-profile tests passed, including regressions
+  proving all three controls share the filter group and FPS remains available
+  when the map list fails;
+  headless Chromium confirmed matching 1248px desktop filter and `Pick a map`
+  states, equal 601px map fields, a 1536px selected analytics canvas, and fluid
+  343px mobile panels without horizontal overflow; `npm run verify` passed.
+
+### CJS-041 — Simplify shared refresh controls
+
+- **Status:** done
+- **Owner:** Codex / refresh-control polish session
+- **Dependencies:** CJS-004, CJS-007, CJS-008, CJS-012
+- **Primary boundary:** shared refresh actions in server, leaderboard, and player
+  profile headers
+- **Goal:** reduce persistent refresh actions to the shared refresh icon while
+  preserving discoverability and accessible names.
+- **Work:** replace repeated text-and-icon refresh buttons with the shared ghost
+  icon-button treatment; expose refresh context on hover and to assistive
+  technology; keep loading and disabled states intact.
+- **Acceptance:** persistent refresh actions render as icon-only controls with
+  hover titles and accessible names; contextual retry actions remain explicit;
+  refresh behavior and responsive layouts do not regress.
+- **Validation:** focused component and feature tests; mobile and desktop visual
+  inspection; `npm run verify`.
+- **Outcome:** the server toolbar, leaderboard results header, and player-profile
+  source actions now use compact ghost refresh icons. Their hover titles and
+  accessible names preserve the refresh context, and loading still replaces the
+  icon with the shared busy spinner.
+- **Validated:** 37 focused server, leaderboard, and player-profile tests passed;
+  `npm run verify` passed with 217 tests, coverage, the production build,
+  performance budgets, and release-artifact checks; headless Chromium at 390px
+  and 1440px confirmed the server refresh control stays compact and unclipped.
+
+### CJS-042 — Improve leaderboard scanability and controls
+
+- **Status:** done
+- **Owner:** Codex / leaderboard readability refinement session
+- **Dependencies:** CJS-008, CJS-041
+- **Primary boundary:** `src/features/leaderboards` and focused leaderboard tests
+- **Goal:** make the leaderboard easier to read and its filters and refresh state
+  easier to understand without changing its data or URL behavior.
+- **Work:** increase table row and secondary-detail legibility; remove nested
+  filter-group card styling and tighten the filter panel; restore a visible
+  leaderboard refresh label with an explicit refreshing state.
+- **Acceptance:** board, FPS, search, and reset remain one compact responsive
+  filter surface; leaderboard rows and placement details are easier to scan;
+  refresh context is visible without hover and announced while loading; existing
+  URL, sorting, loading, empty, error, and responsive behavior does not regress.
+- **Validation:** focused leaderboard tests, mobile and desktop visual inspection,
+  `npm run verify`.
+- **Outcome:** the filter panel now presents board, FPS, search, context, and reset
+  as one lighter surface without nested group cards. Table rows have more vertical
+  room, captions and top-place details use larger type, and the mobile caption no
+  longer collapses into a narrow word column. Refresh is a visible labeled action
+  beside the result summary and exposes both visible and live-region loading text.
+- **Validated:** 9 focused leaderboard tests passed, including the refresh loading
+  transition and announcement; headless Chromium at 390px and 1440px confirmed
+  the compact filters, full-width mobile caption, readable rows, horizontal refresh
+  label, and no horizontal overflow; `npm run verify` passed with 35 files / 218
+  tests, coverage, the production build, performance budgets, and release-artifact
+  checks.
+
+### CJS-043 — Place the country flag in the player profile avatar
+
+- **Status:** done
+- **Owner:** Codex / player-profile flag-placement session
+- **Dependencies:** CJS-012, CJS-025
+- **Primary boundary:** player-profile hero markup, styles, and focused tests
+- **Goal:** use the profile hero's circular identity marker for the player's
+  country flag instead of repeating a small flag beneath the player name.
+- **Acceptance:** the shared accessible country flag fills the profile avatar
+  circle; the country name remains readable in profile metadata without a second
+  flag; unavailable countries retain the shared globe fallback; responsive hero
+  layout and favorite behavior do not regress.
+- **Validation:** focused player-profile tests, `npm run build`.
+- **Outcome:** the profile hero now uses the shared country flag as its large
+  circular identity marker. The full country label remains in the metadata row
+  without a duplicate flag, and missing or invalid codes continue through the
+  shared globe fallback.
+- **Validated:** the focused player-profile suite passed with 15 tests, including
+  a regression assertion for avatar placement and metadata deduplication;
+  `npm run verify` passed with 35 files / 218 tests, coverage, lint, formatting,
+  strict TypeScript, the production build, performance budgets, and artifact
+  checks. Live Chromium at 1440×1000 and 390×844 confirmed the Spain flag fills
+  the 44px avatar, the metadata contains no duplicate flag, and there is no
+  horizontal overflow or console noise.
+
+### CJS-044 — Clarify player profile identity and leaderboard summaries
+
+- **Status:** done
+- **Owner:** Codex / player-profile header-clarity session
+- **Dependencies:** CJS-023, CJS-043
+- **Primary boundary:** player-profile header, performance summary, styles, and
+  focused tests
+- **Goal:** keep the profile header focused on identity while making account
+  roles and leaderboard-derived aggregates visually quieter and unambiguous.
+- **Acceptance:** account roles use a compact non-pill treatment; best FPS is not
+  repeated as an account status; the header no longer carries a dense statistic
+  strip; route completion remains available in Performance; rank aggregates are
+  explicitly labeled as leaderboard placements across board/FPS combinations;
+  responsive and accessible behavior remains intact.
+- **Validation:** focused player-profile tests, mobile and desktop browser
+  inspection, `npm run verify`.
+- **Outcome:** moved the country flag into the avatar, replaced header pills with
+  quiet account-role text, removed the dense header statistic strip, and moved
+  the useful aggregates into a clearly labeled Performance summary.
+- **Contract evidence:** the live J4L profile for player `1` reports 12 top-10
+  placements and one first-place placement, exactly matching its 14 published
+  leaderboard/FPS position rows; a JH profile with a recent map rank of 7 still
+  reports zero top-10 placements because its published leaderboard placements
+  begin at 181. The OpenAPI fields are undescribed, so the UI now calls these
+  leaderboard placements rather than map records.
+- **Validated:** all 15 focused player-profile tests and the full `npm run verify`
+  gate pass (35 files, 218 tests); live desktop (1440px) and mobile (390px)
+  inspection confirmed clean wrapping, no horizontal overflow, and no console
+  warnings or errors.
+
+### CJS-045 — Enlarge the player profile country avatar
+
+- **Status:** done
+- **Owner:** Codex / player-profile avatar-size session
+- **Dependencies:** CJS-043
+- **Primary boundary:** player-profile avatar styles
+- **Goal:** make the country flag avatar visually prominent enough to anchor the
+  player identity header.
+- **Acceptance:** the profile-only flag avatar renders at twice its previous
+  44px dimensions without changing shared country flags or causing responsive
+  overflow.
+- **Validation:** focused player-profile tests, production build, and mobile and
+  desktop browser inspection.
+- **Outcome:** the profile-only country avatar now renders at 88×88px, exactly
+  twice its previous rendered dimensions, while shared flag sizes are unchanged.
+- **Validated:** all 15 focused profile tests, the production build, and the full
+  35-file / 218-test coverage suite pass; Chrome inspection at 1440×1000 and
+  390×844 confirmed the larger avatar remains circular and causes no horizontal
+  overflow. The normal parallel coverage run intermittently timed out in two
+  unrelated infinite-scroll tests; both pass alone and the full suite passes
+  with one worker.
+
+### CJS-046 — Clarify leaderboard filter actions
+
+- **Status:** done
+- **Owner:** Codex / leaderboard-filter-copy session
+- **Dependencies:** CJS-014
+- **Primary boundary:** leaderboard filter actions and focused tests
+- **Goal:** remove redundant ranking copy and make the reset action self-evident.
+- **Acceptance:** ordinary boards do not repeat that API rankings are official;
+  the J4L-only Rank XP note remains; the reset action is labeled “Reset filters”
+  and appears only after a board, FPS, search, or sort setting differs from the
+  default Speed / 125 FPS / rank-ascending view.
+- **Validation:** focused leaderboard tests and `npm run build`.
+- **Outcome:** removed the redundant official-ranking sentence, retained the
+  contextual Rank XP availability note, and replaced the always-visible “Reset
+  view” action with a conditional “Reset filters” action that restores Speed,
+  125 FPS, rank ascending, and an empty search.
+- **Validated:** all 9 focused leaderboard tests and the full `npm run verify`
+  gate pass (35 files, 218 tests); Chrome inspection confirmed the default
+  desktop panel has no redundant footer and the filtered mobile panel presents
+  the reset action without overflow.
+
+### CJS-047 — Clarify the maps discovery header
+
+- **Status:** done
+- **Owner:** Codex / maps-header-copy session
+- **Dependencies:** CJS-010
+- **Primary boundary:** maps discovery hero markup, styles, and focused tests
+- **Goal:** describe the page as a map browser and present its introduction as a
+  single coherent content block.
+- **Acceptance:** the title is map-oriented rather than implying the user is
+  choosing a route; the description explains map and author search, route and
+  FPS comparison, and record discovery; it sits beneath the title and remains
+  visible at mobile and desktop widths.
+- **Validation:** focused maps tests, mobile and desktop browser inspection, and
+  `npm run build`.
+- **Outcome:** replaced “Find your next route” with “Browse maps,” rewrote the
+  introduction around map and author search, route/FPS comparison, and records,
+  and consolidated the hero into one left-aligned text block that remains
+  visible on small screens.
+- **Validated:** all 8 focused maps tests, the 5 router navigation tests, and the
+  full `npm run verify` gate pass (35 files, 218 tests); Chrome inspection at
+  1440×1000 and 390×844 confirmed coherent wrapping and no horizontal overflow.
+
+### CJS-048 — Make leaderboard source context explicit
+
+- **Status:** done
+- **Owner:** Codex / leaderboard-source-header session
+- **Dependencies:** CJS-014
+- **Primary boundary:** leaderboard hero copy and focused tests
+- **Goal:** remove the decorative source tag and identify the active data source
+  directly in the page heading and introduction.
+- **Acceptance:** the hero has no JumpersHeaven or Jump4Life pill; its H1 names
+  the active source; its description accurately distinguishes J4L Rank XP from
+  the boards shared by both sources.
+- **Validation:** focused leaderboard tests, mobile and desktop browser
+  inspection, and `npm run verify`.
+- **Outcome:** removed the source badge, changed the H1 to identify the active
+  JumpersHeaven or Jump4Life leaderboard directly, and made the introduction
+  source-aware so Rank XP is mentioned only for Jump4Life.
+- **Validated:** all 9 focused leaderboard tests and the production build pass;
+  Chrome inspection at 1440×1000 and 390×844 confirmed clean wrapping and no
+  source pill. The full `npm run verify` gate is currently blocked by unrelated
+  concurrent formatting changes in four API files and an existing exhaustive
+  dependency lint error in `src/features/replay/useReplayAnalytics.ts`.
+
+### CJS-049 — Clarify live server cards
+
+- **Status:** done
+- **Owner/handoff:** Codex / collapsible source-group refinement
+- **Dependencies:** CJS-019, CJS-024, CJS-041
+- **Primary boundary:** live server card markup and styles, focused server tests
+- **Goal:** reduce explanatory copy so server identity, map, address, status, and
+  player activity can be scanned with less visual noise.
+- **Acceptance:** online state uses a compact non-color-only accessible indicator
+  with hover context; address copying uses an icon-only action with accessible
+  feedback; redundant map, address, and roster labels are shortened or removed;
+  copy behavior, map links, empty states, keyboard access, and mobile/desktop
+  layouts do not regress.
+- **Validation:** focused server tests and accessibility scan, mobile and desktop
+  browser inspection, `npm run build`, and `npm run verify` when concurrent work
+  permits.
+- **Outcome:** removed the visible Online/Offline, Current map, Server address,
+  Click to copy, and Connected players copy. Server availability is now a filled
+  online or hollow offline dot with hover text and an accessible name; addresses
+  remain selectable beside one icon-only copy action whose icon and accessible
+  feedback reflect success or failure; the roster heading is shortened to
+  “Players.” Reduced body spacing makes empty and populated cards denser without
+  hiding map, address, or roster data.
+- **Validated:** all 14 focused server tests and the full `npm run verify` gate
+  pass (36 files / 228 tests), including formatting, lint, coverage, strict
+  TypeScript, production build, performance budgets, and release-artifact checks.
+  Chrome inspection at 390×844 and 1440×1000 confirmed compact cards, working
+  hover/copy context, successful icon feedback, and no horizontal overflow; the
+  mobile Lighthouse snapshot retained a 100 accessibility score.
+- **Follow-up 2026-09-01:** replaced the delayed native status title with an
+  immediate CSS tooltip, restored the normal cursor, and changed the wide grid
+  to three columns while preserving the two- and one-column breakpoints.
+- **Follow-up validation:** all 14 focused server tests and the full
+  `npm run verify` gate pass (36 files / 231 tests). Chrome inspection at
+  1440×1000 confirmed the immediate tooltip, normal cursor, three-column grid,
+  and no horizontal overflow; 390×844 retained one column without overflow.
+- **Toolbar follow-up 2026-09-01:** flattened the bordered toolbar, toggle pills,
+  and segmented-control shell into one lightly divided control row; replaced the
+  redundant source badges with quiet color markers; and, after owner
+  clarification, removed the separate network dropdown. Each source heading is
+  now an independent button whose chevron and expanded state communicate that
+  its server cards can be folded while the source count remains visible.
+- **Toolbar budget:** the total CSS ceiling moved narrowly from 16.0 to 16.5 KiB;
+  the verified build measures 16.4 KiB. The initial CSS budget remains
+  unchanged.
+- **Toolbar validation:** all 15 focused server tests and `npm run verify` pass
+  (36 files / 233 tests), including formatting, lint, coverage, strict
+  TypeScript, production build, performance budgets, and release artifacts.
+  Chrome at 1440×1000 and 390×844 confirmed the responsive toolbar,
+  independently folding source groups, visible counts, three-/one-column cards,
+  and no horizontal overflow or console issues. Mobile Lighthouse retained 100
+  accessibility, best-practices, and SEO scores.
+
+### CJS-050 — Source-neutral map YouTube videos
+
+- **Status:** done
+- **Owner/handoff:** Codex / map-video integration session
+- **Dependencies:** CJS-010, CJS-017
+- **Primary boundary:** map discovery/detail modules and their focused tests
+- **Goal:** expose the same curated map videos on JumpersHeaven and Jump4Life
+  profiles without making source-specific map IDs the media identity.
+- **Acceptance:** video availability is keyed by normalized map name; the map
+  filter and cards recognize catalog-backed videos; details support one or many
+  videos and route chapters; embeds use YouTube's privacy-enhanced domain and
+  load only after explicit interaction; non-YouTube API media links retain their
+  existing safe fallback; replay analytics occupies the left desktop column.
+- **Catalog evidence:** the public Open CJ Stats map catalog listed 117 records
+  and 144 video rows on 2026-09-02. Normalizing duplicate map records and one
+  exact duplicate video produced 115 unique map names and 143 distinct video or
+  route-chapter entries. The checked-in catalog contains only labels, YouTube
+  IDs, route labels, and start offsets; the application has no runtime dependency
+  on the reference site.
+- **Validation:** focused catalog/model/list/detail/component tests, desktop and
+  mobile browser inspection, `npm run build`, and `npm run verify`.
+- **Outcome:** added a checked-in, source-neutral catalog for 115 map names and
+  143 distinct videos or route chapters; map discovery media filters and cards
+  now recognize those videos; map details present a responsive click-to-load
+  player, an explicit YouTube link, and a selector for multiple videos. API media
+  URLs still supplement the catalog when they identify a different safe YouTube
+  video, while existing non-YouTube HTTP(S) links retain their external-link
+  fallback. J4L replay analytics now occupies the left desktop column and the
+  first mobile position; JH omits that column and lets Top runs use the full
+  width.
+- **Performance budget:** the complete static catalog and player raised measured
+  total JavaScript from 116.3 to 120.9 KiB gzip and total CSS from 16.4 to
+  16.8 KiB gzip. Their ceilings moved narrowly to 121.5 and 17 KiB; initial
+  JavaScript/CSS and route-increment ceilings remain unchanged.
+- **Validated:** 32 focused map tests and the full `npm run verify` gate pass
+  (39 files / 244 tests), including formatting, lint, coverage, strict
+  TypeScript, production build, performance budgets, and release artifacts.
+  Chrome at 1440×1000 and 390×844 confirmed source-neutral video continuity,
+  left-first J4L replay layout, full-width JH runs, click-to-load iframe behavior,
+  and no horizontal overflow. The live JH `mp_chilli` profile rendered both
+  videos and six top runs with no console messages. The current deployed J4L API
+  still returns the already-known replay aggregate 404 and map-tops 500 until
+  the pending backend deployment; those failures remain isolated in their
+  existing retryable states.
+
+### CJS-051 — Dock map video previews beside top runs
+
+- **Status:** done
+- **Owner/handoff:** Codex / map-video preview layout follow-up
+- **Dependencies:** CJS-050
+- **Primary boundary:** map detail layout, map video component/styles, embed security policy,
+  and focused tests
+- **Goal:** keep map video discovery close to replay context without sacrificing the
+  larger viewing experience.
+- **Work:** place the video preview below map replay statistics for Jump4Life and in
+  that same left-column position for JumpersHeaven; open the selected video in a
+  large view after explicit interaction; return to the preview when playback pauses
+  when the privacy-enhanced YouTube player can report that state.
+- **Acceptance:** both sources keep the preview in the left desktop column; J4L
+  replay analytics remains above it; the mobile reading order stays deliberate;
+  embeds remain privacy-enhanced and interaction-gated; the large view closes by
+  pause, close control, backdrop, or Escape without losing keyboard focus.
+- **Validation:** focused map-video and map-detail tests, mobile and desktop browser
+  inspection, `npm run build`, and `npm run verify`.
+- **Performance budget:** the large-player dialog and pause-state integration add less
+  than 1 KiB gzip; the total-JavaScript ceiling moves narrowly from 121.5 to 122.5
+  KiB while initial JavaScript/CSS, route-increment, and total-CSS ceilings remain
+  unchanged.
+- **Outcome:** map details now use a shared left insights column: J4L renders replay
+  analytics followed by the video preview, while JH uses the same position for video
+  alone. Activating a preview opens a responsive modal player; pause, Escape, backdrop,
+  and the close control reduce it back to the preview and restore focus. YouTube API
+  code remains interaction-gated, embeds keep the privacy-enhanced host, and the
+  production content-security policy narrowly permits the required script, frame, and
+  thumbnail hosts.
+- **Validated:** 15 focused map-detail/video tests and the complete `npm run verify`
+  gate pass (39 files / 246 tests), including formatting, lint, coverage, strict
+  TypeScript, production build, performance budgets at 121.8/122.5 KiB total
+  JavaScript and 16.9/17 KiB total CSS, and release artifacts. Chrome at 1440×1000 and
+  390×844 confirmed JH/J4L placement, responsive modal sizing, Escape closure, focus
+  return, privacy-enhanced iframe URLs, and no horizontal overflow. The live J4L replay
+  and map-tops requests retain their previously documented 404/500 states pending the
+  backend deployment; both remain isolated from the video experience.
+
+### CJS-052 — Simplify map video card copy and actions
+
+- **Status:** done
+- **Owner/handoff:** Codex / map-video card hierarchy follow-up
+- **Dependencies:** CJS-051
+- **Primary boundary:** map detail hero, map video component, styles, and focused tests
+- **Goal:** remove redundant map/video labels and make the external YouTube action feel
+  like part of the selected-video metadata.
+- **Work:** use “Map videos” as the card's single heading, remove the video-count/map
+  availability sentence, remove the route/type/source badge row beneath the map name,
+  and restyle “Watch on YouTube” as a compact secondary action.
+- **Acceptance:** the map hero and video card contain no redundant labels, the card has
+  one clear heading, and its external link is visually integrated with an explicit
+  accessible name and preserved new-tab disclosure.
+- **Validation:** focused map-video/map-detail tests, responsive browser inspection,
+  and `npm run verify`.
+- **Outcome:** the map hero no longer repeats type, route/difficulty, or source badges;
+  the video card now uses one compact “Map videos” heading, omits availability copy,
+  and presents the external YouTube link as an integrated outlined action.
+- **Validation result:** 15 focused tests passed; desktop (1440×1000) and mobile
+  (390×844) browser checks showed no card, caption, or page overflow; `npm run verify`
+  passed with 39 files / 246 tests plus typecheck, production build, performance
+  budgets, and release-artifact checks.
+
+### CJS-053 — Fold map statistics into the detail header
+
+- **Status:** done
+- **Owner/handoff:** Codex / map-header density follow-up
+- **Dependencies:** CJS-052
+- **Primary boundary:** map detail header, summary styles, and focused tests
+- **Goal:** replace the full-width three-column statistics panel with a concise summary
+  inside the map header.
+- **Work:** move completions, selected-FPS difficulty, and recorded tops beneath the
+  author/date byline; render them as a quiet wrapping metadata row without cards,
+  borders, or pills.
+- **Acceptance:** all three values remain contextual and accessible, update with the
+  selected route/FPS, fit the header at desktop and mobile widths, and leave no
+  standalone statistics panel.
+- **Validation:** focused map-detail tests, responsive browser inspection, and
+  `npm run verify`.
+- **Outcome:** completions, selected-FPS difficulty, and recorded tops now render as
+  value-first metadata beneath the author/date byline; the bordered standalone panel
+  and its mobile stacking rules are removed.
+- **Validation result:** 11 focused map-detail tests passed; Chrome at 1440×900 kept
+  all three items on one line and 390×844 wrapped them cleanly across two lines, with
+  no hero, summary, or page overflow; `npm run verify` passed with 39 files / 246
+  tests plus lint, typecheck, production build, performance budgets, and release
+  artifacts.
+
+### CJS-054 — Quiet discovery filter surfaces
+
+- **Status:** done
+- **Owner/handoff:** Codex / discovery-filter surface polish session
+- **Dependencies:** CJS-008, CJS-009, CJS-011
+- **Primary boundary:** leaderboard, map, and player discovery filter panels and focused
+  presentation tests
+- **Goal:** preserve the useful grouping around discovery filters while reducing the
+  visual weight of their shared container treatment.
+- **Work:** move the three discovery filter trays from the strong panel treatment to
+  the quieter default surface, reduce excess padding in the player-search tray, and
+  verify the player heading has deliberate clearance beneath the application header.
+- **Acceptance:** filter controls remain clearly grouped and accessible, the three
+  discovery pages use a consistent quiet surface, and desktop/mobile layouts retain
+  their spacing without clipping or overflow.
+- **Validation:** focused discovery-page tests, responsive browser inspection, and
+  `npm run build`.
+- **Outcome:** leaderboards, maps, and player discovery retain their bordered filter
+  trays on the quieter default panel surface; the player-search tray now uses the
+  standard medium padding instead of the oversized treatment. Direct-load inspection
+  confirmed the player heading already has deliberate header clearance, so no
+  page-specific spacing override was added.
+- **Validation result:** 23 focused discovery-page tests passed; Chrome inspection at
+  1440×900 and 390×844 showed clear grouping with no clipping or horizontal overflow;
+  `npm run verify` passed with formatting, lint, 39 test files / 246 tests, coverage,
+  strict TypeScript, the Vite production build, performance budgets, and
+  release-artifact checks.
+
+### CJS-055 — Explore a CJS logo direction
+
+- **Status:** done
+- **Owner/handoff:** Codex / CJS identity concept session
+- **Dependencies:** CJS-004, CJS-014
+- **Primary boundary:** non-production brand concept assets
+- **Goal:** explore an original CodJumper Stats identity that connects competitive
+  COD2 energy with the established Jump4Life emerald-and-compass visual family.
+- **Work:** generate a square CJS emblem with a jump-chevron compass, restrained
+  gold/emerald/silver materials, and a legible CJS monogram; preserve the concept as
+  a reviewable asset without replacing the current site identity.
+- **Revision:** the owner rejected the abstract emblem direction and requested a
+  character-led composition using the COD2 gold star with the Jump4Life mascot beside
+  or holding it.
+- **Acceptance:** the concept is visually distinct from both references, contains no
+  copied wordmark or character art, reads clearly on the site's dark background, and
+  remains isolated from production until owner approval.
+- **Validation:** inspect composition, monogram accuracy, source dimensions, and
+  project path; document any production-format limitation.
+- **Outcome:** created a distinct compass-and-upward-chevron emblem with a central
+  emerald, restrained gold/silver structure, and an exact CJS monogram. Saved the
+  dark-background review concept without changing the current header or metadata.
+  After owner review rejected that direction, created v2 around the requested visual:
+  the Jump4Life mascot visibly holds a dominant faceted COD2-style gold star above an
+  exact CJS wordmark on the site's near-black background.
+- **Validation result:** visually inspected the generated concept and confirmed a
+  1254×1254 RGB PNG at `docs/design/cjs-logo-concept-v1.png`. The built-in generator
+  baked its checkerboard into both attempted transparency exports, so this concept is
+  intentionally presented on the site background; a later approved production pass
+  should redraw it as SVG or create a verified alpha master. A 32/48/96px browser
+  check confirmed the silhouette survives at icon sizes, but the CJS monogram becomes
+  reliably readable only near 96px; an approved identity system should therefore add
+  a simplified small-size mark.
+- **Revision validation:** visually inspected v2 and confirmed a 1254×1254 RGB PNG at
+  `docs/design/cjs-logo-concept-v2.png`; the existing site identity remains unchanged
+  pending explicit approval to integrate a concept.
+- **Second revision:** create a detouring-friendly white-background version of v2 and
+  make its emerald accents modestly more vibrant without altering the composition.
+- **Second revision validation:** visually inspected the white-background edit and
+  confirmed a 1254×1254 RGB PNG at
+  `docs/design/cjs-logo-concept-v3-white.png`. The star, mascot pose, hands, face, and
+  exact CJS wordmark remain intact; emerald eyes, jewels, tassels, leaves, and magical
+  ribbons are more vibrant for cleaner separation from the white field.
+- **Third revision:** discard the edited-white approach and regenerate from only the
+  original star and mascot references, using restrained emerald color and a uniformly
+  white background around, between, and inside the CJS characters.
+- **Third revision validation:** generated v4 from scratch rather than editing a prior
+  concept and confirmed a 1254×1254 RGB PNG at
+  `docs/design/cjs-logo-concept-v4-white.png`. The new composition uses only the
+  original COD2-star and mascot references, restores restrained jade/emerald accents,
+  and separates the front-facing CJS letters with white negative space and no dark
+  backing plate.
+- **Fourth revision:** generate five independent white-background variations from the
+  two original references, prioritizing anatomically clear hands and wrists that hold
+  the star without intersecting, fusing, or disappearing behind it.
+- **Fourth revision validation:** generated and visually inspected five independent
+  1254×1254 RGB PNG concepts at `docs/design/cjs-logo-variation-a-white.png`
+  through `docs/design/cjs-logo-variation-e-white.png`; the owner selected variation B
+  as the preferred composition for further refinement.
+- **Fifth revision:** preserve variation B's face, pose, two-hand hug, restrained
+  emerald accents, white background, and exact CJS wordmark while restoring the
+  mascot's complete body and rebuilding the star from the original COD2 reference.
+- **Fifth revision validation:** visually inspected the final refinement and confirmed
+  a 1254×1254 RGB PNG at
+  `docs/design/cjs-logo-concept-v5-full-body-white.png`. The complete figure and both
+  boots are visible, the hands connect naturally to the star edges, and the star uses
+  sharper points, a cleaner central convergence, and higher-contrast metallic facets.
+  The current site identity remains unchanged pending explicit approval to integrate
+  the concept.
+
+### CJS-056 — Integrate the approved CJS mascot logo
+
+- **Status:** done
+- **Owner/handoff:** Codex / approved identity integration
+- **Dependencies:** CJS-055
+- **Primary boundary:** `public/cjs-logo.png`, shared application shell, shell tests
+- **Goal:** use the owner-supplied transparent mascot-and-star artwork as the visible
+  CJS identity throughout the site without modifying its pixels.
+- **Acceptance:** the exact supplied RGBA PNG appears in the shared header and footer,
+  retains explicit intrinsic dimensions, remains decorative beside readable identity
+  text, and does not replace the purpose-built small favicon.
+- **Validation:** confirm source/destination hashes match, run the shell test, inspect
+  desktop and mobile layouts, and pass `npm run verify`.
+- **Outcome:** copied the owner-supplied artwork unchanged to `public/cjs-logo.png`
+  and replaced the visible header/footer brand images while retaining the existing
+  small-format SVG favicon and readable identity text.
+- **Validation result:** source and destination SHA-256 hashes both equal
+  `2e6d2d8b3813ad58a8ae2b36f84c0c021e19089bdacf9ebdff3493827ab4278e`;
+  all 8 `AppShell` tests passed; desktop at 1497×900 and mobile at 375×812 were
+  visually inspected without overlap or clipping. Formatting and lint passed in
+  `npm run verify`, but the repository-wide gate and standalone build are currently
+  blocked by the unrelated concurrent `MapCard.tsx` import of a nonexistent Lucide
+  `Youtube` export (`TS2305`), which also crashes four map tests. That file was left
+  untouched by this task.
+
+### CJS-057 — Use the YouTube mark in map results
+
+- **Status:** done
+- **Owner/handoff:** Codex / map-result video-icon refinement
+- **Dependencies:** CJS-050
+- **Primary boundary:** map result cards and focused map-list tests
+- **Goal:** make video availability immediately recognizable as YouTube in the map
+  list.
+- **Acceptance:** every map-result video link uses a recognizable YouTube-style red
+  mark built from the Lucide play glyph while preserving its existing destination,
+  accessible name, and safe external-link behavior.
+- **Validation:** focused map-list tests and `npm run build`.
+- **Outcome:** replaced the generic outlined square-play glyph with a compact red
+  YouTube-style mark and white Lucide play glyph inside a 36 px interactive target.
+  Catalog-backed links still open the source-stable map video section, and safe
+  fallback media links retain their external-link behavior.
+- **Validation result:** all 9 focused map-list tests passed; `npm run build` passed
+  strict TypeScript, the Vite production build, performance budgets, and release
+  artifact checks. Chrome at 1440×900 and 390×844 confirmed the mark remains clear,
+  accessible, and free of horizontal overflow or console issues.
+
+### CJS-059 — Add About-page brand art and a compact CJ favicon
+
+- **Status:** done
+- **Owner/handoff:** Codex / responsive brand placement
+- **Dependencies:** CJS-056
+- **Primary boundary:** About hero, favicon metadata, project-owned image assets, and
+  related tests
+- **Goal:** give the full mascot-and-star identity enough space to read on the About
+  page while using a purpose-built star-and-CJ mark at browser-tab sizes.
+- **Acceptance:** the supplied mascot PNG is presented prominently without pixel
+  changes; the favicon reads at 32px and 64px, contains only the star and exact CJ
+  monogram, and is referenced by document and manifest metadata; both layouts remain
+  responsive and accessible.
+- **Validation:** run focused About and metadata tests, inspect desktop/mobile About
+  layouts and favicon-size previews, then run the repository verification gate.
+- **Outcome:** placed the supplied mascot-and-star PNG unchanged in a responsive
+  About-page hero and added dedicated 32, 64, 192, and 512 px favicon assets. The
+  final compact mark keeps the silver-grey C and J level with the gold star and uses
+  emerald only as an inset accent. Desktop (1497×900), mobile (375×812), and 32/64
+  px favicon previews remain clear; the 5 focused About/metadata tests, formatting,
+  lint, all 246 repository tests, the isolated Vite build, the total CSS budget, and
+  release-artifact checks pass. The repository gate currently stops in TypeScript
+  on concurrent replay test fixtures in `MapDetailPage.test.tsx` and
+  `PlayerDetailPage.test.tsx` that omit the newly required `fps` field; the isolated
+  performance check also reports the concurrent route increment just over budget.
+
+### CJS-058 — Show replay run identity and FPS
+
+- **Status:** done
+- **Owner/handoff:** Codex / replay-ranking metadata
+- **Dependencies:** replay watch rankings API
+- **Primary boundary:** replay ranking contract, normalization, and map highlight
+- **Goal:** identify the exact run and FPS behind a map's most-watched replay.
+- **Acceptance:** replay watch ranking rows expose their normalized FPS, and the map
+  highlight renders the run ID and FPS beside its viewer and watch-time metadata.
+- **Validation:** focused backend query/handler tests, focused frontend normalizer and
+  replay panel tests, desktop/mobile inspection, and `npm run build`.
+- **Outcome:** the backend ranking query now joins each watch summary to its source
+  run and publishes an optional normalized `fps` value (`mix` becomes `0`). The
+  frontend validates that contract and renders `Run #<id> · <fps> FPS` after the
+  existing viewer and watch-time metadata, with `mixed FPS` for normalized `0`.
+- **Follow-up (2026-09-02):** renamed the map panel to “In-game Replay views” and
+  added a heading regression assertion. A read-only live API check confirmed that
+  deployed ranking rows still omit `fps`, so the UI intentionally waits for the
+  backend field instead of guessing from the selected map filter; publishing the
+  backend change remains necessary before FPS appears on the live site.
+- **Validation result:** 3 focused backend query tests, the backend ranking-handler
+  test, and the replay OpenAPI contract test pass. The focused frontend suite passes
+  61 tests, including API normalization and map/player replay integrations;
+  `npm run build` passes strict TypeScript, Vite production compilation, all bundle
+  budgets, and release-artifact checks. Chrome at 1440×900 and 390×844 confirmed
+  the metadata remains readable with no horizontal overflow or console warnings.
+  The follow-up's 20 focused panel/map tests, formatting, lint, TypeScript, Vite
+  compilation, and release-artifact check pass; the full build currently stops at
+  the pre-existing 30.0 KiB route-increment performance boundary. The renamed
+  heading was also rechecked at 1440×900 and 390×844 without overflow or console
+  warnings.
+
+### CJS-060 — Expose JumpersHeaven COD4 servers
+
+- **Status:** done
+- **Owner/handoff:** Codex / JH COD4 server-list toggle
+- **Dependencies:** CJS-007
+- **Primary boundary:** `src/features/servers`, focused server fixtures/tests
+- **Goal:** let visitors switch the JumpersHeaven server group between COD2 and
+  COD4 servers without implying broader COD4 feature support.
+- **Acceptance:** a URL-backed control exposes COD4 only for JumpersHeaven; the
+  default remains COD2; Jump4Life remains COD2-only; switching games filters the
+  already-returned Tracker payload and never sends an undocumented API parameter;
+  COD4 maps do not link to COD2 map profiles; invalid URL values recover safely.
+- **Contract evidence:** the live Tracker response inspected on 2026-09-02 exposes
+  both `COD2` and `COD4` values through its `game_type` discriminator for JH. The
+  OpenAPI endpoint still documents only the `source` request parameter and an open
+  response schema, so this task is intentionally limited to client-side filtering
+  of the shared feed.
+- **Validation:** focused server model/component tests, URL-state and accessibility
+  coverage, responsive mobile/desktop inspection, `npm run verify`.
+- **Outcome:** restored a compact COD2/COD4 segmented control to the live-server
+  toolbar. COD2 remains the default and continues to show both source groups;
+  COD4 filters the existing JH payload by `game_type`, omits the incompatible J4L
+  group, and keeps COD4 map names as text instead of linking into COD2 profiles.
+  Invalid game values fall back safely to COD2 and the selected game round-trips
+  through the URL.
+- **Validation result:** the 24 focused server component/model tests pass, including
+  mixed JH/J4L game filtering, URL state, malformed values, and axe coverage. The
+  full `npm run verify` gate passes with formatting, lint, 39 files / 248 tests,
+  coverage, production build budgets, and release-artifact checks. Live Chromium at
+  360×800 and 1440×1000 displayed all 11 reporting JH COD4 servers with no J4L
+  group, COD2 map links, console errors, or horizontal overflow; captured Tracker
+  requests contained only the documented `source` parameter.
+
+### CJS-061 — Move source selection into feature filters
+
+- **Status:** done
+- **Owner/handoff:** Codex / feature-local source clarity refinement
+- **Dependencies:** CJS-006, CJS-008, CJS-011
+- **Primary boundary:** application header plus leaderboard and player discovery source
+  affordances and focused tests/styles
+- **Goal:** make JH/J4L selection obvious where it changes results and remove redundant
+  source labels from the shared header and player headings.
+- **Acceptance:** the shared header no longer renders a source selector; leaderboard and
+  player discovery use an explicit JH/J4L segmented control consistent with maps; player
+  discovery does not repeat a source-data badge; source state remains URL-backed and
+  keyboard accessible.
+- **Validation:** focused shell, leaderboard, and player discovery tests; responsive
+  desktop/mobile inspection; `npm run build`.
+- **Outcome:** removed the global header source selector and its now-unused responsive
+  styles. Leaderboards and player discovery now present Data source as a first-class
+  JH/J4L segmented control inside their filter panels, consistent with maps, while the
+  redundant player-directory source badge is gone.
+- **Validation result:** 21 focused tests pass, and `npm run verify` passes formatting,
+  lint, all 39 files / 247 tests with coverage, strict TypeScript, Vite, performance
+  budgets, and release-artifact checks. Live Chromium at 320px and 1440px confirmed both
+  feature controls are visible, the header has no source control, the redundant badge is
+  absent, and neither page has horizontal overflow.
+
+### CJS-062 — Standardize page headings and source controls
+
+- **Status:** done
+- **Owner/handoff:** Codex / cross-page presentation consistency refinement
+- **Dependencies:** CJS-004, CJS-006, CJS-008, CJS-009, CJS-011, CJS-013
+- **Primary boundary:** top-level page heading presentation plus leaderboard and player
+  discovery source-control layout
+- **Goal:** use the leaderboard heading as the shared visual baseline and make feature
+  source selection match the compact, left-aligned maps control.
+- **Acceptance:** Servers, Leaderboards, Maps, Players, Favorites, and About share the
+  same eyebrow, title, and description typography and spacing; leaderboard and player
+  discovery source controls use the same compact segmented-control treatment as Maps at
+  the left edge of their filter panels; responsive layouts and accessible labels remain
+  intact.
+- **Validation:** focused component tests, responsive desktop/mobile inspection, and
+  `npm run verify`.
+- **Outcome:** added one shared leaderboard-derived page-heading treatment and applied it
+  to Servers, Leaderboards, Maps, Players, Favorites, and About. Leaderboard and player
+  discovery now place the compact maps-style JH/J4L control first in their filter panels;
+  the leaderboard source choice no longer inherits the stretched board/FPS treatment.
+- **Validation result:** 47 focused tests pass, and `npm run verify` passes formatting,
+  lint, all 39 files / 247 tests with coverage, strict TypeScript, Vite, performance
+  budgets, and release-artifact checks. Live Chromium at 390px and 1440px confirmed
+  matching computed eyebrow/title/description styles across all six pages, source-first
+  controls on all three discovery views, and no horizontal overflow.
 
 ## Agent handoff template
 

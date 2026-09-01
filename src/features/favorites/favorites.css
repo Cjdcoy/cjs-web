@@ -10,34 +10,9 @@
   gap: var(--cjs-space-5);
 }
 
-.cjs-favorites__header h1,
-.cjs-favorites__header p,
 .cjs-favorites__notice p,
 .cjs-favorite-card p {
   margin: 0;
-}
-
-.cjs-favorites__header h1 {
-  margin-block-start: var(--cjs-space-1);
-  font-size: var(--cjs-font-size-2xl);
-  line-height: var(--cjs-line-height-tight);
-}
-
-.cjs-favorites__header h1 + p {
-  max-width: var(--cjs-reading-width);
-  margin-block-start: var(--cjs-space-3);
-  color: var(--cjs-color-text-muted);
-}
-
-.cjs-favorites__eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--cjs-space-2);
-  color: var(--cjs-color-accent-secondary);
-  font-size: var(--cjs-font-size-xs);
-  font-weight: var(--cjs-font-weight-bold);
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
 }
 
 .cjs-favorites__notice {

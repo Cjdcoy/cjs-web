@@ -3,21 +3,14 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { act } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
-import {
-  markNavigationComplete,
-  navigate,
-  SourceProvider,
-  type AppRouteId,
-} from "../../lib/routing";
+import { markNavigationComplete, navigate, type AppRouteId } from "../../lib/routing";
 import { AppShell } from "./AppShell";
 
 function renderShell(routeId: AppRouteId = "maps") {
   return render(
-    <SourceProvider>
-      <AppShell route={{ id: routeId, params: {} }}>
-        <h1>Route content</h1>
-      </AppShell>
-    </SourceProvider>,
+    <AppShell route={{ id: routeId, params: {} }}>
+      <h1>Route content</h1>
+    </AppShell>,
   );
 }
 
@@ -28,7 +21,7 @@ describe("AppShell", () => {
   });
 
   it("provides the shared landmarks, skip link, navigation, and footer", () => {
-    renderShell();
+    const { container } = renderShell();
 
     expect(screen.getByRole("banner")).toBeInTheDocument();
     expect(screen.getByRole("main")).toHaveAttribute("id", "main-content");
@@ -40,6 +33,8 @@ describe("AppShell", () => {
     expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Maps" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("An independent interface for public jump statistics.")).toBeVisible();
+    expect(container.querySelectorAll('img[src="/cjs-logo.png"]')).toHaveLength(2);
+    expect(screen.queryByRole("radiogroup", { name: "Data source" })).not.toBeInTheDocument();
   });
 
   it("treats detail routes as part of their parent navigation section", () => {
@@ -73,29 +68,6 @@ describe("AppShell", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("navigation", { name: "Mobile navigation" })).not.toBeInTheDocument();
     expect(toggle).toHaveFocus();
-  });
-
-  it("keeps source context in the URL without dropping other filters", async () => {
-    window.history.replaceState(null, "", "/maps?query=mp%20jump");
-    const user = userEvent.setup();
-    renderShell();
-
-    await user.click(screen.getByRole("radio", { name: "Jump4Life" }));
-    expect(window.location.search).toContain("query=mp+jump");
-    expect(window.location.search).toContain("source=j4l");
-
-    await user.click(screen.getByRole("radio", { name: "JumpersHeaven" }));
-    expect(window.location.search).toBe("?query=mp+jump");
-  });
-
-  it("returns to player discovery when changing source from a player profile", async () => {
-    window.history.replaceState(null, "", "/players/42?source=jh&view=runs");
-    const user = userEvent.setup();
-    renderShell("player-detail");
-
-    await user.click(screen.getByRole("radio", { name: "Jump4Life" }));
-
-    expect(`${window.location.pathname}${window.location.search}`).toBe("/players?source=j4l");
   });
 
   it("announces route transitions", async () => {

@@ -35,15 +35,23 @@ export function AboutPage() {
     <Page active="/about" accent="amber">
       <div className="cjs-about">
         <header className="cjs-about__hero">
-          <div className="cjs-about__introduction">
-            <p className="cjs-about__eyebrow">About the project</p>
+          <div className="cjs-about__introduction cjs-page-heading">
+            <p className="cjs-about__eyebrow cjs-page-heading__eyebrow">About the project</p>
             <h1>Jump statistics, clearly sourced.</h1>
-            <p>
+            <p className="cjs-page-heading__description">
               CodJumper Stats is an independent public frontend for exploring player, map,
               leaderboard, and live-server data from JumpersHeaven and Jump4Life.
             </p>
             <Badge tone="warning">Independent community project</Badge>
           </div>
+
+          <img
+            src="/cjs-logo.png"
+            alt="CJS mascot holding a faceted gold star above the CJS initials"
+            width="1254"
+            height="1254"
+            decoding="async"
+          />
 
           <dl className="cjs-about__facts" aria-label="Project facts">
             <div>
