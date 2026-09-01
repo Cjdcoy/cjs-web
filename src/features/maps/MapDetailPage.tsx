@@ -8,7 +8,7 @@ import {
   Route,
   Trophy,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Badge,
   CodPlayerName,
@@ -24,7 +24,8 @@ import {
   VisuallyHidden,
   type DataTableColumn,
 } from "../../components/ui";
-import { FPS_VALUES, type Fps, type TopRun } from "../../lib/api";
+import { type Fps, type TopRun } from "../../lib/api";
+import { getMapImageSources } from "../../lib/mapImages";
 import {
   appPaths,
   playerDetailPath,
@@ -38,11 +39,16 @@ import { hasFavorite, toggleMapFavorite, useFavorites } from "../../lib/storage"
 import {
   formatRunDate,
   formatRunTime,
+  getMapRouteLabel,
   getPlainPlayerName,
   getSafeMediaUrl,
+  hasMapTopRuns,
   mapDetailQuerySchema,
+  MAP_PROFILE_FPS_VALUES,
   selectCheckpoint,
+  selectMapProfileFps,
   type MapLookup,
+  type MapProfileFps,
 } from "./mapDetailModel";
 import { useMapRecord, useMapTopRuns } from "./useMapDetail";
 import "./maps.css";
@@ -54,17 +60,26 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
   const { source, setSource } = useSourceContext();
   const [selection, setSelection] = useQueryState(mapDetailQuerySchema);
   const [favoriteAnnouncement, setFavoriteAnnouncement] = useState("");
+  const [failedImagePath, setFailedImagePath] = useState<string | null>(null);
   const favoriteDocument = useFavorites();
   const lookup: MapLookup =
     new URLSearchParams(location.search).get("lookup") === "cpid" ? "cpid" : "mapid";
   const mapRequest = useMapRecord({ mapId, lookup, source });
   const selectedMap = mapRequest.data ? selectCheckpoint(mapRequest.data, selection.cp) : null;
+  const selectedFps = selectedMap ? selectMapProfileFps(selectedMap, selection.fps) : selection.fps;
+  const selectedFpsHasTops = selectedMap ? hasMapTopRuns(selectedMap, selectedFps) : false;
   const runsRequest = useMapTopRuns({
-    checkpointId: selectedMap?.cp_id ?? null,
-    fps: selection.fps,
+    checkpointId: selectedFpsHasTops ? (selectedMap?.cp_id ?? null) : null,
+    fps: selectedFps,
     source,
   });
   const runColumns = useRunColumns(source);
+
+  useEffect(() => {
+    if (selectedMap && selection.fps !== selectedFps) {
+      setSelection({ fps: selectedFps });
+    }
+  }, [selectedFps, selectedMap, selection.fps, setSelection]);
 
   const isFavorite = Boolean(
     selectedMap && hasFavorite(favoriteDocument, "map", source, selectedMap.mapid),
@@ -112,22 +127,46 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
         <>
           <header className="cjs-map-detail__hero">
             <div className="cjs-map-detail__art" aria-hidden="true">
-              <span>{selectedMap.mapname.slice(0, 2).toUpperCase()}</span>
-              <MapIcon size={42} />
+              {failedImagePath !== getMapImageSources(selectedMap.mapname).card ? (
+                <img
+                  src={getMapImageSources(selectedMap.mapname).card}
+                  srcSet={getMapImageSources(selectedMap.mapname).srcSet}
+                  sizes="(max-width: 48rem) 100vw, 16rem"
+                  alt=""
+                  decoding="async"
+                  onError={() => setFailedImagePath(getMapImageSources(selectedMap.mapname).card)}
+                />
+              ) : (
+                <>
+                  <span>{selectedMap.mapname.slice(0, 2).toUpperCase()}</span>
+                  <MapIcon size={42} />
+                </>
+              )}
             </div>
             <div className="cjs-map-detail__identity">
               <p className="cjs-map-detail__eyebrow">Map record</p>
               <h1>{selectedMap.mapname}</h1>
-              <p>
-                {selectedMap.author?.trim()
-                  ? `Created by ${selectedMap.author}`
-                  : "Map author not available"}
-              </p>
+              <div className="cjs-map-detail__byline">
+                <span>
+                  {selectedMap.author?.trim()
+                    ? `Created by ${selectedMap.author}`
+                    : "Map author not available"}
+                </span>
+                <span aria-hidden="true">·</span>
+                <span>
+                  <CalendarDays aria-hidden="true" size={15} />
+                  {formatReleaseDate(selectedMap.released)}
+                </span>
+              </div>
               <div className="cjs-map-detail__badges">
                 <Badge icon={<Route size={14} />}>
                   {selectedMap.type?.trim() || "Route type unavailable"}
                 </Badge>
-                <Badge>Checkpoint {selectedMap.cp_id}</Badge>
+                {mapRequest.data.checkpoints.length > 1 && (
+                  <Badge>
+                    {selectedRouteLabel(mapRequest.data.checkpoints, selectedMap.cp_id)}
+                  </Badge>
+                )}
                 <Badge tone="information">{sourceLabel(source)}</Badge>
               </div>
             </div>
@@ -151,7 +190,11 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
 
           <VisuallyHidden aria-live="polite">{favoriteAnnouncement}</VisuallyHidden>
 
-          <Panel className="cjs-map-detail__controls" variant="strong">
+          <Panel
+            className="cjs-map-detail__controls"
+            variant="strong"
+            data-has-routes={mapRequest.data.checkpoints.length > 1 || undefined}
+          >
             <fieldset>
               <legend>Data source</legend>
               <SegmentedControl<SourceId>
@@ -165,44 +208,55 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
                 }))}
               />
             </fieldset>
-            <Select
-              label="Checkpoint"
-              value={String(selectedMap.cp_id)}
-              onChange={(event) => {
-                const checkpointId = Number(event.currentTarget.value);
-                setSelection({
-                  cp: checkpointId === mapRequest.data?.defaultCheckpointId ? 0 : checkpointId,
-                });
-              }}
-              helperText={`${mapRequest.data.checkpoints.length} checkpoint${mapRequest.data.checkpoints.length === 1 ? "" : "s"} available`}
-            >
-              {mapRequest.data.checkpoints.map((checkpoint, index) => (
-                <option value={checkpoint.cp_id} key={checkpoint.cp_id}>
-                  Checkpoint {index + 1} (CP {checkpoint.cp_id})
-                </option>
-              ))}
-            </Select>
-            <Select
-              label="FPS"
-              value={selection.fps}
-              onChange={(event) => setSelection({ fps: event.currentTarget.value as Fps })}
-              helperText="Saved in this page's URL"
-            >
-              {FPS_VALUES.map((fps) => (
-                <option value={fps} key={fps}>
-                  {fps === "0" ? "Generic / unspecified" : `${fps} FPS`}
-                </option>
-              ))}
-            </Select>
+            {mapRequest.data.checkpoints.length > 1 && (
+              <Select
+                label="Route"
+                value={String(selectedMap.cp_id)}
+                onChange={(event) => {
+                  const checkpointId = Number(event.currentTarget.value);
+                  setSelection({
+                    cp: checkpointId === mapRequest.data?.defaultCheckpointId ? 0 : checkpointId,
+                  });
+                }}
+                helperText={`${mapRequest.data.checkpoints.length} routes available`}
+              >
+                {mapRequest.data.checkpoints.map((route, index) => (
+                  <option value={route.cp_id} key={route.cp_id}>
+                    {getMapRouteLabel(route, index)}
+                  </option>
+                ))}
+              </Select>
+            )}
+            <fieldset>
+              <legend>FPS</legend>
+              <SegmentedControl<MapProfileFps>
+                ariaLabel="Top runs FPS"
+                value={selectedFps}
+                onChange={(fps) => setSelection({ fps })}
+                options={MAP_PROFILE_FPS_VALUES.map((fps) => {
+                  const hasTops = hasMapTopRuns(selectedMap, fps);
+                  return {
+                    accessibleLabel: `${fpsButtonLabel(fps)}${hasTops ? "" : ", no tops available"}`,
+                    disabled: !hasTops,
+                    label: fpsButtonLabel(fps),
+                    value: fps,
+                  };
+                })}
+              />
+            </fieldset>
           </Panel>
 
-          <MapSummary map={selectedMap} fps={selection.fps} />
+          <MapSummary map={selectedMap} fps={selectedFps} />
 
           <section className="cjs-map-detail__runs" aria-labelledby="map-top-runs-heading">
             <div className="cjs-map-detail__section-heading">
               <div>
-                <p className="cjs-map-detail__eyebrow">Checkpoint {selectedMap.cp_id}</p>
-                <h2 id="map-top-runs-heading">Top runs at {fpsLabel(selection.fps)}</h2>
+                {mapRequest.data.checkpoints.length > 1 && (
+                  <p className="cjs-map-detail__eyebrow">
+                    {selectedRouteLabel(mapRequest.data.checkpoints, selectedMap.cp_id)}
+                  </p>
+                )}
+                <h2 id="map-top-runs-heading">Top runs at {fpsLabel(selectedFps)}</h2>
               </div>
               {runsRequest.status === "loading" && <span role="status">Loading selected runs</span>}
             </div>
@@ -210,26 +264,20 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
             {runsRequest.status === "loading" && (
               <SkeletonGroup count={5} label="Loading top runs" />
             )}
-            {runsRequest.status === "error" && (
-              <ErrorState
-                title="Top runs could not be loaded"
-                description={runsRequest.error ?? "The top-runs request failed."}
-                onRetry={runsRequest.reload}
-                retryLabel="Retry top runs"
-              />
-            )}
-            {runsRequest.status === "success" && runsRequest.data?.length === 0 && (
+            {(!selectedFpsHasTops ||
+              runsRequest.status === "error" ||
+              (runsRequest.status === "success" && runsRequest.data?.length === 0)) && (
               <EmptyState
                 icon={Trophy}
-                title="No top runs at this FPS"
-                description="Try another FPS or checkpoint to look for recorded runs."
+                title={`No tops available for ${fpsLabel(selectedFps)} on ${selectedMap.mapname}`}
+                description="Choose another available FPS to view recorded runs."
               />
             )}
             {runsRequest.status === "success" &&
               runsRequest.data &&
               runsRequest.data.length > 0 && (
                 <DataTable
-                  caption={`Top runs for ${selectedMap.mapname} at ${fpsLabel(selection.fps)}`}
+                  caption={`Top runs for ${selectedMap.mapname} at ${fpsLabel(selectedFps)}`}
                   columns={runColumns}
                   rows={runsRequest.data}
                   getRowKey={(run) => run.run_id ?? `${run.player_id}-${run.cpid}-${run.rank}`}
@@ -269,13 +317,6 @@ function MapSummary({
       <div>
         <dt>Recorded tops</dt>
         <dd>{difficulty ? formatCount(difficulty.nb_tops) : "Not available"}</dd>
-      </div>
-      <div>
-        <dt>
-          <CalendarDays aria-hidden="true" size={15} />
-          Released
-        </dt>
-        <dd>{formatReleaseDate(map.released)}</dd>
       </div>
     </dl>
   );
@@ -362,7 +403,20 @@ function formatReleaseDate(value: string | null | undefined): string {
 }
 
 function fpsLabel(fps: Fps): string {
-  return fps === "0" ? "generic FPS" : `${fps} FPS`;
+  return fps === "0" ? "mixed FPS" : `${fps} FPS`;
+}
+
+function fpsButtonLabel(fps: MapProfileFps): string {
+  return fps === "0" ? "Mix" : fps;
+}
+
+function selectedRouteLabel(
+  routes: readonly NonNullable<ReturnType<typeof selectCheckpoint>>[],
+  checkpointId: number,
+): string {
+  const routeIndex = routes.findIndex((route) => route.cp_id === checkpointId);
+  const route = routes[routeIndex];
+  return route ? getMapRouteLabel(route, routeIndex) : "Route";
 }
 
 function mapsPath(source: SourceId): string {

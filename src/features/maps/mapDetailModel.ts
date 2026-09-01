@@ -1,4 +1,4 @@
-import { FPS_VALUES, type GameMap, type TopRun } from "../../lib/api";
+import { type Fps, type GameMap, type TopRun } from "../../lib/api";
 import { stripCodColorCodes } from "../../lib/codName";
 import { defineQuerySchema, enumQueryParam, integerQueryParam } from "../../lib/routing";
 
@@ -10,8 +10,11 @@ export interface MapRecord {
   checkpoints: GameMap[];
 }
 
+export const MAP_PROFILE_FPS_VALUES = ["125", "250", "333", "0"] as const satisfies readonly Fps[];
+export type MapProfileFps = (typeof MAP_PROFILE_FPS_VALUES)[number];
+
 export const mapDetailQuerySchema = defineQuerySchema({
-  fps: enumQueryParam(FPS_VALUES, "125"),
+  fps: enumQueryParam(MAP_PROFILE_FPS_VALUES, "125"),
   cp: integerQueryParam({ defaultValue: 0, min: 1 }),
 });
 
@@ -59,6 +62,21 @@ export function selectCheckpoint(record: MapRecord, requestedCheckpointId: numbe
     record.checkpoints.find((map) => map.cp_id === record.defaultCheckpointId) ??
     record.checkpoints[0]
   );
+}
+
+export function hasMapTopRuns(map: GameMap, fps: MapProfileFps): boolean {
+  const topCount = map.difficulty?.[fps]?.nb_tops;
+  return topCount !== undefined && Number.isFinite(topCount) && topCount > 0;
+}
+
+export function selectMapProfileFps(map: GameMap, requestedFps: MapProfileFps): MapProfileFps {
+  if (hasMapTopRuns(map, requestedFps)) return requestedFps;
+  return MAP_PROFILE_FPS_VALUES.find((fps) => hasMapTopRuns(map, fps)) ?? "125";
+}
+
+export function getMapRouteLabel(map: GameMap, index: number): string {
+  const routeName = map.ender === null || map.ender === undefined ? "" : String(map.ender).trim();
+  return routeName ? `Route ${index + 1}: ${routeName}` : `Route ${index + 1}`;
 }
 
 export function getSafeMediaUrl(value: string | null | undefined): string | null {

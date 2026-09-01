@@ -8,12 +8,10 @@ import {
 } from "../../lib/routing";
 
 export const MAP_MEDIA_FILTERS = ["all", "with-media", "without-media"] as const;
-export const MAP_DIFFICULTY_FILTERS = ["all", "rated", "unrated"] as const;
 export const MAP_SORTS = ["completions", "released", "difficulty", "name"] as const;
 export const MAP_VIEWS = ["list", "grid"] as const;
 
 export type MapMediaFilter = (typeof MAP_MEDIA_FILTERS)[number];
-export type MapDifficultyFilter = (typeof MAP_DIFFICULTY_FILTERS)[number];
 export type MapSort = (typeof MAP_SORTS)[number];
 export type MapView = (typeof MAP_VIEWS)[number];
 
@@ -22,9 +20,8 @@ export const mapDiscoveryQuerySchema = defineQuerySchema({
   route: stringQueryParam({ defaultValue: "all", maxLength: 40, trim: true }),
   media: enumQueryParam(MAP_MEDIA_FILTERS, "all"),
   fps: enumQueryParam(FPS_VALUES, "125"),
-  difficulty: enumQueryParam(MAP_DIFFICULTY_FILTERS, "all"),
-  sort: enumQueryParam(MAP_SORTS, "completions"),
-  view: enumQueryParam(MAP_VIEWS, "list"),
+  sort: enumQueryParam(MAP_SORTS, "released"),
+  view: enumQueryParam(MAP_VIEWS, "grid"),
   page: integerQueryParam({ defaultValue: 1, min: 1, max: 10_000 }),
 });
 
@@ -33,7 +30,6 @@ export interface MapDiscoveryFilters {
   route: string;
   media: MapMediaFilter;
   fps: Fps;
-  difficulty: MapDifficultyFilter;
   sort: MapSort;
 }
 
@@ -84,18 +80,13 @@ export function filterAndSortMaps(
 ): PreparedMap[] {
   const query = normalizeText(filters.q);
   const route = normalizeText(filters.route);
-  const filtered = items.filter((item) => {
-    const difficulty = getMapDifficulty(item.map, filters.fps);
-
-    return (
+  const filtered = items.filter(
+    (item) =>
       (!query || item.searchText.includes(query)) &&
       (route === "all" || item.routeType === route) &&
       (filters.media === "all" ||
-        (filters.media === "with-media" ? item.hasMedia : !item.hasMedia)) &&
-      (filters.difficulty === "all" ||
-        (filters.difficulty === "rated" ? difficulty !== null : difficulty === null))
-    );
-  });
+        (filters.media === "with-media" ? item.hasMedia : !item.hasMedia)),
+  );
 
   return filtered.sort((left, right) => compareMaps(left, right, filters));
 }

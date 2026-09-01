@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppRouter } from "../../app/AppRouter";
@@ -11,6 +11,7 @@ const alphaCheckpoints: GameMap[] = [
     mapid: 1,
     mapname: "mp_alpha",
     cp_id: 101,
+    ender: "main",
     author: "First Mapper",
     released: "2025-01-01T00:00:00Z",
     type: "jump",
@@ -25,6 +26,7 @@ const alphaCheckpoints: GameMap[] = [
     mapid: 1,
     mapname: "mp_alpha",
     cp_id: 102,
+    ender: "bonus",
     author: null,
     released: null,
     type: null,
@@ -112,10 +114,20 @@ describe("MapDetailPage", () => {
         signal: expect.any(AbortSignal),
       }),
     );
-    expect(screen.getByRole("combobox", { name: "Checkpoint" })).toHaveValue("102");
-    expect(screen.getByRole("combobox", { name: "FPS" })).toHaveValue("333");
+    expect(screen.getByRole("combobox", { name: "Route" })).toHaveValue("102");
+    expect(
+      within(screen.getByRole("radiogroup", { name: "Top runs FPS" })).getByRole("radio", {
+        name: "333",
+      }),
+    ).toHaveAttribute("aria-checked", "true");
     expect(screen.getByText("Map author not available")).toBeVisible();
     expect(screen.getByText("Release date unavailable")).toBeVisible();
+    const mapImage = document.querySelector<HTMLImageElement>(".cjs-map-detail__art img");
+    expect(mapImage).toHaveAttribute("src", "/maps/cards/mp_alpha.avif");
+    expect(mapImage).toHaveAttribute(
+      "srcset",
+      "/maps/thumbs/mp_alpha.avif 480w, /maps/cards/mp_alpha.avif 960w",
+    );
     const playerLink = await screen.findByRole("link", { name: "Alpha Runner" });
     expect(playerLink).toHaveAttribute("href", "/players/7?source=j4l");
     expect(playerLink).toHaveAttribute("data-variant", "player");
@@ -125,6 +137,11 @@ describe("MapDetailPage", () => {
       "href",
       "https://media.example.invalid/maps/mp_alpha",
     );
+
+    if (!mapImage) throw new Error("Expected the map profile image to render.");
+    fireEvent.error(mapImage);
+    expect(document.querySelector(".cjs-map-detail__art img")).not.toBeInTheDocument();
+    expect(screen.getByText("MP")).toBeVisible();
   });
 
   it("renders through the application router on a direct nested-route load", async () => {
@@ -140,17 +157,25 @@ describe("MapDetailPage", () => {
         name: "Jump4Life",
       }),
     ).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByRole("combobox", { name: "FPS" })).toHaveValue("333");
+    expect(
+      within(screen.getByRole("radiogroup", { name: "Top runs FPS" })).getByRole("radio", {
+        name: "333",
+      }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(screen.queryByRole("combobox", { name: "Route" })).not.toBeInTheDocument();
+    expect(screen.queryByText(/^Route 1/)).not.toBeInTheDocument();
   });
 
-  it("updates the checkpoint selection in the URL and requests only the new run list", async () => {
+  it("shows route selection only for multi-route maps and requests the selected route", async () => {
     vi.spyOn(api, "maps").mockResolvedValue(alphaCheckpoints);
     const topsRequest = vi.spyOn(api, "mapTops").mockResolvedValue([alphaRun]);
     const user = userEvent.setup();
 
     renderMapDetail();
     await screen.findByRole("heading", { name: "mp_alpha", level: 1 });
-    await user.selectOptions(screen.getByRole("combobox", { name: "Checkpoint" }), "102");
+    expect(screen.getByRole("option", { name: "Route 1: main" })).toBeVisible();
+    expect(screen.getByRole("option", { name: "Route 2: bonus" })).toBeVisible();
+    await user.selectOptions(screen.getByRole("combobox", { name: "Route" }), "102");
 
     await waitFor(() => {
       expect(window.location.search).toContain("cp=102");
@@ -212,7 +237,11 @@ describe("MapDetailPage", () => {
 
     renderMapDetail();
     await waitFor(() => expect(firstSignal).toBeDefined());
-    await user.selectOptions(screen.getByRole("combobox", { name: "FPS" }), "333");
+    await user.click(
+      within(screen.getByRole("radiogroup", { name: "Top runs FPS" })).getByRole("radio", {
+        name: "333",
+      }),
+    );
 
     expect(await screen.findByRole("link", { name: "Fresh Runner" })).toBeVisible();
     expect(firstSignal?.aborted).toBe(true);
@@ -231,10 +260,71 @@ describe("MapDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: "mp_alpha", level: 1 })).toBeVisible();
     expect(
-      await screen.findByRole("heading", { name: "Top runs could not be loaded" }),
+      await screen.findByRole("heading", {
+        name: "No tops available for 125 FPS on mp_alpha",
+      }),
     ).toBeVisible();
-    expect(screen.getByText("Runs unavailable")).toBeVisible();
+    expect(screen.queryByText("Runs unavailable")).not.toBeInTheDocument();
     expect(screen.getByText("30")).toBeVisible();
+  });
+
+  it("disables FPS values without tops and falls back from 125 to the first available FPS", async () => {
+    const fallbackMap: GameMap = {
+      ...alphaCheckpoints[0],
+      difficulty: {
+        "125": { difficulty: 2, nb_tops: 0 },
+        "250": { difficulty: 3, nb_tops: 4 },
+        "333": { difficulty: 4, nb_tops: 2 },
+        "0": { difficulty: 5, nb_tops: 1 },
+      },
+    };
+    vi.spyOn(api, "maps").mockResolvedValue([fallbackMap]);
+    const topsRequest = vi.spyOn(api, "mapTops").mockResolvedValue([alphaRun]);
+
+    renderMapDetail();
+
+    const fpsControl = await screen.findByRole("radiogroup", { name: "Top runs FPS" });
+    const fps125 = within(fpsControl).getByRole("radio", {
+      name: "125, no tops available",
+    });
+    const fps250 = within(fpsControl).getByRole("radio", { name: "250" });
+    expect(fps125).toBeDisabled();
+    expect(fps250).toHaveAttribute("aria-checked", "true");
+    expect(within(fpsControl).getByRole("radio", { name: "333" })).toBeEnabled();
+    expect(within(fpsControl).getByRole("radio", { name: "Mix" })).toBeEnabled();
+    await waitFor(() => {
+      expect(topsRequest).toHaveBeenCalledWith(expect.objectContaining({ fps: "250" }));
+      expect(window.location.search).toContain("fps=250");
+    });
+  });
+
+  it("falls back to disabled 125 and skips the tops request when no FPS has tops", async () => {
+    vi.spyOn(api, "maps").mockResolvedValue([
+      {
+        ...alphaCheckpoints[0],
+        difficulty: {
+          "125": { difficulty: 2, nb_tops: 0 },
+          "250": { difficulty: 3, nb_tops: 0 },
+          "333": { difficulty: 4, nb_tops: 0 },
+          "0": { difficulty: 5, nb_tops: 0 },
+        },
+      },
+    ]);
+    const topsRequest = vi.spyOn(api, "mapTops");
+
+    renderMapDetail();
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "No tops available for 125 FPS on mp_alpha",
+      }),
+    ).toBeVisible();
+    expect(
+      within(screen.getByRole("radiogroup", { name: "Top runs FPS" })).getByRole("radio", {
+        name: "125, no tops available",
+      }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(topsRequest).not.toHaveBeenCalled();
   });
 
   it("renders explicit catalog-error and unavailable-map states", async () => {

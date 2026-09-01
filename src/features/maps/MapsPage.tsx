@@ -1,11 +1,10 @@
 import { Film, Grid2X2, List, Map as MapIcon, RefreshCw, RotateCcw, Search } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   EmptyState,
   ErrorState,
   Input,
-  Pagination,
   Panel,
   SegmentedControl,
   Select,
@@ -32,6 +31,7 @@ export function MapsPage() {
   const { source, setSource } = useSourceContext();
   const [filters, setFilters] = useQueryState(mapDiscoveryQuerySchema);
   const [favoriteAnnouncement, setFavoriteAnnouncement] = useState("");
+  const loadMoreTriggerRef = useRef<HTMLDivElement>(null);
   const favoriteDocument = useFavorites();
   const loadMaps = useCallback((signal: AbortSignal) => api.maps({ source, signal }), [source]);
   const { data, error, loading, reload } = useAsync(loadMaps, source);
@@ -44,7 +44,8 @@ export function MapsPage() {
   );
   const pageCount = Math.max(1, Math.ceil(filteredMaps.length / PAGE_SIZE));
   const activePage = Math.min(filters.page, pageCount);
-  const visibleMaps = filteredMaps.slice((activePage - 1) * PAGE_SIZE, activePage * PAGE_SIZE);
+  const visibleMaps = filteredMaps.slice(0, activePage * PAGE_SIZE);
+  const hasMoreMaps = visibleMaps.length < filteredMaps.length;
 
   const favoriteIds = useMemo(() => {
     return new Set(
@@ -62,10 +63,32 @@ export function MapsPage() {
   }, [data, filters.route, loading, routeTypes, setFilters]);
 
   useEffect(() => {
-    if (filters.page > pageCount) {
+    if (!loading && data !== null && filters.page > pageCount) {
       setFilters({ page: pageCount }, { replace: true });
     }
-  }, [filters.page, pageCount, setFilters]);
+  }, [data, filters.page, loading, pageCount, setFilters]);
+
+  const loadMoreMaps = useCallback(() => {
+    if (!hasMoreMaps) return;
+    setFilters({ page: Math.min(activePage + 1, pageCount) }, { replace: true });
+  }, [activePage, hasMoreMaps, pageCount, setFilters]);
+
+  useEffect(() => {
+    const trigger = loadMoreTriggerRef.current;
+    if (trigger === null || !hasMoreMaps || typeof IntersectionObserver === "undefined") return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (!entries[0]?.isIntersecting) return;
+        observer.unobserve(trigger);
+        loadMoreMaps();
+      },
+      { rootMargin: "640px 0px", threshold: 0.01 },
+    );
+    observer.observe(trigger);
+
+    return () => observer.disconnect();
+  }, [hasMoreMaps, loadMoreMaps]);
 
   const updateFilter = <Key extends keyof typeof filters>(
     key: Key,
@@ -80,9 +103,8 @@ export function MapsPage() {
       route: "all",
       media: "all",
       fps: "125",
-      difficulty: "all",
-      sort: "completions",
-      view: "list",
+      sort: "released",
+      view: "grid",
       page: 1,
     });
   };
@@ -93,24 +115,23 @@ export function MapsPage() {
   };
 
   const hasLoadedData = data !== null;
-  const firstVisibleResult = filteredMaps.length === 0 ? 0 : (activePage - 1) * PAGE_SIZE + 1;
+  const firstVisibleResult = filteredMaps.length === 0 ? 0 : 1;
   const lastVisibleResult = Math.min(activePage * PAGE_SIZE, filteredMaps.length);
 
   return (
     <div className="cjs-maps cjs-stack">
       <header className="cjs-maps__header">
-        <span className="cjs-maps__eyebrow">
-          <MapIcon aria-hidden="true" size={16} />
-          Map discovery
-        </span>
-        <h1>Find your next route</h1>
-        <p>
-          Search public map records, compare FPS-specific difficulty, and keep useful routes close
-          at hand.
-        </p>
+        <div className="cjs-maps__heading">
+          <span className="cjs-maps__eyebrow">
+            <MapIcon aria-hidden="true" size={16} />
+            Map discovery
+          </span>
+          <h1>Find your next route</h1>
+        </div>
+        <p>Search maps, compare FPS difficulty, and open the route that fits your next run.</p>
       </header>
 
-      <Panel className="cjs-maps__filters" variant="strong">
+      <Panel className="cjs-maps__filters" padding="small" variant="strong">
         <div className="cjs-maps__filter-grid">
           <fieldset className="cjs-maps__source-field">
             <legend>Data source</legend>
@@ -127,6 +148,7 @@ export function MapsPage() {
           </fieldset>
 
           <Input
+            containerClassName="cjs-maps__search-field"
             label="Search maps"
             value={filters.q}
             onChange={(event) => updateFilter("q", event.target.value)}
@@ -167,18 +189,6 @@ export function MapsPage() {
                 {fps === "0" ? "Generic / unspecified" : `${fps} FPS`}
               </option>
             ))}
-          </Select>
-
-          <Select
-            label="Difficulty status"
-            value={filters.difficulty}
-            onChange={(event) =>
-              updateFilter("difficulty", event.target.value as typeof filters.difficulty)
-            }
-          >
-            <option value="all">Rated and unrated</option>
-            <option value="rated">Rated at selected FPS</option>
-            <option value="unrated">Unrated at selected FPS</option>
           </Select>
 
           <Select
@@ -300,7 +310,7 @@ export function MapsPage() {
         >
           {visibleMaps.map((item) => (
             <MapCard
-              key={item.map.mapid}
+              key={`${item.map.mapid}:${item.map.cp_id}`}
               item={item}
               source={source}
               fps={filters.fps}
@@ -311,13 +321,16 @@ export function MapsPage() {
         </section>
       )}
 
-      {filteredMaps.length > PAGE_SIZE && (
-        <Pagination
-          page={activePage}
-          pageCount={pageCount}
-          onPageChange={(page) => setFilters({ page })}
-          aria-label="Map results pages"
-        />
+      {hasMoreMaps && (
+        <div className="cjs-maps__load-more" ref={loadMoreTriggerRef}>
+          <Button variant="secondary" onClick={loadMoreMaps}>
+            Load more maps
+          </Button>
+          <p>
+            {visibleMaps.length} of {filteredMaps.length} maps loaded. More maps load automatically
+            as you scroll.
+          </p>
+        </div>
       )}
 
       <VisuallyHidden role="status" aria-live="polite">

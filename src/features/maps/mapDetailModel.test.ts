@@ -3,11 +3,14 @@ import type { GameMap, TopRun } from "../../lib/api";
 import {
   formatRunDate,
   formatRunTime,
+  getMapRouteLabel,
   getPlainPlayerName,
   getSafeMediaUrl,
+  hasMapTopRuns,
   parseMapRouteId,
   resolveMapRecord,
   selectCheckpoint,
+  selectMapProfileFps,
 } from "./mapDetailModel";
 
 const checkpoints: GameMap[] = [
@@ -36,6 +39,31 @@ describe("map detail model", () => {
     expect(selectCheckpoint(record, 101).cp_id).toBe(101);
     expect(selectCheckpoint(record, 999).cp_id).toBe(102);
     expect(selectCheckpoint(record, 0).cp_id).toBe(102);
+  });
+
+  it("selects an available profile FPS in 125, 250, 333, mix order", () => {
+    const map: GameMap = {
+      mapid: 1,
+      mapname: "target",
+      cp_id: 101,
+      difficulty: {
+        "125": { difficulty: 2, nb_tops: 0 },
+        "250": { difficulty: 3, nb_tops: 4 },
+        "333": { difficulty: 4, nb_tops: 2 },
+        "0": { difficulty: 5, nb_tops: 1 },
+      },
+    };
+
+    expect(hasMapTopRuns(map, "125")).toBe(false);
+    expect(hasMapTopRuns(map, "250")).toBe(true);
+    expect(selectMapProfileFps(map, "125")).toBe("250");
+    expect(selectMapProfileFps(map, "333")).toBe("333");
+    expect(selectMapProfileFps({ ...map, difficulty: null }, "333")).toBe("125");
+  });
+
+  it("uses route names when supplied and safe numbered labels otherwise", () => {
+    expect(getMapRouteLabel({ ...checkpoints[0], ender: "hard" }, 1)).toBe("Route 2: hard");
+    expect(getMapRouteLabel(checkpoints[0], 0)).toBe("Route 1");
   });
 
   it("rejects malformed route IDs and unsafe media URLs", () => {

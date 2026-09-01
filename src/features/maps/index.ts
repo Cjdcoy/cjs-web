@@ -10,7 +10,6 @@ export {
   prepareMaps,
 } from "./mapDiscovery";
 export type {
-  MapDifficultyFilter,
   MapDiscoveryFilters,
   MapMediaFilter,
   MapSort,
