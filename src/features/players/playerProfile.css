@@ -1,5 +1,5 @@
 .cjs-player-profile {
-  --cjs-stack-space: var(--cjs-space-6);
+  --cjs-stack-space: var(--cjs-space-4);
 }
 
 .cjs-player-profile__back {
@@ -7,49 +7,53 @@
   width: fit-content;
   align-items: center;
   gap: var(--cjs-space-2);
+  font-size: var(--cjs-font-size-sm);
 }
 
-.cjs-player-profile__hero,
 .cjs-player-profile__identity,
 .cjs-player-profile__meta,
 .cjs-player-profile__section-header,
 .cjs-player-profile__badges,
 .cjs-player-profile__resource-error,
 .cjs-player-profile__partial-error,
-.cjs-player-profile__capability,
-.cjs-player-profile__activity-grid > div {
+.cjs-player-profile__capability {
   display: flex;
   align-items: center;
 }
 
 .cjs-player-profile__hero {
-  padding: var(--cjs-space-5);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--cjs-space-4);
+  padding: var(--cjs-space-4);
   border: var(--cjs-border-width) solid var(--cjs-color-border);
   border-radius: var(--cjs-radius-lg);
   background:
-    linear-gradient(135deg, var(--cjs-color-accent-surface), transparent 58%),
+    linear-gradient(135deg, var(--cjs-color-accent-surface), transparent 52%),
     var(--cjs-color-panel);
-  justify-content: space-between;
-  gap: var(--cjs-space-5);
 }
 
 .cjs-player-profile__identity {
   min-width: 0;
-  align-items: flex-start;
-  gap: var(--cjs-space-4);
+  gap: var(--cjs-space-3);
+}
+
+.cjs-player-profile__identity > div {
+  min-width: 0;
 }
 
 .cjs-player-profile__avatar {
   display: grid;
-  width: var(--cjs-space-16);
-  height: var(--cjs-space-16);
+  width: var(--cjs-space-12);
+  height: var(--cjs-space-12);
   flex: none;
   place-items: center;
   border: var(--cjs-border-width) solid var(--cjs-color-border-strong);
   border-radius: var(--cjs-radius-pill);
   background: var(--cjs-color-accent-surface-strong);
   color: var(--cjs-color-accent-strong);
-  font-size: var(--cjs-font-size-xl);
+  font-size: var(--cjs-font-size-lg);
   font-weight: var(--cjs-font-weight-bold);
   box-shadow: var(--cjs-shadow-accent);
 }
@@ -62,14 +66,15 @@
 .cjs-player-profile__capability p,
 .cjs-player-profile__resource-status,
 .cjs-player-profile__partial-error,
-.cjs-player-profile__progress p {
+.cjs-player-profile__progress p,
+.cjs-player-profile__fps-breakdown h3 {
   margin: 0;
 }
 
 .cjs-player-profile__hero h1 {
-  margin-block: var(--cjs-space-1) var(--cjs-space-2);
+  margin-block: var(--cjs-space-1);
   overflow-wrap: anywhere;
-  font-size: var(--cjs-font-size-2xl);
+  font-size: var(--cjs-font-size-xl);
   line-height: var(--cjs-line-height-tight);
 }
 
@@ -77,7 +82,7 @@
   color: var(--cjs-color-accent-strong);
   font-size: var(--cjs-font-size-xs);
   font-weight: var(--cjs-font-weight-bold);
-  letter-spacing: 0.1em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
@@ -98,9 +103,36 @@
   box-shadow: var(--cjs-shadow-accent);
 }
 
+.cjs-player-profile__highlights {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(5rem, auto));
+  margin: 0;
+}
+
+.cjs-player-profile__highlights > div {
+  min-width: 0;
+  padding-inline: var(--cjs-space-3);
+  border-inline-start: var(--cjs-border-width) solid var(--cjs-color-border);
+}
+
+.cjs-player-profile__highlights dt {
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-xs);
+  font-weight: var(--cjs-font-weight-medium);
+  text-transform: uppercase;
+}
+
+.cjs-player-profile__highlights dd {
+  margin: var(--cjs-space-1) 0 0;
+  color: var(--cjs-color-text);
+  font-size: var(--cjs-font-size-lg);
+  font-weight: var(--cjs-font-weight-bold);
+  line-height: var(--cjs-line-height-tight);
+}
+
 .cjs-player-profile__tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: var(--cjs-space-1);
   padding: var(--cjs-space-1);
   border: var(--cjs-border-width) solid var(--cjs-color-border);
@@ -110,7 +142,7 @@
 
 .cjs-player-profile__tab {
   display: flex;
-  min-height: var(--cjs-control-height-md);
+  min-height: var(--cjs-control-height-sm);
   align-items: center;
   justify-content: center;
   padding-inline: var(--cjs-space-3);
@@ -137,30 +169,36 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--cjs-space-4);
+  gap: var(--cjs-space-3);
   padding-inline: var(--cjs-space-1);
   color: var(--cjs-color-text-muted);
-  font-size: var(--cjs-font-size-sm);
-}
-
-.cjs-player-profile__source-note > div {
-  display: grid;
-  gap: var(--cjs-space-1);
+  font-size: var(--cjs-font-size-xs);
 }
 
 .cjs-player-profile__source-note strong {
   color: var(--cjs-color-text);
 }
 
+.cjs-player-profile__source-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--cjs-space-3);
+}
+
+.cjs-player-profile__source-actions .cjs-player-profile__refresh {
+  margin-inline-start: 0;
+}
+
 .cjs-player-profile__controls {
   display: flex;
   flex-wrap: wrap;
   align-items: end;
-  gap: var(--cjs-space-4);
+  gap: var(--cjs-space-3);
 }
 
 .cjs-player-profile__controls > :first-child:not(.cjs-player-profile__refresh) {
-  width: min(100%, 22rem);
+  width: min(100%, 20rem);
 }
 
 .cjs-player-profile__controls > .cjs-player-profile__fps-filter {
@@ -179,25 +217,21 @@
 .cjs-player-profile__fps-filter legend {
   margin-block-end: var(--cjs-space-2);
   color: var(--cjs-color-text);
-  font-size: var(--cjs-font-size-md);
+  font-size: var(--cjs-font-size-sm);
   font-weight: var(--cjs-font-weight-bold);
 }
 
-.cjs-player-profile__fps-filter p {
-  margin: 0;
-  color: var(--cjs-color-text-muted);
+.cjs-player-profile__fps-options .cjs-segmented-control__option {
+  min-height: var(--cjs-control-height-sm);
+  flex: 1 1 0;
+  padding-inline: var(--cjs-space-3);
   font-size: var(--cjs-font-size-sm);
 }
 
-.cjs-player-profile__fps-options .cjs-segmented-control__option {
-  min-height: var(--cjs-control-height-md);
-  flex: 1 1 0;
-  padding-inline: var(--cjs-space-4);
-  font-size: var(--cjs-font-size-md);
-}
-
 .cjs-player-profile__refresh {
+  flex: none;
   margin-inline-start: auto;
+  white-space: nowrap;
 }
 
 .cjs-player-profile__partial-error,
@@ -214,39 +248,69 @@
 .cjs-player-profile__partial-error {
   flex-wrap: wrap;
   justify-content: flex-start;
-  padding: var(--cjs-space-3) var(--cjs-space-4);
+  padding: var(--cjs-space-3);
 }
 
 .cjs-player-profile__sections {
   display: grid;
-  gap: var(--cjs-space-8);
+  gap: var(--cjs-space-4);
+}
+
+.cjs-player-profile__overview-grid {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  align-items: start;
+  gap: var(--cjs-space-4);
 }
 
 .cjs-player-profile__section {
-  display: grid;
-  gap: var(--cjs-space-3);
+  min-width: 0;
   scroll-margin-block-start: var(--cjs-space-6);
+}
+
+.cjs-player-profile__overview-column {
+  display: grid;
+  align-content: start;
+  gap: var(--cjs-space-4);
+}
+
+.cjs-player-profile__overview-column--summary {
+  grid-column: span 7;
+}
+
+.cjs-player-profile__overview-column--recent {
+  grid-column: span 5;
+}
+
+.cjs-player-profile__section--activity,
+.cjs-player-profile__section--position,
+.cjs-player-profile__section--wide {
+  grid-column: 1 / -1;
+}
+
+.cjs-player-profile__section-panel {
+  overflow: hidden;
 }
 
 .cjs-player-profile__section-header {
   align-items: flex-start;
   gap: var(--cjs-space-3);
+  padding: var(--cjs-space-3) var(--cjs-space-4);
+  border-block-end: var(--cjs-border-width) solid var(--cjs-color-border);
 }
 
 .cjs-player-profile__section-header > span {
   display: grid;
-  width: var(--cjs-control-height-sm);
-  height: var(--cjs-control-height-sm);
+  width: var(--cjs-space-5);
+  height: var(--cjs-space-5);
   flex: none;
   place-items: center;
-  border-radius: var(--cjs-radius-sm);
-  background: var(--cjs-color-accent-surface);
   color: var(--cjs-color-accent-strong);
 }
 
 .cjs-player-profile__section-header h2,
 .cjs-player-profile__capability h2 {
-  font-size: var(--cjs-font-size-xl);
+  font-size: var(--cjs-font-size-lg);
   line-height: var(--cjs-line-height-tight);
 }
 
@@ -255,13 +319,13 @@
   max-width: var(--cjs-reading-width);
   margin-block-start: var(--cjs-space-1);
   color: var(--cjs-color-text-muted);
-  font-size: var(--cjs-font-size-sm);
+  font-size: var(--cjs-font-size-xs);
 }
 
 .cjs-player-profile__resource-state,
 .cjs-player-profile__resource-content {
   min-width: 0;
-  padding: var(--cjs-space-5);
+  padding: var(--cjs-space-4);
 }
 
 .cjs-player-profile__resource-status {
@@ -271,28 +335,35 @@
 }
 
 .cjs-player-profile__resource-error {
-  margin-block-end: var(--cjs-space-4);
+  margin-block-end: var(--cjs-space-3);
   padding: var(--cjs-space-3);
 }
 
 .cjs-player-profile__stat-grid,
+.cjs-player-profile__tracking-grid,
 .cjs-player-profile__activity-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: var(--cjs-space-3);
+  gap: var(--cjs-space-3) var(--cjs-space-5);
   margin: 0;
 }
 
+.cjs-player-profile__stat-grid,
+.cjs-player-profile__tracking-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.cjs-player-profile__activity-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .cjs-player-profile__stat-grid > div,
+.cjs-player-profile__tracking-grid > div,
 .cjs-player-profile__activity-grid > div {
   min-width: 0;
-  padding: var(--cjs-space-4);
-  border: var(--cjs-border-width) solid var(--cjs-color-border);
-  border-radius: var(--cjs-radius-sm);
-  background: var(--cjs-color-panel-soft);
 }
 
 .cjs-player-profile__stat-grid dt,
+.cjs-player-profile__tracking-grid dt,
 .cjs-player-profile__activity-grid dt {
   color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
@@ -301,18 +372,30 @@
 }
 
 .cjs-player-profile__stat-grid dd,
+.cjs-player-profile__tracking-grid dd,
 .cjs-player-profile__activity-grid dd {
   margin: var(--cjs-space-1) 0 0;
   overflow-wrap: anywhere;
   color: var(--cjs-color-text);
-  font-size: var(--cjs-font-size-lg);
+  font-size: var(--cjs-font-size-md);
   font-weight: var(--cjs-font-weight-bold);
+  line-height: var(--cjs-line-height-tight);
 }
 
 .cjs-player-profile__activity-grid dt {
   display: flex;
   align-items: center;
-  gap: var(--cjs-space-2);
+  gap: var(--cjs-space-1);
+}
+
+.cjs-player-profile__activity-grid > div {
+  display: grid;
+  align-content: start;
+  gap: var(--cjs-space-1);
+}
+
+.cjs-player-profile__activity-grid dd {
+  margin-block-start: 0;
 }
 
 .cjs-player-profile__activity-grid dt > span {
@@ -321,32 +404,63 @@
 }
 
 .cjs-player-profile__activity-grid svg {
-  width: var(--cjs-space-5);
-  height: var(--cjs-space-5);
+  width: var(--cjs-space-4);
+  height: var(--cjs-space-4);
 }
 
 .cjs-player-profile__badges {
   flex-wrap: wrap;
+  gap: var(--cjs-space-1);
+  margin-block-start: var(--cjs-space-2);
+}
+
+.cjs-player-profile__fps-breakdown {
+  display: grid;
   gap: var(--cjs-space-2);
-  margin-block-start: var(--cjs-space-4);
+  margin-block-start: var(--cjs-space-3);
+  padding-block-start: var(--cjs-space-3);
+  border-block-start: var(--cjs-border-width) solid var(--cjs-color-border);
+}
+
+.cjs-player-profile__fps-breakdown h3 {
+  font-size: var(--cjs-font-size-sm);
+}
+
+.cjs-player-profile__fps-breakdown dl {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0;
+  margin: 0;
+}
+
+.cjs-player-profile__fps-breakdown dl > div {
+  min-width: 0;
+  padding: var(--cjs-space-1) var(--cjs-space-2);
+  text-align: center;
+}
+
+.cjs-player-profile__fps-breakdown dt {
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-xs);
+}
+
+.cjs-player-profile__fps-breakdown dd {
+  margin: var(--cjs-space-1) 0 0;
+  font-weight: var(--cjs-font-weight-bold);
 }
 
 .cjs-player-profile__skill-summary {
-  margin-block-end: var(--cjs-space-4);
+  margin-block-end: var(--cjs-space-3);
 }
 
 .cjs-player-profile__best-runs {
   display: grid;
-  gap: var(--cjs-space-4);
+  gap: var(--cjs-space-3);
   font-size: var(--cjs-font-size-md);
 }
 
-.cjs-player-profile__best-runs .cjs-player-profile__stat-grid dt {
-  font-size: var(--cjs-font-size-sm);
-}
-
 .cjs-player-profile__best-runs .cjs-player-profile__stat-grid dd {
-  font-size: var(--cjs-font-size-xl);
+  font-size: var(--cjs-font-size-lg);
 }
 
 .cjs-player-profile__best-runs .cjs-table__cell,
@@ -354,63 +468,97 @@
   font-size: var(--cjs-font-size-md);
 }
 
+.cjs-player-profile__rank-achievement {
+  white-space: nowrap;
+}
+
+.cjs-player-profile__rank-achievement[data-achievement="first"] {
+  color: var(--cjs-color-podium-gold);
+}
+
+.cjs-player-profile__rank-achievement[data-achievement="second"] {
+  color: var(--cjs-color-podium-silver);
+}
+
+.cjs-player-profile__rank-achievement[data-achievement="third"] {
+  color: var(--cjs-color-podium-bronze);
+}
+
+.cjs-player-profile__rank-achievement[data-achievement="top-ten"] {
+  color: var(--cjs-color-accent-strong);
+}
+
 .cjs-player-profile__recent {
   display: grid;
-  gap: var(--cjs-space-4);
+  gap: var(--cjs-space-3);
 }
 
 .cjs-player-profile__recent-list {
   display: grid;
-  gap: var(--cjs-space-2);
+  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.cjs-player-profile__recent-list li {
+.cjs-player-profile__recent-scroll {
+  max-block-size: 30rem;
+  overflow-y: auto;
+  padding-inline-end: var(--cjs-space-1);
+  border-block: var(--cjs-border-width) solid var(--cjs-color-border);
+  scrollbar-gutter: stable;
+}
+
+.cjs-player-profile__recent-list li,
+.cjs-player-profile__oldest-record {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: var(--cjs-space-4);
-  padding: var(--cjs-space-3) var(--cjs-space-4);
-  border: var(--cjs-border-width) solid var(--cjs-color-border);
-  border-radius: var(--cjs-radius-sm);
-  background: var(--cjs-color-panel-soft);
+  gap: var(--cjs-space-3);
+  padding: var(--cjs-space-2) 0;
+  border-block-end: var(--cjs-border-width) solid var(--cjs-color-border);
 }
 
-.cjs-player-profile__recent-list li > div {
+.cjs-player-profile__recent-list li:last-child {
+  border-block-end: 0;
+}
+
+.cjs-player-profile__oldest-record {
+  padding-block: var(--cjs-space-1) 0;
+  border-block-end: 0;
+}
+
+.cjs-player-profile__recent-list li > div,
+.cjs-player-profile__oldest-record > div {
   display: flex;
   align-items: center;
-  gap: var(--cjs-space-3);
+  gap: var(--cjs-space-2);
 }
 
-.cjs-player-profile__recent-list li > div:first-child {
+.cjs-player-profile__recent-list li > div:first-child,
+.cjs-player-profile__oldest-record > div:first-child {
   min-width: 0;
   align-items: flex-start;
   flex-direction: column;
-  gap: var(--cjs-space-1);
+  gap: 0;
 }
 
 .cjs-player-profile__recent-list span,
-.cjs-player-profile__recent-empty {
+.cjs-player-profile__recent-empty,
+.cjs-player-profile__oldest-record span {
   color: var(--cjs-color-text-muted);
-  font-size: var(--cjs-font-size-sm);
+  font-size: var(--cjs-font-size-xs);
 }
 
 .cjs-player-profile__recent-empty {
   margin: 0;
-  padding: var(--cjs-space-4);
-  border-radius: var(--cjs-radius-sm);
-  background: var(--cjs-color-panel-soft);
+  padding-block: var(--cjs-space-3);
 }
 
 .cjs-player-profile__progress {
   display: grid;
-  gap: var(--cjs-space-3);
-  margin-block-start: var(--cjs-space-4);
-  padding: var(--cjs-space-4);
-  border-radius: var(--cjs-radius-sm);
-  background: var(--cjs-color-panel-soft);
+  gap: var(--cjs-space-2);
+  margin-block-start: var(--cjs-space-3);
 }
 
 .cjs-player-profile__progress > div {
@@ -433,36 +581,502 @@
   accent-color: var(--cjs-color-accent);
 }
 
+.cjs-player-profile__route-dashboard {
+  display: grid;
+  gap: var(--cjs-space-3);
+}
+
+.cjs-player-profile__route-summary {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.cjs-player-profile__route-summary dd {
+  font-size: var(--cjs-font-size-xl);
+}
+
+.cjs-player-profile__route-progress {
+  margin-block-start: 0;
+}
+
+.cjs-player-profile__route-results-header,
+.cjs-player-profile__route-load-more {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cjs-space-3);
+}
+
+.cjs-player-profile__route-results-header,
+.cjs-player-profile__route-load-more p {
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-sm);
+}
+
+.cjs-player-profile__route-progress strong {
+  color: var(--cjs-color-accent-strong);
+  font-size: var(--cjs-font-size-md);
+}
+
+.cjs-player-profile__route-progress progress {
+  height: var(--cjs-space-3);
+}
+
+.cjs-player-profile__route-history-note {
+  margin: 0;
+}
+
+.cjs-player-profile__route-status {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--cjs-space-1);
+}
+
+.cjs-player-profile__route-filters {
+  display: grid;
+  grid-template-columns: minmax(12rem, 1fr) minmax(20rem, 2fr);
+  align-items: end;
+  gap: var(--cjs-space-3);
+  margin-block-start: var(--cjs-space-4);
+}
+
+.cjs-player-profile__route-results-header {
+  min-height: var(--cjs-control-height-md);
+  margin-block: var(--cjs-space-3);
+}
+
+.cjs-player-profile__route-results-header p,
+.cjs-player-profile__route-load-more p {
+  margin: 0;
+}
+
+.cjs-player-profile__route-load-more {
+  justify-content: center;
+  margin-block-start: var(--cjs-space-4);
+  padding-block-start: var(--cjs-space-3);
+  border-block-start: var(--cjs-border-width) solid var(--cjs-color-border);
+}
+
+.cjs-player-profile__activity {
+  display: grid;
+  gap: var(--cjs-space-3);
+}
+
 .cjs-player-profile__capability {
   align-items: flex-start;
+  gap: var(--cjs-space-3);
+  padding: var(--cjs-space-2) 0;
+}
+
+.cjs-run-progress,
+.cjs-run-progress__history,
+.cjs-run-progress__chart-block,
+.cjs-run-progress__ledger {
+  display: grid;
   gap: var(--cjs-space-4);
 }
 
-.cjs-player-profile__capability .cjs-badge {
+.cjs-run-progress__map-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: start;
+  gap: var(--cjs-space-3);
+}
+
+.cjs-run-progress > .cjs-run-progress__map-picker {
+  grid-template-columns: minmax(12rem, 0.8fr) minmax(14rem, 1.2fr);
+}
+
+.cjs-run-progress__state-layout,
+.cjs-run-progress__analytics {
+  display: grid;
+  min-width: 0;
+  gap: var(--cjs-space-3);
+}
+
+.cjs-run-progress__analytics-controls {
+  min-width: 0;
+}
+
+.cjs-run-progress__ledger-heading,
+.cjs-run-progress__details-heading,
+.cjs-run-progress__chart-heading,
+.cjs-run-progress__legend {
+  display: flex;
+  align-items: center;
+}
+
+.cjs-run-progress__ledger-heading > span,
+.cjs-run-progress__details-heading > span {
+  display: grid;
+  width: var(--cjs-control-height-sm);
+  height: var(--cjs-control-height-sm);
   flex: none;
+  place-items: center;
+  border-radius: var(--cjs-radius-sm);
+  background: var(--cjs-color-accent-surface);
+  color: var(--cjs-color-accent-strong);
+}
+
+.cjs-run-progress__chart-heading h2,
+.cjs-run-progress__chart-heading p,
+.cjs-run-progress__ledger-heading h2,
+.cjs-run-progress__ledger-heading h3,
+.cjs-run-progress__ledger-heading p,
+.cjs-run-progress__details-heading p {
+  margin: 0;
+}
+
+.cjs-run-progress__chart-heading p,
+.cjs-run-progress__ledger-heading p,
+.cjs-run-progress__stale {
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-xs);
+}
+
+.cjs-run-progress__stale {
+  margin: 0;
+  padding: var(--cjs-space-2) var(--cjs-space-3);
+  border-radius: var(--cjs-radius-sm);
+  background: var(--cjs-color-warning-surface);
+}
+
+.cjs-run-progress__summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--cjs-space-2);
+  margin: 0;
+}
+
+.cjs-run-progress__summary dt,
+.cjs-run-progress__details dt {
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-xs);
+  font-weight: var(--cjs-font-weight-medium);
+  text-transform: uppercase;
+}
+
+.cjs-run-progress__summary dd,
+.cjs-run-progress__details dd {
+  margin: var(--cjs-space-1) 0 0;
+  overflow-wrap: anywhere;
+  font-weight: var(--cjs-font-weight-bold);
+}
+
+.cjs-run-progress__chart-block,
+.cjs-run-progress__ledger {
+  padding: var(--cjs-space-4);
+  border: var(--cjs-border-width) solid var(--cjs-color-border);
+  border-radius: var(--cjs-radius-md);
+  background: var(--cjs-color-panel);
+}
+
+.cjs-run-progress__chart-heading {
+  justify-content: space-between;
+  gap: var(--cjs-space-3);
+}
+
+.cjs-run-progress__chart-heading h2,
+.cjs-run-progress__ledger-heading h2,
+.cjs-run-progress__ledger-heading h3 {
+  font-size: var(--cjs-font-size-md);
+}
+
+.cjs-run-progress__legend {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--cjs-space-3);
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-xs);
+}
+
+.cjs-run-progress__legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cjs-space-2);
+}
+
+.cjs-run-progress__legend span::before {
+  width: var(--cjs-space-6);
+  height: calc(var(--cjs-border-width) * 2);
+  background: var(--cjs-color-accent);
+  content: "";
+}
+
+.cjs-run-progress__legend span[data-series="best"]::before {
+  border-block-start: calc(var(--cjs-border-width) * 2) dashed var(--cjs-color-information);
+  background: transparent;
+}
+
+.cjs-run-progress__chart {
+  min-width: 0;
+  overflow-x: auto;
+  border-radius: var(--cjs-radius-sm);
+  background: var(--cjs-color-panel-soft);
+}
+
+.cjs-run-progress__chart-canvas {
+  position: relative;
+  min-width: 34rem;
+}
+
+.cjs-run-progress__chart svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.cjs-run-progress__grid-line {
+  stroke: var(--cjs-color-border);
+  stroke-width: var(--cjs-border-width);
+}
+
+.cjs-run-progress__axis-label {
+  fill: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-xs);
+}
+
+.cjs-run-progress__line {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: calc(var(--cjs-border-width) * 2);
+}
+
+.cjs-run-progress__line--finish {
+  stroke: var(--cjs-color-accent);
+}
+
+.cjs-run-progress__line--best {
+  stroke: var(--cjs-color-information);
+  stroke-dasharray: var(--cjs-space-2) var(--cjs-space-2);
+}
+
+.cjs-run-progress__dot {
+  fill: var(--cjs-color-panel);
+  stroke: var(--cjs-color-accent);
+  stroke-width: calc(var(--cjs-border-width) * 2);
+}
+
+.cjs-run-progress__dot[data-personal-best="true"] {
+  fill: var(--cjs-color-accent);
+}
+
+.cjs-run-progress__point {
+  position: absolute;
+  top: var(--cjs-run-y);
+  left: var(--cjs-run-x);
+  width: var(--cjs-space-6);
+  height: var(--cjs-space-6);
+  padding: 0;
+  border: 0;
+  border-radius: var(--cjs-radius-pill);
+  background: transparent;
+  cursor: pointer;
+  transform: translate(-50%, -50%);
+}
+
+.cjs-run-progress__point:hover,
+.cjs-run-progress__point[data-selected="true"] {
+  border: calc(var(--cjs-border-width) * 2) solid var(--cjs-color-accent-strong);
+  background: var(--cjs-color-accent-surface);
+}
+
+.cjs-run-progress__details {
+  display: grid;
+  gap: var(--cjs-space-3);
+}
+
+.cjs-run-progress__details-heading {
+  flex-wrap: wrap;
+  gap: var(--cjs-space-3);
+}
+
+.cjs-run-progress__details-heading .cjs-badge {
+  flex: none;
+  width: max-content;
+  margin-inline-start: auto;
+  white-space: nowrap;
+}
+
+.cjs-run-progress__details dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--cjs-space-2);
+  margin: 0;
+}
+
+.cjs-run-progress__ledger-heading {
+  min-width: 0;
+  align-items: flex-start;
+  gap: var(--cjs-space-3);
+}
+
+.cjs-run-progress__ledger-headings {
+  display: grid;
+  gap: var(--cjs-space-3);
+}
+
+@media (min-width: 80rem) {
+  .cjs-run-progress {
+    --cjs-run-analytics-width: min(96rem, calc(100vw - (var(--cjs-space-8) * 2)));
+
+    width: var(--cjs-run-analytics-width);
+    margin-inline-start: calc((100% - var(--cjs-run-analytics-width)) / 2);
+  }
+
+  .cjs-run-progress__state-layout {
+    grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .cjs-run-progress__analytics {
+    grid-template-columns: minmax(34rem, 1fr) minmax(16rem, 19rem);
+    align-items: start;
+  }
+
+  .cjs-run-progress__analytics-controls {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .cjs-run-progress__analytics-controls .cjs-run-progress__map-picker {
+    grid-template-columns: minmax(12rem, 0.8fr) minmax(14rem, 1.2fr);
+  }
+
+  .cjs-run-progress__chart-block {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .cjs-run-progress__details {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .cjs-run-progress__ledger-headings {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.7fr);
+  }
+
+  .cjs-run-progress__summary {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 64rem) and (max-width: 79.999rem) {
+  .cjs-run-progress__state-layout {
+    grid-template-columns: minmax(14rem, 17rem) minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .cjs-run-progress__analytics {
+    grid-template-columns: minmax(34rem, 1fr) minmax(16rem, 18rem);
+    align-items: start;
+  }
+
+  .cjs-run-progress__analytics-controls {
+    grid-column: 1 / -1;
+    grid-row: 1;
+  }
+
+  .cjs-run-progress__analytics-controls .cjs-run-progress__map-picker {
+    grid-template-columns: minmax(12rem, 0.8fr) minmax(14rem, 1.2fr);
+  }
+
+  .cjs-run-progress__chart-block {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .cjs-run-progress__details {
+    grid-column: 2;
+    grid-row: 2;
+  }
+
+  .cjs-run-progress__ledger-headings {
+    grid-template-columns: minmax(0, 1fr) minmax(18rem, 0.8fr);
+  }
+
+  .cjs-run-progress__summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 63.999rem) {
+  .cjs-player-profile__hero {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .cjs-player-profile__highlights {
+    grid-column: 1 / -1;
+    padding-block-start: var(--cjs-space-3);
+    border-block-start: var(--cjs-border-width) solid var(--cjs-color-border);
+  }
+
+  .cjs-player-profile__favorite {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: start;
+  }
+
+  .cjs-player-profile__overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cjs-player-profile__overview-column,
+  .cjs-player-profile__section--activity,
+  .cjs-player-profile__section--position,
+  .cjs-player-profile__section--wide {
+    grid-column: 1;
+  }
+
+  .cjs-player-profile__activity-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .cjs-run-progress__details dl {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 47.999rem) {
-  .cjs-player-profile__hero,
+  .cjs-player-profile {
+    --cjs-stack-space: var(--cjs-space-3);
+  }
+
+  .cjs-player-profile__hero {
+    gap: var(--cjs-space-3);
+    padding: var(--cjs-space-3);
+  }
+
+  .cjs-player-profile__identity {
+    align-items: flex-start;
+  }
+
+  .cjs-player-profile__avatar {
+    width: var(--cjs-control-height-lg);
+    height: var(--cjs-control-height-lg);
+  }
+
+  .cjs-player-profile__highlights {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--cjs-space-2) 0;
+  }
+
+  .cjs-player-profile__source-note,
+  .cjs-player-profile__source-actions,
   .cjs-player-profile__resource-error,
-  .cjs-player-profile__capability,
-  .cjs-player-profile__source-note {
+  .cjs-player-profile__capability {
     align-items: stretch;
     flex-direction: column;
   }
 
-  .cjs-player-profile__favorite {
-    align-self: flex-start;
-  }
-
-  .cjs-player-profile__stat-grid,
-  .cjs-player-profile__activity-grid {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
   .cjs-player-profile__tabs {
-    overflow-x: auto;
-    grid-template-columns: repeat(3, minmax(8.5rem, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cjs-player-profile__tab {
+    padding-inline: var(--cjs-space-1);
+    font-size: var(--cjs-font-size-xs);
   }
 
   .cjs-player-profile__controls {
@@ -480,29 +1094,91 @@
     margin-inline-start: 0;
   }
 
+  .cjs-player-profile__section-header,
   .cjs-player-profile__resource-state,
   .cjs-player-profile__resource-content {
-    padding: var(--cjs-space-4);
+    padding: var(--cjs-space-3);
   }
 
-  .cjs-player-profile__recent-list li {
+  .cjs-player-profile__stat-grid,
+  .cjs-player-profile__activity-grid,
+  .cjs-player-profile__route-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cjs-player-profile__route-filters {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cjs-player-profile__route-results-header,
+  .cjs-player-profile__route-load-more {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .cjs-player-profile__tracking-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cjs-player-profile__fps-breakdown dl {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .cjs-player-profile__recent-list li,
+  .cjs-player-profile__oldest-record {
     align-items: flex-start;
+  }
+
+  .cjs-run-progress__map-picker,
+  .cjs-run-progress > .cjs-run-progress__map-picker {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cjs-run-progress__summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cjs-run-progress__chart-block,
+  .cjs-run-progress__ledger {
+    padding: var(--cjs-space-3);
+  }
+
+  .cjs-run-progress__chart-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .cjs-run-progress__legend {
+    justify-content: flex-start;
   }
 }
 
 @media (max-width: 22.499rem) {
   .cjs-player-profile__identity {
+    flex-direction: column;
+  }
+
+  .cjs-player-profile__highlights > div {
+    padding-inline: var(--cjs-space-2);
+  }
+
+  .cjs-player-profile__activity-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cjs-player-profile__recent-list li,
+  .cjs-player-profile__oldest-record,
+  .cjs-player-profile__progress > div {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .cjs-player-profile__avatar {
-    width: var(--cjs-control-height-lg);
-    height: var(--cjs-control-height-lg);
-  }
-
-  .cjs-player-profile__progress > div {
-    flex-direction: column;
     gap: var(--cjs-space-1);
+  }
+
+  .cjs-run-progress__details dl {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .cjs-run-progress__summary {
+    grid-template-columns: minmax(0, 1fr);
   }
 }

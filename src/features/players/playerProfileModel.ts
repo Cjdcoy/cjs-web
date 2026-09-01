@@ -1,5 +1,7 @@
 import type {
   Fps,
+  GameMap,
+  Player,
   PlayerLeaderboard,
   PlayerLeaderboardPosition,
   PlayerJumpScores,
@@ -9,17 +11,48 @@ import type {
   Source,
   TopRun,
 } from "../../lib/api";
-import { FPS_VALUES, PLAYER_LEADERBOARDS } from "../../lib/api";
-import { defineQuerySchema, enumQueryParam } from "../../lib/routing";
+import { FPS_VALUES } from "../../lib/api";
+import {
+  defineQuerySchema,
+  enumQueryParam,
+  integerQueryParam,
+  stringQueryParam,
+} from "../../lib/routing";
 
-export const PLAYER_PROFILE_VIEWS = ["overview", "runs", "routes"] as const;
+export const PLAYER_PROFILE_VIEWS = ["overview", "runs", "progress", "routes"] as const;
 export type PlayerProfileView = (typeof PLAYER_PROFILE_VIEWS)[number];
 
+export const ROUTE_COMPLETION_STATUSES = ["all", "completed", "remaining"] as const;
+export type RouteCompletionStatus = (typeof ROUTE_COMPLETION_STATUSES)[number];
+
 export const playerProfileQuerySchema = defineQuerySchema({
-  board: enumQueryParam(PLAYER_LEADERBOARDS, "speed"),
   fps: enumQueryParam(FPS_VALUES, "125"),
+  map: integerQueryParam({ min: 1 }),
+  q: stringQueryParam({ maxLength: 80, trim: true }),
+  status: enumQueryParam(ROUTE_COMPLETION_STATUSES, "all"),
   view: enumQueryParam(PLAYER_PROFILE_VIEWS, "overview"),
 });
+
+export interface PlayerRouteInventoryItem {
+  completed: boolean;
+  ender: string | null;
+  fpsList: readonly Fps[];
+  mapId: number;
+  mapName: string;
+  published: boolean;
+  routeId: string;
+  routeType: string | null;
+  totalFinishes: number;
+}
+
+export interface PlayerRouteInventorySummary {
+  archivedCompleted: number;
+  completed: number;
+  completionRate: number;
+  remaining: number;
+  total: number;
+  totalFinishes: number;
+}
 
 export interface PlayerProfileIdentity {
   country: string | null;
@@ -31,11 +64,19 @@ export interface PlayerProfileIdentity {
 }
 
 export interface PlayerIdentityInputs {
+  directory: Player | null;
   performance: PlayerPerformanceStats | null;
   positions: readonly PlayerLeaderboardPosition[] | null;
   rank: PlayerRankInfo | null;
   routes: readonly PlayerRouteCompletion[] | null;
   scores: PlayerJumpScores | null;
+}
+
+export type RunAchievementTier = "first" | "second" | "third" | "top-ten";
+
+export interface RunAchievement {
+  label: "First place" | "Second place" | "Third place" | "Top 10";
+  tier: RunAchievementTier;
 }
 
 const boardLabels: Readonly<Record<PlayerLeaderboard, string>> = {
@@ -55,6 +96,9 @@ const numberFormatter = new Intl.NumberFormat();
 const decimalFormatter = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 1,
 });
+const percentFormatter = new Intl.NumberFormat(undefined, {
+  maximumFractionDigits: 2,
+});
 
 export function playerBoardLabel(board: PlayerLeaderboard): string {
   return boardLabels[board];
@@ -64,14 +108,101 @@ export function playerSourceLabel(source: Source): string {
   return sourceLabels[source];
 }
 
+export function getRunAchievement(rank: number): RunAchievement | null {
+  if (!Number.isInteger(rank) || rank < 1 || rank > 10) return null;
+  if (rank === 1) return { label: "First place", tier: "first" };
+  if (rank === 2) return { label: "Second place", tier: "second" };
+  if (rank === 3) return { label: "Third place", tier: "third" };
+  return { label: "Top 10", tier: "top-ten" };
+}
+
+export function createPlayerRouteInventory(
+  maps: readonly GameMap[],
+  routes: readonly PlayerRouteCompletion[],
+): PlayerRouteInventoryItem[] {
+  const completionByRoute = new Map(
+    routes.map((route) => [routeIdentity(route.map_id, route.ender), route]),
+  );
+  const inventory = maps.map((map) => {
+    const routeId = routeIdentity(map.mapid, map.ender);
+    const completion = completionByRoute.get(routeId);
+    completionByRoute.delete(routeId);
+
+    return {
+      completed: completion !== undefined,
+      ender:
+        firstText(
+          completion?.ender,
+          map.ender === null || map.ender === undefined ? null : String(map.ender),
+        ) || null,
+      fpsList: completion?.fps_list ?? [],
+      mapId: map.mapid,
+      mapName: map.mapname,
+      published: true,
+      routeId,
+      routeType: firstText(map.type) || null,
+      totalFinishes: completion?.total_finishes ?? 0,
+    };
+  });
+
+  for (const completion of completionByRoute.values()) {
+    inventory.push({
+      completed: true,
+      ender: firstText(completion.ender) || null,
+      fpsList: completion.fps_list,
+      mapId: completion.map_id,
+      mapName: completion.map_name,
+      published: false,
+      routeId: routeIdentity(completion.map_id, completion.ender),
+      routeType: null,
+      totalFinishes: completion.total_finishes,
+    });
+  }
+
+  return inventory.sort((left, right) => left.mapName.localeCompare(right.mapName));
+}
+
+export function summarizePlayerRouteInventory(
+  inventory: readonly PlayerRouteInventoryItem[],
+): PlayerRouteInventorySummary {
+  const published = inventory.filter((route) => route.published);
+  const completed = published.filter((route) => route.completed).length;
+  const archivedCompleted = inventory.filter((route) => !route.published && route.completed).length;
+  const totalFinishes = inventory.reduce((total, route) => total + route.totalFinishes, 0);
+  return {
+    archivedCompleted,
+    completed,
+    completionRate: published.length === 0 ? 0 : completed / published.length,
+    remaining: published.length - completed,
+    total: published.length,
+    totalFinishes,
+  };
+}
+
+export function filterPlayerRouteInventory(
+  inventory: readonly PlayerRouteInventoryItem[],
+  filters: { query: string; status: RouteCompletionStatus },
+): PlayerRouteInventoryItem[] {
+  const query = filters.query.trim().toLocaleLowerCase();
+  return inventory.filter((route) => {
+    const matchesStatus =
+      filters.status === "all" ||
+      (filters.status === "completed" ? route.completed : !route.completed);
+    const searchText = `${route.mapName}\u0000${route.ender ?? ""}\u0000${route.routeType ?? ""}`;
+    return matchesStatus && (query.length === 0 || searchText.toLocaleLowerCase().includes(query));
+  });
+}
+
 export function createPlayerProfileIdentity(
   playerId: number,
-  { performance, positions, rank, routes, scores }: PlayerIdentityInputs,
+  { directory, performance, positions, rank, routes, scores }: PlayerIdentityInputs,
 ): PlayerProfileIdentity {
   const embeddedRank = rank ?? performance?.rank ?? null;
   const position = positions?.[0];
   const route = routes?.[0];
   const name = firstText(
+    directory?.pref_name,
+    directory?.playername,
     embeddedRank?.player_name,
     position?.player_name,
     scores?.player_name,
@@ -79,10 +210,23 @@ export function createPlayerProfileIdentity(
   );
 
   return {
-    country: firstText(embeddedRank?.country, position?.country, scores?.country) || null,
+    country:
+      firstText(embeddedRank?.country, position?.country, scores?.country, directory?.country) ||
+      null,
     countryCode:
-      firstText(embeddedRank?.country_code, position?.country_code, scores?.country_code) || null,
-    lastSeen: firstText(embeddedRank?.last_seen, position?.last_seen, scores?.last_seen) || null,
+      firstText(
+        embeddedRank?.country_code,
+        position?.country_code,
+        scores?.country_code,
+        directory?.country,
+      ) || null,
+    lastSeen:
+      firstText(
+        directory?.last_seen,
+        embeddedRank?.last_seen,
+        position?.last_seen,
+        scores?.last_seen,
+      ) || null,
     name: name || `Player #${playerId}`,
     playerId,
     region: firstText(embeddedRank?.region, position?.region, scores?.region) || null,
@@ -103,7 +247,7 @@ export function formatProfileDecimal(value: number | null | undefined): string {
 
 export function formatProfilePercent(value: number | null | undefined): string {
   if (value === null || value === undefined) return "Not available";
-  return `${Math.round(value * 100)}%`;
+  return `${percentFormatter.format(value * 100)}%`;
 }
 
 export function formatDuration(milliseconds: number): string {
@@ -136,6 +280,18 @@ export function fpsLabel(fps: Fps): string {
   return fps === "0" ? "Mix" : `${fps} FPS`;
 }
 
+export function formatFpsList(values: readonly Fps[]): string {
+  if (values.length === 0) return "Not available";
+  const labels = values.map((fps) => (fps === "0" ? "Mix" : fps));
+  return `${labels.join(", ")}${values.some((fps) => fps !== "0") ? " FPS" : ""}`;
+}
+
 function firstText(...values: Array<string | null | undefined>): string {
   return values.find((value) => value?.trim())?.trim() ?? "";
+}
+
+function routeIdentity(mapId: number, ender: number | string | null | undefined): string {
+  return `${mapId}:${String(ender ?? "")
+    .trim()
+    .toLocaleLowerCase()}`;
 }
