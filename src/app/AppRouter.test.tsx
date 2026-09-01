@@ -1,7 +1,9 @@
 import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { HttpResponse, http } from "msw";
+import { act } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
+import { navigate } from "../lib/routing";
 import { server } from "../test/server";
 import { AppRouter } from "./AppRouter";
 
@@ -46,7 +48,9 @@ describe("AppRouter", () => {
 
     await waitFor(() => {
       expect(`${window.location.pathname}${window.location.search}`).toBe("/maps/73?source=j4l");
+      expect(screen.getByRole("main")).not.toHaveAttribute("aria-busy");
     });
+    expect(screen.queryByText("Loading page")).not.toBeInTheDocument();
   });
 
   it("focuses and announces a completed pathname navigation", async () => {
@@ -65,5 +69,20 @@ describe("AppRouter", () => {
     await screen.findByRole("heading", { name: "Find your next route" });
     await waitFor(() => expect(screen.getByRole("main")).toHaveFocus());
     expect(screen.getByText("Maps page loaded.")).toBeInTheDocument();
+  });
+
+  it("clears pending state after a query-only navigation", async () => {
+    window.history.replaceState(null, "", "/about");
+    render(<AppRouter />);
+
+    await screen.findByRole("heading", { name: "Jump statistics, clearly sourced." });
+    act(() => navigate("/about?view=list#results"));
+
+    await waitFor(() => {
+      expect(window.location.search).toBe("?view=list");
+      expect(window.location.hash).toBe("#results");
+      expect(screen.getByRole("main")).not.toHaveAttribute("aria-busy");
+    });
+    expect(screen.queryByText("Loading page")).not.toBeInTheDocument();
   });
 });

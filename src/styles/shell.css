@@ -264,14 +264,14 @@
 
 .cjs-site-footer nav a {
   border-radius: var(--cjs-radius-sm);
-  color: var(--cjs-color-text-muted);
+  color: var(--cjs-color-text);
   font-size: var(--cjs-font-size-sm);
   font-weight: var(--cjs-font-weight-semibold);
-  text-decoration: underline;
-  text-underline-offset: var(--cjs-space-1);
+  text-decoration: none;
 }
 
-.cjs-site-footer nav a:hover {
+.cjs-site-footer nav a:hover,
+.cjs-site-footer nav a:focus-visible {
   color: var(--cjs-color-accent-strong);
 }
 

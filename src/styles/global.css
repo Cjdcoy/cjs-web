@@ -12,7 +12,14 @@ body {
 }
 
 a {
-  color: inherit;
+  color: var(--cjs-color-text);
+  text-decoration: none;
+  transition: color var(--cjs-duration-fast) var(--cjs-ease-standard);
+}
+
+a:hover,
+a:focus-visible {
+  color: var(--cjs-color-accent-strong);
 }
 
 :where(a, button, input, select, textarea, [tabindex]):focus-visible {

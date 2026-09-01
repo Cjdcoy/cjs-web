@@ -99,7 +99,7 @@ export function DataTable<Row>({
         <thead>
           <tr>
             {columns.map((column) => (
-              <th key={column.id} scope="col">
+              <th key={column.id} scope="col" data-align={column.align ?? "start"}>
                 {column.header}
               </th>
             ))}

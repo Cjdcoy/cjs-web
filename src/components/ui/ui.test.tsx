@@ -82,7 +82,13 @@ describe("design-system data and feedback", () => {
 
   const columns: readonly DataTableColumn<Row>[] = [
     { id: "player", header: "Player", cell: (row) => row.player },
-    { id: "time", header: "Completion time", cardLabel: "Time", cell: (row) => row.time },
+    {
+      id: "time",
+      header: "Completion time",
+      cardLabel: "Time",
+      align: "end",
+      cell: (row) => row.time,
+    },
   ];
 
   it("keeps mobile card labels in semantic table cells", () => {
@@ -99,6 +105,11 @@ describe("design-system data and feedback", () => {
     const cells = within(row).getAllByRole("cell");
     expect(cells[0].getAttribute("data-label")).toBe("Player");
     expect(cells[1].getAttribute("data-label")).toBe("Time");
+    expect(screen.getByRole("columnheader", { name: "Completion time" })).toHaveAttribute(
+      "data-align",
+      "end",
+    );
+    expect(cells[1]).toHaveAttribute("data-align", "end");
   });
 
   it("labels the current page and prevents out-of-range navigation", async () => {
