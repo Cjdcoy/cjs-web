@@ -1,10 +1,12 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { api, type Player } from "../../lib/api";
+import { clearPlayerDirectoryCache, getCachedPlayer } from "./playerDirectoryCache";
 import { usePlayerSearch } from "./usePlayerSearch";
 
 describe("usePlayerSearch", () => {
   beforeEach(() => {
+    clearPlayerDirectoryCache();
     vi.useFakeTimers();
   });
 
@@ -39,6 +41,7 @@ describe("usePlayerSearch", () => {
       expect.objectContaining({ sort: "last-seen", source: "jh" }),
     );
     expect(result.current.players[0]?.playername).toBe("Recent");
+    expect(getCachedPlayer("jh", 1)?.playername).toBe("Recent");
     expect(searchPlayers).not.toHaveBeenCalled();
 
     rerender({ query: "alpha" });
@@ -97,6 +100,7 @@ describe("usePlayerSearch", () => {
       await Promise.resolve();
     });
     expect(result.current.players[0]?.player_id).toBe(2);
+    expect(getCachedPlayer("j4l", 2)?.playername).toBe("Beta");
 
     await act(async () => {
       firstRequest.resolve([{ player_id: 1, playername: "Alpha" }]);

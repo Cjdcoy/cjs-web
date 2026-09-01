@@ -5,6 +5,7 @@ import {
   PLAYER_SEARCH_LIMIT,
   PLAYER_SEARCH_MIN_LENGTH,
 } from "./playerDiscovery";
+import { cachePlayerDirectory } from "./playerDirectoryCache";
 
 type SearchPlayers = typeof api.searchPlayers;
 type ListPlayers = typeof api.players;
@@ -100,6 +101,7 @@ export function usePlayerSearch({
       void request
         .then((players) => {
           if (controller.signal.aborted) return;
+          cachePlayerDirectory(source, players, !isSearch);
           setState({ error: null, players, requestKey, status: "success" });
         })
         .catch((reason: unknown) => {

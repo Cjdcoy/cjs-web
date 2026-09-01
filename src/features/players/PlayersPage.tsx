@@ -12,6 +12,7 @@ import {
   sortPlayers,
 } from "./playerDiscovery";
 import { useFavoritePlayers } from "./useFavoritePlayers";
+import { usePlayerLevels } from "./usePlayerLevels";
 import { usePlayerSearch } from "./usePlayerSearch";
 import "./players.css";
 
@@ -21,9 +22,11 @@ const sourceLabels: Readonly<Record<Source, string>> = {
 };
 
 export function PlayersPage({
+  listPlayerRanks,
   listPlayers,
   searchPlayers,
 }: {
+  listPlayerRanks?: typeof api.rankXpLeaderboard;
   listPlayers?: typeof api.players;
   searchPlayers?: typeof api.searchPlayers;
 } = {}) {
@@ -36,6 +39,12 @@ export function PlayersPage({
     sort: queryState.sort,
     source,
   });
+  const {
+    error: levelError,
+    levels: playerLevels,
+    retry: retryLevels,
+    status: levelStatus,
+  } = usePlayerLevels({ listPlayerRanks, source });
   const sortedPlayers = useMemo(
     () => sortPlayers(players, queryState.sort),
     [players, queryState.sort],
@@ -101,16 +110,21 @@ export function PlayersPage({
 
         <p className="cjs-player-discovery__note">
           Directory players are revealed in batches as you scroll. Name searches use the documented
-          lookup and are limited to {PLAYER_SEARCH_LIMIT} results. Country, visits, and last-seen
-          values appear only when the API supplies them.
+          lookup and are limited to {PLAYER_SEARCH_LIMIT} results. Country, visits, admin level, and
+          last-seen values appear only when the API supplies them. Player level is available for
+          Jump4Life.
         </p>
 
         <PlayerResults
           error={error}
           favoriteIds={favoriteIds}
+          levelError={levelError}
+          levelStatus={levelStatus}
           players={sortedPlayers}
+          playerLevels={playerLevels}
           query={normalizedQuery}
           retry={retry}
+          retryLevels={retryLevels}
           source={source}
           status={status}
           toggleFavorite={toggleFavorite}
