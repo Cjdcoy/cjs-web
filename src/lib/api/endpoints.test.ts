@@ -57,7 +57,6 @@ describe("typed CJS API endpoints", () => {
         source: "jh",
         playerId: 501,
         fps: "125",
-        leaderboard: "speed",
       }),
     ).resolves.toHaveLength(1);
     await expect(
@@ -67,6 +66,9 @@ describe("typed CJS API endpoints", () => {
     });
     await expect(
       api.playerTops({ source: "jh", playerId: 501, fps: "125", limit: 2 }),
+    ).resolves.toHaveLength(1);
+    await expect(
+      api.playerMapRuns({ source: "jh", playerId: 501, checkpointId: 901, fps: "125" }),
     ).resolves.toHaveLength(1);
     await expect(api.playerRoutes({ source: "jh", playerId: 501 })).resolves.toHaveLength(1);
     await expect(api.playerRank({ source: "j4l", playerId: 501 })).resolves.toMatchObject({
@@ -85,9 +87,10 @@ describe("typed CJS API endpoints", () => {
       "https://example.test/proxy/api/v1/player/all?source=jh&sort=last-seen",
       "https://example.test/proxy/api/v1/player/id-from-name?source=jh&name=%5E1+Runner+%2F+%3F&limit=2",
       "https://example.test/proxy/api/v1/player/performance-stats?source=jh&playerid=501",
-      "https://example.test/proxy/api/v1/player/leaderboard-positions?source=jh&playerid=501&fps=125&leaderboard=speed",
+      "https://example.test/proxy/api/v1/player/leaderboard-positions?source=jh&playerid=501&fps=125",
       "https://example.test/proxy/api/v1/player/jump-scores?source=jh&playerid=501&fps=125",
       "https://example.test/proxy/api/v1/player/tops?source=jh&playerid=501&fps=125&limit=2",
+      "https://example.test/proxy/api/v1/player/map-runs?source=jh&playerid=501&cpid=901&fps=125",
       "https://example.test/proxy/api/v1/player/routes-completion?source=jh&playerid=501",
       "https://example.test/proxy/api/v1/player/rank?source=j4l&playerid=501",
       "https://example.test/proxy/api/v1/player/activity-summary?source=j4l&playerid=501",
@@ -136,6 +139,9 @@ describe("typed CJS API endpoints", () => {
     await expect(api.playerTops({ source: "jh", playerId: -1, fps: "125" })).rejects.toMatchObject({
       kind: "invalid-argument",
     });
+    await expect(
+      api.playerMapRuns({ source: "jh", playerId: 501, checkpointId: "", fps: "125" }),
+    ).rejects.toMatchObject({ kind: "invalid-argument" });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 });
@@ -153,6 +159,7 @@ function responseFor(pathname: string): unknown {
   if (pathname.endsWith("/player/leaderboard-positions")) return playerPositionsFixture;
   if (pathname.endsWith("/player/jump-scores")) return playerJumpScoresFixture;
   if (pathname.endsWith("/player/tops")) return topRunsFixture;
+  if (pathname.endsWith("/player/map-runs")) return topRunsFixture;
   if (pathname.endsWith("/player/routes-completion")) return playerRoutesFixture;
   if (pathname.endsWith("/player/rank")) return playerRankFixture;
   if (pathname.endsWith("/player/activity-summary")) return playerActivityFixture;

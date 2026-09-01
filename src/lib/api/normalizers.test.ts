@@ -20,6 +20,7 @@ import {
   normalizeMaps,
   normalizePlayerActivity,
   normalizePlayerJumpScores,
+  normalizePlayerMapRuns,
   normalizePlayerPerformance,
   normalizePlayerPositions,
   normalizePlayerRank,
@@ -94,6 +95,11 @@ describe("API response normalizers", () => {
     });
   });
 
+  it("normalizes player map history and its documented empty sentinel", () => {
+    expect(normalizePlayerMapRuns(topRunsFixture, path)).toHaveLength(1);
+    expect(normalizePlayerMapRuns(null, path)).toEqual([]);
+  });
+
   it("normalizes performance and supplies safe defaults for optional data", () => {
     expect(normalizePlayerPerformance(playerPerformanceFixture, path)).toMatchObject({
       total_maps_completed: 18,
@@ -117,6 +123,25 @@ describe("API response normalizers", () => {
       nb_tops_per_fps: {},
       best_fps: null,
     });
+
+    expect(
+      normalizePlayerPerformance(
+        {
+          average_rank: 0,
+          best_fps: "",
+          best_rank: 0,
+          recent_tops: [],
+          total_maps_completed: 3,
+        },
+        path,
+      ),
+    ).toMatchObject({
+      average_rank: null,
+      best_fps: null,
+      best_rank: null,
+      recent_tops: [],
+      total_maps_completed: 3,
+    });
   });
 
   it("normalizes player positions and completed routes", () => {
@@ -130,6 +155,10 @@ describe("API response normalizers", () => {
       fps_list: ["125", "333"],
       total_finishes: 3,
     });
+  });
+
+  it("normalizes a successful null player position response as no placement", () => {
+    expect(normalizePlayerPositions(null, path)).toEqual([]);
   });
 
   it("normalizes player jump-skill map scores", () => {
@@ -147,6 +176,25 @@ describe("API response normalizers", () => {
         },
       ]),
     });
+
+    expect(
+      normalizePlayerJumpScores(
+        {
+          player_id: 143872,
+          player_name: "",
+          rank: 0,
+          rating: 0,
+          score: 0,
+          top_list: {},
+        },
+        path,
+      ),
+    ).toMatchObject({
+      map_scores: [],
+      player_id: 143872,
+      rank: 0,
+      score: 0,
+    });
   });
 
   it("normalizes J4L rank and activity summaries", () => {
@@ -157,6 +205,21 @@ describe("API response normalizers", () => {
     expect(normalizePlayerActivity(playerActivityFixture, path)).toMatchObject({
       runtime_ms: 480_000,
       distance_travelled: 98_765,
+    });
+  });
+
+  it("keeps J4L rank rows when optional country metadata is absent", () => {
+    const [rank] = rankLeaderboardFixture as Record<string, unknown>[];
+    const [normalized] = normalizeRankLeaderboard(
+      [{ ...rank, country: null, country_code: null, region: null }],
+      path,
+    );
+
+    expect(normalized).toMatchObject({ player_id: 501, level: 12, level_display: "12" });
+    expect(normalized).toMatchObject({
+      country: undefined,
+      country_code: undefined,
+      region: undefined,
     });
   });
 

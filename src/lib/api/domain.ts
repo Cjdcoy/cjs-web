@@ -163,9 +163,9 @@ export interface PlayerRankInfo {
   xp_for_level: number;
   xp_to_next: number;
   maxed: boolean;
-  country: string;
-  country_code: string;
-  region: string;
+  country?: string;
+  country_code?: string;
+  region?: string;
   last_seen: string;
 }
 

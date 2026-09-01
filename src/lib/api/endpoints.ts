@@ -33,6 +33,7 @@ import {
   normalizeMaps,
   normalizePlayerActivity,
   normalizePlayerJumpScores,
+  normalizePlayerMapRuns,
   normalizePlayerPerformance,
   normalizePlayerPositions,
   normalizePlayerRank,
@@ -53,6 +54,7 @@ const PATHS = {
   playerPositions: "/api/v1/player/leaderboard-positions",
   playerJumpScores: "/api/v1/player/jump-scores",
   playerTops: "/api/v1/player/tops",
+  playerMapRuns: "/api/v1/player/map-runs",
   playerRoutes: "/api/v1/player/routes-completion",
   playerRank: "/api/v1/player/rank",
   playerActivity: "/api/v1/player/activity-summary",
@@ -85,7 +87,7 @@ export interface CjsApi {
     options: RequestContext & {
       playerId: number;
       fps: Fps;
-      leaderboard: PlayerLeaderboard;
+      leaderboard?: PlayerLeaderboard;
     },
   ): Promise<PlayerLeaderboardPosition[]>;
   playerJumpScores(
@@ -93,6 +95,9 @@ export interface CjsApi {
   ): Promise<PlayerJumpScores>;
   playerTops(
     options: RequestContext & { playerId: number; fps: Fps; limit?: number },
+  ): Promise<TopRun[]>;
+  playerMapRuns(
+    options: RequestContext & { playerId: number; checkpointId: number | string; fps: Fps },
   ): Promise<TopRun[]>;
   playerRoutes(options: RequestContext & { playerId: number }): Promise<PlayerRouteCompletion[]>;
   playerRank(options: RequestContext & { playerId: number }): Promise<PlayerRankInfo>;
@@ -221,7 +226,7 @@ export function createCjsApi(client: JsonClient): CjsApi {
       const game = playerContext(options, PATHS.playerPositions);
       assertCapability("players", options.source, game);
       requireFps(options.fps, PATHS.playerPositions);
-      if (!isPlayerLeaderboard(options.leaderboard)) {
+      if (options.leaderboard !== undefined && !isPlayerLeaderboard(options.leaderboard)) {
         throw invalidArgument(PATHS.playerPositions, "leaderboard");
       }
       return normalizePlayerPositions(
@@ -262,6 +267,22 @@ export function createCjsApi(client: JsonClient): CjsApi {
           limit: options.limit,
         }),
         PATHS.playerTops,
+      );
+    },
+
+    async playerMapRuns(options) {
+      const game = playerContext(options, PATHS.playerMapRuns);
+      assertCapability("players", options.source, game);
+      requireFps(options.fps, PATHS.playerMapRuns);
+      requireCheckpointId(options.checkpointId, PATHS.playerMapRuns);
+      return normalizePlayerMapRuns(
+        await get(client, PATHS.playerMapRuns, options, {
+          source: options.source,
+          playerid: options.playerId,
+          cpid: options.checkpointId,
+          fps: options.fps,
+        }),
+        PATHS.playerMapRuns,
       );
     },
 
@@ -320,6 +341,12 @@ function playerContext(options: RequestContext & { playerId: number }, path: str
 
 function requireFps(value: unknown, path: string): asserts value is Fps {
   if (!isFps(value)) throw invalidArgument(path, "fps");
+}
+
+function requireCheckpointId(value: unknown, path: string): asserts value is number | string {
+  if ((typeof value !== "string" && typeof value !== "number") || String(value).trim() === "") {
+    throw invalidArgument(path, "checkpointId");
+  }
 }
 
 function limit(value: number | undefined, path: string): void {
