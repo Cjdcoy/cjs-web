@@ -42,8 +42,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    // CI already ran `npm run build` in the quality gate; dist/ is still there.
-    command: `${process.env.CI ? "" : "npm run build && "}npm run preview -- --host 127.0.0.1 --port 4173 --strictPort`,
+    // The build must run here: VITE_API_BASE_URL below is inlined at build
+    // time, and it is what points the app at the mocked /__api routes.
+    command: "npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
     env: {
       VITE_API_BASE_URL: `${baseURL}/__api`,
     },
