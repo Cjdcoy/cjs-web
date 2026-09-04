@@ -67,8 +67,10 @@ describe("PlayerDetailPage", () => {
     expect(apiClient.playerRank).toHaveBeenCalledOnce();
     expect(apiClient.playerActivitySummary).toHaveBeenCalledOnce();
     expect(await screen.findByRole("heading", { name: "Replay reach" })).toBeInTheDocument();
-    expect(apiClient.replayWatchAggregate).toHaveBeenCalledWith(
-      expect.objectContaining({ ownerPlayerId: 42, source: "j4l" }),
+    await waitFor(() =>
+      expect(apiClient.replayWatchAggregate).toHaveBeenCalledWith(
+        expect.objectContaining({ ownerPlayerId: 42, source: "j4l" }),
+      ),
     );
     expect(apiClient.replayWatchRankings).toHaveBeenCalledWith(
       expect.objectContaining({ ownerPlayerId: 42, metric: "watch_count", source: "j4l" }),

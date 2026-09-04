@@ -48,6 +48,12 @@ describe("theme", () => {
     expect(readStoredPreference()).toBe(DEFAULT_THEME_PREFERENCE);
   });
 
+  it("gives a first-time visitor Jade whichever source they land on", () => {
+    for (const source of ["jh", "j4l"]) {
+      expect(resolveTheme(readStoredPreference(), source)).toBe("jade");
+    }
+  });
+
   it("round-trips a stored preference and puts the theme on the document element", () => {
     storePreference("cobalt");
     expect(readStoredPreference()).toBe("cobalt");

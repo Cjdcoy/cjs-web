@@ -36,6 +36,12 @@ jobs:
       - name: Run quality gate
         run: npm run verify
 
+      - name: Cache Playwright browsers
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
       - name: Install browsers for compatibility tests
         run: npx playwright install --with-deps chromium firefox webkit
 

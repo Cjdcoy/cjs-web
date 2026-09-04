@@ -27,7 +27,7 @@ export const THEME_PREFERENCES = [{ id: "auto", label: "Match source" }, ...THEM
 
 export type ThemePreference = (typeof THEME_PREFERENCES)[number]["id"];
 
-export const DEFAULT_THEME_PREFERENCE: ThemePreference = "auto";
+export const DEFAULT_THEME_PREFERENCE: ThemePreference = "jade";
 
 const SOURCE_THEMES = { j4l: "jade", jh: "cobalt" } as const satisfies Record<string, ThemeId>;
 
