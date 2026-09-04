@@ -30,11 +30,32 @@ jobs:
           node-version: 26
           cache: npm
 
+      - name: Cache node_modules
+        id: node-modules
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+
       - name: Install dependencies
+        if: steps.node-modules.outputs.cache-hit != 'true'
         run: npm ci
 
       - name: Run quality gate
         run: npm run verify
+
+      - name: Validate Cloudflare package without deploying
+        run: npm run deploy:dry-run
+
+      # Hands the validated dist/ to the deploy workflow: the Actions policy only
+      # allows actions/cache, which saves the path when the job ends. Playwright
+      # builds into dist-e2e/, so dist/ is still the production bundle by then.
+      - name: Cache production build for deploy
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: dist
+          key: dist-${{ github.sha }}
 
       - name: Cache Playwright browsers
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -47,6 +68,3 @@ jobs:
 
       - name: Run critical browser flows
         run: npm run test:e2e
-
-      - name: Validate Cloudflare package without deploying
-        run: npm run deploy:dry-run

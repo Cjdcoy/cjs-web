@@ -8,7 +8,7 @@ import tseslint from "typescript-eslint";
 
 export default tseslint.config(
   {
-    ignores: ["coverage", "dist", "graphify-out", "playwright-report", "test-results"],
+    ignores: ["coverage", "dist", "dist-e2e", "graphify-out", "playwright-report", "test-results"],
   },
   js.configs.recommended,
   ...tseslint.configs.strict,

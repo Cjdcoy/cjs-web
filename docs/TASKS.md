@@ -2224,6 +2224,38 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   document" LCP check (the image list comes from the API), the Cloudflare-injected
   `cloudflareinsights` beacon blocked by CSP, and document TTFB at the edge.
 
+### CJS-064 — Cut CI and deploy time
+
+- **Status:** done
+- **Owner/handoff:** Claude (Fable supervisor, Opus worker) / pipeline speed
+- **Dependencies:** CJS-063
+- **Primary boundary:** `.github/workflows/*.yml`, `deploy:dry-run` script, Playwright web
+  server command, release runbook
+- **Goal:** merge-to-live took about 10 minutes (CI 6–10 min, deploy 3.5 min) for a static
+  site; bring it under 5.
+- **Acceptance:** no per-run download of Wrangler; `npm ci` skipped when the lockfile is
+  unchanged; the deploy job ships the `dist/` CI validated instead of rebuilding; the
+  Cloudflare dry run validates the production bundle, not the Playwright mock build.
+- **Validation:** GitHub Actions step timings and job logs of the last four runs; local
+  `npm run deploy:dry-run`; `npm run verify`; first run of the new workflows.
+- **Outcome:** `wrangler@4.114.0` is an exact devDependency and the dry run uses it (the old
+  `npx --yes wrangler@…` downloaded Wrangler and workerd on every cold run: 88 s to 5 min).
+  CI caches `node_modules` by lockfile hash and skips `npm ci` on a hit (`npm ci` took
+  54 s to 5 min even with a warm npm tarball cache). The dry run now runs right after
+  `npm run verify`, before Playwright rebuilds `dist/` against the mocked API, and on `main`
+  CI saves that `dist/` to the Actions cache keyed by commit (the repository's Actions
+  policy allows `actions/cache` but not the artifact actions). The deploy job restores it
+  by the triggering commit and no longer runs `npm ci`, a rebuild, or a second dry run; a
+  manual dispatch still rebuilds. The Wrangler version the deploy action installs is read
+  from `package.json`. The deploy job also restores the same `node_modules` cache so the
+  Wrangler action finds the pinned binary and skips its own `npm i wrangler` (measured at
+  33 s to 5 min 10 s). Playwright's web server runs `vite build` only, into `dist-e2e/`, so `dist/` stays the
+  production bundle for the whole CI job.
+- **Validation result:** workflows parse; `npm run deploy:dry-run` passes locally with the
+  local binary; `npm run verify` passes 41 files / 259 tests, budgets, and artifact checks.
+  Expected steady-state: CI about 3.5 min, deploy about 1 min. Remaining floor: Playwright
+  `install --with-deps` (about 55 s of apt) and the three-browser e2e run.
+
 ## Agent handoff template
 
 ```md

@@ -43,8 +43,12 @@ export default defineConfig({
   ],
   webServer: {
     // The build must run here: VITE_API_BASE_URL below is inlined at build
-    // time, and it is what points the app at the mocked /__api routes.
-    command: "npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
+    // time, and it is what points the app at the mocked /__api routes. It goes
+    // to dist-e2e/ so dist/ stays the production bundle CI hands to the deploy,
+    // and only the bundle is built; typecheck and the budget/artifact checks
+    // belong to `npm run verify`.
+    command:
+      "npx vite build --outDir dist-e2e && npm run preview -- --outDir dist-e2e --host 127.0.0.1 --port 4173 --strictPort",
     env: {
       VITE_API_BASE_URL: `${baseURL}/__api`,
     },
