@@ -40,7 +40,7 @@ describe("AppShell", () => {
     expect(screen.getByRole("navigation", { name: "Primary navigation" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Maps" })).toHaveAttribute("aria-current", "page");
     expect(screen.getByText("An independent interface for public jump statistics.")).toBeVisible();
-    expect(container.querySelectorAll('img[src="/cjs-logo.png"]')).toHaveLength(2);
+    expect(container.querySelectorAll('img[src="/cjs-logo-96.avif"]')).toHaveLength(2);
     expect(screen.queryByRole("radiogroup", { name: "Data source" })).not.toBeInTheDocument();
   });
 

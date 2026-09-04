@@ -2,6 +2,19 @@
 /assets/*
   Cache-Control: public, max-age=31536000, immutable
 
+# Stable-name image assets are replaced by name, so a week of caching is safe.
+/maps/thumbs/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/maps/cards/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/ranks/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+/country-flags/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
 # HTML, metadata, and stable-name assets revalidate while sharing one security policy.
 /*
   Content-Security-Policy: default-src 'self'; base-uri 'none'; connect-src 'self' https:; font-src 'self'; form-action 'self'; frame-ancestors 'none'; frame-src https://www.youtube-nocookie.com; img-src 'self' data: https://i.ytimg.com; object-src 'none'; script-src 'self' https://www.youtube.com; style-src 'self' 'unsafe-inline'; upgrade-insecure-requests

@@ -14,6 +14,7 @@ export interface MapCardProps {
   fps: Fps;
   favorite: boolean;
   onToggleFavorite: () => void;
+  priority?: boolean;
 }
 
 const numberFormatter = new Intl.NumberFormat("en");
@@ -24,7 +25,14 @@ const dateFormatter = new Intl.DateTimeFormat("en", {
   year: "numeric",
 });
 
-export function MapCard({ favorite, fps, item, onToggleFavorite, source }: MapCardProps) {
+export function MapCard({
+  favorite,
+  fps,
+  item,
+  onToggleFavorite,
+  priority = false,
+  source,
+}: MapCardProps) {
   const { map } = item;
   const imageSources = getMapImageSources(map.mapname);
   const routeName = map.ender === null || map.ender === undefined ? "" : String(map.ender).trim();
@@ -52,7 +60,8 @@ export function MapCard({ favorite, fps, item, onToggleFavorite, source }: MapCa
             srcSet={imageSources.srcSet}
             sizes="(max-width: 48rem) 100vw, 18rem"
             alt=""
-            loading="lazy"
+            loading={priority ? "eager" : "lazy"}
+            fetchPriority={priority ? "high" : undefined}
             decoding="async"
             onError={() => setFailedImagePath(imageSources.card)}
           />

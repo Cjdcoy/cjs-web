@@ -45,10 +45,10 @@ export function AboutPage() {
           </div>
 
           <img
-            src="/cjs-logo.png"
+            src="/cjs-logo-576.avif"
             alt="CJS mascot holding a faceted gold star above the CJS initials"
-            width="1254"
-            height="1254"
+            width="576"
+            height="576"
             decoding="async"
           />
 

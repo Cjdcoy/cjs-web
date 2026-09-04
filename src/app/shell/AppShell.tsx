@@ -84,7 +84,7 @@ export function AppShell({ children, route }: { children: ReactNode; route: Rout
       <header className="cjs-site-header">
         <div className="cjs-site-header__inner cjs-page">
           <a className="cjs-brand" href="/">
-            <img src="/cjs-logo.png" alt="" width="48" height="48" />
+            <img src="/cjs-logo-96.avif" alt="" width="48" height="48" />
             <span>
               <strong>CodJumper</strong>
               <small>Stats</small>
@@ -143,7 +143,7 @@ export function AppShell({ children, route }: { children: ReactNode; route: Rout
       <footer className="cjs-site-footer">
         <div className="cjs-site-footer__inner cjs-page">
           <div className="cjs-site-footer__identity">
-            <img src="/cjs-logo.png" alt="" width="40" height="40" />
+            <img src="/cjs-logo-96.avif" alt="" width="40" height="40" />
             <p>
               <strong>CodJumper Stats</strong>
               <span>An independent interface for public jump statistics.</span>
