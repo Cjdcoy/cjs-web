@@ -305,13 +305,18 @@
   background: var(--cjs-color-accent-surface);
 }
 
+/* Dimmed with a token rather than opacity: opacity composites the text down
+   to 3.09:1 against the panel, below the WCAG AA 4.5:1 minimum. */
 .cjs-map-card__difficulty-list li[data-unrated] {
   background: none;
-  opacity: 0.55;
+}
+
+.cjs-map-card__difficulty-list li[data-unrated] span,
+.cjs-map-card__difficulty-list li[data-unrated] strong {
+  color: var(--cjs-color-text-subtle);
 }
 
 .cjs-map-card__difficulty-list li[data-unrated] strong {
-  color: var(--cjs-color-text-muted);
   font-weight: var(--cjs-font-weight-regular);
 }
 

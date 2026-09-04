@@ -34,7 +34,7 @@ test("critical pages reflow without horizontal page overflow at 320px", async ({
   const routes = [
     { path: "/", heading: "Live servers" },
     { path: "/leaderboards", heading: "Leaderboards" },
-    { path: "/maps", heading: "Find your next route" },
+    { path: "/maps", heading: "Browse maps" },
     { path: "/maps/101", heading: "mp_cjs_training" },
     { path: "/players?q=Runner", heading: "Find a player" },
     { path: "/players/501", heading: "Runner" },
@@ -75,7 +75,7 @@ test("mobile navigation and visible leaderboard sorting work with the keyboard",
   await expect(mobileNavigation).toBeVisible();
   await mobileNavigation.getByRole("link", { name: "Maps" }).focus();
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("heading", { name: "Find your next route" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Browse maps" })).toBeVisible();
   await expect(page.getByRole("main")).toBeFocused();
   await expect(page.getByText("Maps page loaded.")).toBeAttached();
 });

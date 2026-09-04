@@ -12,7 +12,7 @@ test("live servers and leaderboards render stable public data", async ({ page })
   ).toBeVisible();
   await expect(
     page.getByLabel(/JumpersHeaven:/).getByRole("link", { name: "mp_cjs_training" }),
-  ).toHaveAttribute("href", "/maps/101?source=jh");
+  ).toHaveAttribute("href", "/maps/101?source=jh&lookup=cpid");
   await page.getByRole("checkbox", { name: "Auto-refresh" }).uncheck();
 
   await page.goto("/leaderboards");
@@ -110,7 +110,7 @@ test("direct nested routes survive refresh and critical views pass WCAG axe rule
   const routes = [
     { path: "/", heading: "Live servers" },
     { path: "/leaderboards", heading: "Leaderboards" },
-    { path: "/maps", heading: "Find your next route" },
+    { path: "/maps", heading: "Browse maps" },
     { path: "/maps/101", heading: "mp_cjs_training" },
     { path: "/players?q=Runner", heading: "Find a player" },
     { path: "/players/501", heading: "Runner" },
