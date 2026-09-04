@@ -5,8 +5,9 @@
   "workers_dev": false,
   "preview_urls": false,
   "keep_vars": true,
-  // The Worker is the origin for this hostname, so Wrangler manages its DNS.
-  "routes": [{ "pattern": "stats.jump4life.org", "custom_domain": true }],
+  // stats.jump4life.org is attached to this Worker as a custom domain out of
+  // band. Keeping it out of here means CI's token needs Workers Scripts: Edit
+  // and nothing else -- no DNS or Workers Routes permission on the zone.
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application",
