@@ -25,7 +25,7 @@ import {
 } from "./mapDiscovery";
 import "./maps.css";
 
-const PAGE_SIZE = 96;
+const PAGE_SIZE = 24;
 
 export function MapsPage() {
   const { source, setSource } = useSourceContext();
@@ -311,9 +311,10 @@ export function MapsPage() {
           aria-label="Map results"
           aria-busy={loading || undefined}
         >
-          {visibleMaps.map((item) => (
+          {visibleMaps.map((item, index) => (
             <MapCard
               key={`${item.map.mapid}:${item.map.cp_id}`}
+              priority={index < 4}
               item={item}
               source={source}
               fps={filters.fps}

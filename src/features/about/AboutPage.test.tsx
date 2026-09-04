@@ -18,7 +18,7 @@ describe("AboutPage", () => {
       screen.getByRole("img", {
         name: "CJS mascot holding a faceted gold star above the CJS initials",
       }),
-    ).toHaveAttribute("src", "/cjs-logo.png");
+    ).toHaveAttribute("src", "/cjs-logo-576.avif");
   });
 
   it("links safely to the public project, API, and source communities", () => {

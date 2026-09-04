@@ -2193,6 +2193,37 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   matching computed eyebrow/title/description styles across all six pages, source-first
   controls on all three discovery views, and no horizontal overflow.
 
+### CJS-063 — Fix PageSpeed regressions on maps and leaderboards
+
+- **Status:** done
+- **Owner/handoff:** Claude (Fable supervisor, Opus workers) / performance pass
+- **Dependencies:** CJS-062
+- **Primary boundary:** shared shell logo assets, `index.html`, static-asset cache
+  headers, page-container sizing, and map-card image loading
+- **Goal:** clear the PageSpeed desktop findings for `/maps` (LCP 3.7 s, TBT 380 ms) and
+  `/leaderboards` (LCP 2.0 s, CLS 0.095), both reporting "Improve image delivery —
+  1,982 KiB".
+- **Acceptance:** no multi-megabyte image on any page; the first map-card images are
+  discoverable at high priority; the footer does not shift while a page loads; static
+  images are cacheable; `npm run verify` passes.
+- **Validation:** Chrome performance traces of production before and of `vite preview`
+  after; focused component tests; `npm run verify`.
+- **Outcome:** the 2.0 MB 1254×1254 `cjs-logo.png` (rendered at 48 px in the header on
+  every page) is replaced by `cjs-logo-96.avif` (5 KB) for the shell and
+  `cjs-logo-576.avif` (70 KB) for About. `index.html` preconnects to
+  `https://api.jump4life.org`. `_headers` and `nginx.conf` cache `/maps/thumbs/*`,
+  `/maps/cards/*`, `/ranks/*`, and `/country-flags/*` for a week. `.cjs-page-container`
+  now has `min-height: 100vh` so the footer starts below the fold during loading. The
+  maps grid renders 24 cards per page instead of 96 (infinite scroll unchanged) and the
+  first four cards load eagerly with `fetchpriority="high"`.
+- **Validation result:** trace of the built site shows the LCP map thumbnail requested at
+  High priority with eager loading and CLS 0.00 (production trace before: Low priority,
+  lazy, CLS 0.05 from the footer). `npm run verify` passes formatting, lint, 41 files /
+  259 tests with coverage, strict TypeScript, Vite, performance budgets, and
+  release-artifact checks. Not fixable in this repository: the "discoverable in initial
+  document" LCP check (the image list comes from the API), the Cloudflare-injected
+  `cloudflareinsights` beacon blocked by CSP, and document TTFB at the edge.
+
 ## Agent handoff template
 
 ```md

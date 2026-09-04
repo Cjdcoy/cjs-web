@@ -115,7 +115,8 @@ describe("MapsPage", () => {
     );
     if (mapImage === null) throw new Error("Expected the map card image to render.");
     expect(mapImage).toBeInTheDocument();
-    expect(mapImage).toHaveAttribute("loading", "lazy");
+    expect(mapImage).toHaveAttribute("loading", "eager");
+    expect(mapImage).toHaveAttribute("fetchpriority", "high");
     expect(mapImage).toHaveAttribute("decoding", "async");
     expect(mapImage).toHaveAttribute(
       "srcset",
@@ -259,7 +260,7 @@ describe("MapsPage", () => {
   });
 
   it("loads the next map batch automatically without numbered pagination", async () => {
-    vi.spyOn(api, "maps").mockResolvedValue(createMapResponse(110));
+    vi.spyOn(api, "maps").mockResolvedValue(createMapResponse(30));
     const user = userEvent.setup();
     let intersectionCallback: IntersectionObserverCallback | undefined;
     const observe = vi.fn();
@@ -285,12 +286,15 @@ describe("MapsPage", () => {
 
     await screen.findByRole("link", { name: "map_001" });
     await waitFor(() => expect(observe).toHaveBeenCalledOnce());
-    expect(container.querySelectorAll(".cjs-map-card")).toHaveLength(96);
+    expect(container.querySelectorAll(".cjs-map-card")).toHaveLength(24);
     expect(screen.queryByRole("navigation", { name: "Map results pages" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Load more maps" })).toBeVisible();
     expect(screen.getByRole("status", { name: "Map result count" })).toHaveTextContent(
-      "Showing 1–96 of 110 matching maps",
+      "Showing 1–24 of 30 matching maps",
     );
+    const cardImages = container.querySelectorAll(".cjs-map-card__image");
+    expect(cardImages[0]).toHaveAttribute("loading", "eager");
+    expect(cardImages[4]).toHaveAttribute("loading", "lazy");
 
     if (intersectionCallback === undefined) {
       throw new Error("Expected the infinite-scroll observer to be registered.");
@@ -302,12 +306,12 @@ describe("MapsPage", () => {
       );
     });
 
-    await waitFor(() => expect(container.querySelectorAll(".cjs-map-card")).toHaveLength(110));
+    await waitFor(() => expect(container.querySelectorAll(".cjs-map-card")).toHaveLength(30));
     expect(unobserve).toHaveBeenCalledOnce();
     expect(window.location.search).toContain("page=2");
     expect(screen.queryByRole("button", { name: "Load more maps" })).not.toBeInTheDocument();
     expect(screen.getByRole("status", { name: "Map result count" })).toHaveTextContent(
-      "Showing 1–110 of 110 matching maps",
+      "Showing 1–30 of 30 matching maps",
     );
 
     await user.type(screen.getByRole("textbox", { name: "Search maps" }), "map_001");
@@ -318,28 +322,28 @@ describe("MapsPage", () => {
   });
 
   it("restores cumulative map depth from a shared URL", async () => {
-    vi.spyOn(api, "maps").mockResolvedValue(createMapResponse(110));
+    vi.spyOn(api, "maps").mockResolvedValue(createMapResponse(30));
     window.history.replaceState(null, "", "/maps?page=2");
     const { container } = renderMapsPage();
 
-    await screen.findByRole("link", { name: "map_110" });
-    expect(container.querySelectorAll(".cjs-map-card")).toHaveLength(110);
+    await screen.findByRole("link", { name: "map_030" });
+    expect(container.querySelectorAll(".cjs-map-card")).toHaveLength(30);
     expect(screen.getByRole("status", { name: "Map result count" })).toHaveTextContent(
-      "Showing 1–110 of 110 matching maps",
+      "Showing 1–30 of 30 matching maps",
     );
   });
 
   it("offers a load-more fallback when automatic observation is unavailable", async () => {
-    vi.spyOn(api, "maps").mockResolvedValue(createMapResponse(110));
+    vi.spyOn(api, "maps").mockResolvedValue(createMapResponse(30));
     const user = userEvent.setup();
     const { container } = renderMapsPage();
 
     await screen.findByRole("link", { name: "map_001" });
-    expect(container.querySelectorAll(".cjs-map-card")).toHaveLength(96);
+    expect(container.querySelectorAll(".cjs-map-card")).toHaveLength(24);
 
     await user.click(screen.getByRole("button", { name: "Load more maps" }));
 
-    await waitFor(() => expect(container.querySelectorAll(".cjs-map-card")).toHaveLength(110));
+    await waitFor(() => expect(container.querySelectorAll(".cjs-map-card")).toHaveLength(30));
     expect(window.location.search).toContain("page=2");
   });
 
