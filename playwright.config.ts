@@ -9,7 +9,7 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: process.env.CI ? 1 : 0,
-  workers: process.env.CI ? 1 : undefined,
+  workers: process.env.CI ? 4 : undefined,
   reporter: process.env.CI
     ? [["github"], ["html", { open: "never", outputFolder: "playwright-report" }]]
     : [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
@@ -42,6 +42,8 @@ export default defineConfig({
     },
   ],
   webServer: {
+    // The build must run here: VITE_API_BASE_URL below is inlined at build
+    // time, and it is what points the app at the mocked /__api routes.
     command: "npm run build && npm run preview -- --host 127.0.0.1 --port 4173 --strictPort",
     env: {
       VITE_API_BASE_URL: `${baseURL}/__api`,

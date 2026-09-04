@@ -3,20 +3,16 @@ import {
   ArrowLeft,
   BarChart3,
   CalendarClock,
-  CheckCircle2,
-  Circle,
   Clock3,
-  Footprints,
   Gauge,
   Heart,
-  MapPinned,
   Medal,
   RefreshCw,
   Route,
   Search,
   Trophy,
 } from "lucide-react";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Page } from "../../components";
 import {
   Badge,
@@ -30,6 +26,7 @@ import {
   Input,
   Link,
   Panel,
+  RankEmblem,
   SegmentedControl,
   SkeletonGroup,
   type DataTableColumn,
@@ -75,8 +72,12 @@ import {
 import { usePlayerProfile, type PlayerProfileApi, type ProfileResource } from "./usePlayerProfile";
 import { useFavoritePlayers } from "./useFavoritePlayers";
 import { PlayerRunProgression } from "./PlayerRunProgression";
-import { ReplayAnalyticsPanel } from "../replay";
 import "./playerProfile.css";
+
+const ReplayAnalyticsPanel = lazy(async () => {
+  const feature = await import("../replay");
+  return { default: feature.ReplayAnalyticsPanel };
+});
 
 export interface PlayerDetailPageProps {
   apiClient?: PlayerProfileApi;
@@ -176,45 +177,70 @@ function PlayerProfile({
         <BackToPlayers />
 
         <header className="cjs-player-profile__hero">
-          <div className="cjs-player-profile__identity">
-            <CountryFlag
-              className="cjs-player-profile__avatar"
-              code={identity.countryCode}
-              label={identity.country || identity.region || "Country not provided"}
-              size="large"
-            />
-            <div>
-              <p className="cjs-player-profile__eyebrow">
-                Player #{playerId} · {playerSourceLabel(source)}
-              </p>
-              <h1 id="player-profile-title">
-                <CodPlayerName value={identity.name} />
-              </h1>
-              <p className="cjs-player-profile__meta">
-                <span className="cjs-player-profile__country">
-                  {identity.country || identity.region || "Country not provided"}
-                </span>
-                <span className="cjs-player-profile__meta-separator" aria-hidden="true">
-                  ·
-                </span>
-                <span title={identity.lastSeen ? formatDate(identity.lastSeen) : undefined}>
-                  {identity.lastSeen
-                    ? `Last seen ${timeAgo(identity.lastSeen)}`
-                    : "Last seen unknown"}
-                </span>
-              </p>
-              <ProfileAccountDetails performance={resources.performance.data} />
+          <div className="cjs-player-profile__hero-top">
+            <div className="cjs-player-profile__identity">
+              <CountryFlag
+                className="cjs-player-profile__avatar"
+                code={identity.countryCode}
+                label={identity.country || identity.region || "Country not provided"}
+                size="large"
+              />
+              <div>
+                <p className="cjs-player-profile__eyebrow">
+                  Player #{playerId} · {playerSourceLabel(source)}
+                </p>
+                <h1 id="player-profile-title">
+                  <CodPlayerName value={identity.name} />
+                </h1>
+                <p className="cjs-player-profile__meta">
+                  <span className="cjs-player-profile__country">
+                    {identity.country || identity.region || "Country not provided"}
+                  </span>
+                  <span className="cjs-player-profile__meta-separator" aria-hidden="true">
+                    ·
+                  </span>
+                  <span title={identity.lastSeen ? formatDate(identity.lastSeen) : undefined}>
+                    {identity.lastSeen
+                      ? `Last seen ${timeAgo(identity.lastSeen)}`
+                      : "Last seen unknown"}
+                  </span>
+                </p>
+                <ProfileAccountDetails performance={resources.performance.data} />
+              </div>
+            </div>
+            <div className="cjs-player-profile__hero-actions">
+              <Link
+                className="cjs-player-profile__cross-source"
+                href={`/players?source=${source === "jh" ? "j4l" : "jh"}`}
+                variant="standalone"
+              >
+                Find this player in {playerSourceLabel(source === "jh" ? "j4l" : "jh")}
+              </Link>
+              <IconButton
+                label={isSettling ? "Refreshing profile" : "Refresh profile"}
+                isLoading={isSettling}
+                onClick={resources.reload}
+                variant="ghost"
+              >
+                <RefreshCw aria-hidden="true" size={17} />
+              </IconButton>
+              <IconButton
+                className="cjs-player-profile__favorite"
+                label={`${isFavorite ? "Remove" : "Add"} ${identity.name} ${isFavorite ? "from" : "to"} favorites`}
+                aria-pressed={isFavorite}
+                onClick={() => toggleFavorite(favoritePlayer)}
+                variant={isFavorite ? "ghost" : "secondary"}
+              >
+                <Heart aria-hidden="true" fill={isFavorite ? "currentColor" : "none"} size={19} />
+              </IconButton>
             </div>
           </div>
-          <IconButton
-            className="cjs-player-profile__favorite"
-            label={`${isFavorite ? "Remove" : "Add"} ${identity.name} ${isFavorite ? "from" : "to"} favorites`}
-            aria-pressed={isFavorite}
-            onClick={() => toggleFavorite(favoritePlayer)}
-            variant={isFavorite ? "ghost" : "secondary"}
-          >
-            <Heart aria-hidden="true" fill={isFavorite ? "currentColor" : "none"} size={19} />
-          </IconButton>
+          <HeroStats
+            performance={resources.performance}
+            positions={resources.positions}
+            rank={resources.rank}
+            source={source}
+          />
         </header>
 
         <ProfileNavigation
@@ -224,26 +250,6 @@ function PlayerProfile({
           source={source}
           view={queryState.view}
         />
-
-        <div className="cjs-player-profile__source-note">
-          <span>
-            <strong>{playerSourceLabel(source)} profile.</strong> Player #{playerId} belongs to this
-            source only.
-          </span>
-          <div className="cjs-player-profile__source-actions">
-            <Link href={`/players?source=${source === "jh" ? "j4l" : "jh"}`} variant="muted">
-              Find this player in {playerSourceLabel(source === "jh" ? "j4l" : "jh")}
-            </Link>
-            <IconButton
-              label={isSettling ? "Refreshing profile" : "Refresh profile"}
-              isLoading={isSettling}
-              onClick={resources.reload}
-              variant="ghost"
-            >
-              <RefreshCw aria-hidden="true" size={17} />
-            </IconButton>
-          </div>
-        </div>
 
         {queryState.view === "runs" && (
           <Panel
@@ -295,48 +301,44 @@ function PlayerProfile({
             {queryState.view === "overview" && (
               <>
                 <div className="cjs-player-profile__overview-grid">
-                  {source === "j4l" && (
-                    <ActivitySection resource={resources.activity} onRetry={resources.reload} />
-                  )}
                   <div className="cjs-player-profile__overview-column cjs-player-profile__overview-column--summary">
-                    <PerformanceSection
+                    <PositionSection
+                      fps={queryState.fps}
+                      onFpsChange={(fps) => setQueryState({ fps })}
+                      resource={resources.positions}
+                      source={source}
+                      onRetry={resources.reload}
+                    />
+                    <RecordsSection
+                      href={profileViewHref(playerId, source, "runs", queryState.fps, 0)}
                       resource={resources.performance}
                       onRetry={resources.reload}
                     />
-                    {source === "j4l" ? (
-                      <RankSection resource={resources.rank} onRetry={resources.reload} />
-                    ) : (
-                      <aside className="cjs-player-profile__capability" role="note">
-                        <Badge tone="information">Source-specific data</Badge>
-                        <div>
-                          <h2>JumpersHeaven profile</h2>
-                          <p>
-                            JumpersHeaven publishes performance, placements, and recent records. XP
-                            rank, cumulative activity, and replay reach are Jump4Life-only and are
-                            not requested for this profile.
-                          </p>
+                    <Suspense
+                      fallback={
+                        <div className="cjs-player-profile__replay-loading" aria-hidden="true">
+                          <SkeletonGroup />
                         </div>
-                      </aside>
-                    )}
+                      }
+                    >
+                      <ReplayAnalyticsPanel
+                        apiClient={apiClient}
+                        scope={{ ownerPlayerId: playerId }}
+                        source={source}
+                      />
+                    </Suspense>
                   </div>
                   <div className="cjs-player-profile__overview-column cjs-player-profile__overview-column--recent">
+                    {source === "j4l" && (
+                      <ActivitySection resource={resources.activity} onRetry={resources.reload} />
+                    )}
                     <RecentActivitySection
                       performance={resources.performance}
                       source={source}
                       onRetry={resources.reload}
                     />
                   </div>
-                  <PositionSection
-                    fps={queryState.fps}
-                    resource={resources.positions}
-                    onRetry={resources.reload}
-                  />
                 </div>
-                <ReplayAnalyticsPanel
-                  apiClient={apiClient}
-                  scope={{ ownerPlayerId: playerId }}
-                  source={source}
-                />
               </>
             )}
             {queryState.view === "runs" && (
@@ -487,36 +489,16 @@ function RecentActivitySection({
   return (
     <ProfileSection
       className="cjs-player-profile__section--recent"
-      description={
-        source === "j4l"
-          ? "Recent records and last-seen signals; full tracking totals appear below."
-          : "Recent records and last-seen signals published by JumpersHeaven."
-      }
+      description="Newest standing records first; some may be years old."
       icon={<CalendarClock size={19} />}
       id="player-recent-activity"
-      title="Recent activity"
+      title="Last records"
     >
-      <ResourceState resource={performance} label="recent activity" onRetry={onRetry}>
+      <ResourceState resource={performance} label="last records" onRetry={onRetry}>
         {(data) => (
           <div className="cjs-player-profile__recent">
-            <dl className="cjs-player-profile__stat-grid">
-              <ProfileStat
-                label="Last seen"
-                value={
-                  data.days_since_last_seen === null
-                    ? "Not available"
-                    : data.days_since_last_seen === 0
-                      ? "Today"
-                      : `${data.days_since_last_seen}d ago`
-                }
-              />
-              <ProfileStat
-                label="Recent records"
-                value={formatProfileNumber(data.recent_tops.length)}
-              />
-            </dl>
             <div
-              aria-label={`${formatProfileNumber(data.recent_tops.length)} recent records`}
+              aria-label={`${formatProfileNumber(data.recent_tops.length)} last records`}
               className="cjs-player-profile__recent-scroll"
               role="region"
             >
@@ -603,131 +585,234 @@ function profileViewHref(
   return `/players/${playerId}?${search.toString()}`;
 }
 
-function PerformanceSection({
+function HeroStats({
+  performance,
+  positions,
+  rank,
+  source,
+}: {
+  performance: ProfileResource<PlayerPerformanceStats>;
+  positions: ProfileResource<PlayerLeaderboardPosition[]>;
+  rank: ProfileResource<PlayerRankInfo>;
+  source: Source;
+}) {
+  const stats = performance.data;
+
+  if (!stats) {
+    if (performance.status !== "loading") return null;
+    return (
+      <div className="cjs-player-profile__hero-stats" aria-hidden="true">
+        <SkeletonGroup count={1} />
+      </div>
+    );
+  }
+
+  const best = positions.data?.reduce<PlayerLeaderboardPosition | null>(
+    (current, position) => (current === null || position.rank < current.rank ? position : current),
+    null,
+  );
+  const records = FPS_VALUES.reduce((total, fps) => total + (stats.nb_tops_per_fps[fps] ?? 0), 0);
+  const rankInfo = source === "j4l" ? rank.data : null;
+  const rankProgress = rankInfo
+    ? rankInfo.maxed || rankInfo.xp_for_level <= 0
+      ? 100
+      : Math.min(100, Math.max(0, (rankInfo.xp_into_level / rankInfo.xp_for_level) * 100))
+    : 0;
+
+  return (
+    <dl className="cjs-player-profile__hero-stats" aria-label="Player highlights">
+      <HeroStat
+        detail={`${formatProfileNumber(stats.total_maps_completed)} routes completed`}
+        label="Route completion"
+        progress={stats.maps_completed_ratio * 100}
+        value={formatProfilePercent(stats.maps_completed_ratio)}
+      />
+      <HeroStat
+        detail={`Top-10 placements ${formatProfileNumber(stats.top10_count)} · #1 placements ${formatProfileNumber(stats.top1_count)}`}
+        label="Best board"
+        value={
+          best ? (
+            <>
+              <RunRank rank={best.rank} />{" "}
+              <span className="cjs-player-profile__hero-board">
+                {playerBoardLabel(best.leaderboard_type)}
+              </span>
+            </>
+          ) : stats.best_rank === null ? (
+            "Not ranked yet"
+          ) : (
+            `#${formatProfileNumber(stats.best_rank)}`
+          )
+        }
+      />
+      <HeroStat
+        detail={
+          stats.best_fps && stats.average_rank !== null
+            ? `Best at ${fpsLabel(stats.best_fps)} · avg placement ${formatProfileDecimal(stats.average_rank)}`
+            : "No ranked records yet"
+        }
+        label="Records"
+        value={formatProfileNumber(records)}
+      />
+      {rankInfo && (
+        <HeroStat
+          emblem={
+            <RankEmblem
+              level={rankInfo.level}
+              prestige={rankInfo.prestige}
+              size="large"
+              label={`${rankInfo.title || "Rank"}, level ${rankInfo.level_display || rankInfo.level}`}
+            />
+          }
+          detail={`${rankInfo.title || "No title"} · ${
+            rankInfo.maxed
+              ? "Maximum level"
+              : `${formatProfileNumber(rankInfo.xp_to_next)} XP to next`
+          }`}
+          label="Jump4Life rank"
+          progress={rankProgress}
+          tone="secondary"
+          value={
+            <>
+              {rankInfo.prestige > 0 && (
+                <small>Prestige {formatProfileNumber(rankInfo.prestige)} </small>
+              )}
+              Lv {rankInfo.level_display || rankInfo.level}
+            </>
+          }
+        />
+      )}
+    </dl>
+  );
+}
+
+function HeroStat({
+  detail,
+  emblem,
+  label,
+  progress,
+  tone,
+  value,
+}: {
+  detail: string;
+  emblem?: ReactNode;
+  label: string;
+  progress?: number;
+  tone?: "secondary";
+  value: ReactNode;
+}) {
+  return (
+    <div className="cjs-player-profile__hero-stat" data-tone={tone}>
+      <dt>{label}</dt>
+      <dd>
+        <span className="cjs-player-profile__hero-value">
+          {emblem}
+          <strong>{value}</strong>
+        </span>
+        <span className="cjs-player-profile__hero-detail">{detail}</span>
+        {progress !== undefined && <Meter value={progress} />}
+      </dd>
+    </div>
+  );
+}
+
+function Meter({ value }: { value: number }) {
+  return (
+    <span className="cjs-player-profile__meter" aria-hidden="true">
+      <span style={{ width: `${Math.min(100, Math.max(0, value))}%` }} />
+    </span>
+  );
+}
+
+function RecordsSection({
+  href,
   onRetry,
   resource,
 }: {
+  href: string;
   onRetry: () => void;
   resource: ProfileResource<PlayerPerformanceStats>;
 }) {
   return (
     <ProfileSection
-      className="cjs-player-profile__section--performance"
-      description="Route completion, record FPS distribution, and placements across published leaderboard and FPS combinations."
+      actions={
+        <Link href={href} variant="standalone">
+          All best runs
+        </Link>
+      }
+      className="cjs-player-profile__section--records"
+      description="Standing records this player holds at each frame rate."
       icon={<BarChart3 size={19} />}
-      id="player-performance"
-      title="Performance"
+      id="player-records"
+      title="Records by FPS"
     >
-      <ResourceState resource={resource} label="performance statistics" onRetry={onRetry}>
-        {(performance) => (
-          <>
-            <dl className="cjs-player-profile__stat-grid" aria-label="Performance summary">
-              <ProfileStat
-                label="Route completion"
-                value={`${formatProfileNumber(performance.total_maps_completed)} completed · ${formatProfilePercent(performance.maps_completed_ratio)}`}
-              />
-              <ProfileStat
-                label="Best leaderboard placement"
-                value={
-                  performance.best_rank === null
-                    ? "Not ranked yet"
-                    : `#${formatProfileNumber(performance.best_rank)}`
-                }
-              />
-              <ProfileStat
-                label="Top-10 leaderboard placements"
-                value={formatProfileNumber(performance.top10_count)}
-              />
-              <ProfileStat
-                label="#1 leaderboard placements"
-                value={formatProfileNumber(performance.top1_count)}
-              />
-              <ProfileStat
-                label="Average leaderboard placement"
-                value={
-                  performance.average_rank === null
-                    ? "Not ranked yet"
-                    : formatProfileDecimal(performance.average_rank)
-                }
-              />
-              <ProfileStat
-                label="Best record FPS"
-                value={performance.best_fps ? fpsLabel(performance.best_fps) : "Not ranked yet"}
-              />
+      <ResourceState resource={resource} label="records by FPS" onRetry={onRetry}>
+        {(performance) => {
+          const counts = performance.nb_tops_per_fps;
+          const max = Math.max(0, ...FPS_VALUES.map((fps) => counts[fps] ?? 0));
+          return (
+            <dl className="cjs-player-profile__fps-bars" aria-label="Record counts by FPS">
+              {FPS_VALUES.map((fps) => {
+                const count = counts[fps] ?? 0;
+                return (
+                  <div key={fps}>
+                    <dt>{fps === "0" ? "Mix" : fps}</dt>
+                    <dd>
+                      <Meter value={max > 0 ? (count / max) * 100 : 0} />
+                      <strong>{formatProfileNumber(count)}</strong>
+                    </dd>
+                  </div>
+                );
+              })}
             </dl>
-            <FpsRecordDistribution counts={performance.nb_tops_per_fps} />
-          </>
-        )}
+          );
+        }}
       </ResourceState>
     </ProfileSection>
   );
 }
 
-function FpsRecordDistribution({ counts }: { counts: PlayerPerformanceStats["nb_tops_per_fps"] }) {
-  return (
-    <div className="cjs-player-profile__fps-breakdown">
-      <h3>Records by FPS</h3>
-      <dl aria-label="Records by FPS">
-        {FPS_VALUES.map((fps) => (
-          <ProfileStat
-            key={fps}
-            label={fps === "0" ? "Mix" : fps}
-            value={formatProfileNumber(counts[fps] ?? 0)}
-          />
-        ))}
-      </dl>
-    </div>
-  );
+function leaderboardHref(position: PlayerLeaderboardPosition, source: Source): string {
+  const search = new URLSearchParams({ source });
+  if (position.leaderboard_type === "howmany") {
+    search.set("board", "howmany");
+  } else {
+    search.set("board", `${position.leaderboard_type}-skill`);
+    search.set("fps", position.fps);
+  }
+  return `/leaderboards?${search.toString()}`;
 }
 
 function PositionSection({
   fps,
+  onFpsChange,
   onRetry,
   resource,
+  source,
 }: {
-  fps: (typeof FPS_VALUES)[number];
+  fps: Fps;
+  onFpsChange: (fps: Fps) => void;
   onRetry: () => void;
   resource: ProfileResource<PlayerLeaderboardPosition[]>;
+  source: Source;
 }) {
-  const columns = useMemo<readonly DataTableColumn<PlayerLeaderboardPosition>[]>(
-    () => [
-      {
-        id: "rank",
-        header: "Rank",
-        priority: "primary",
-        cell: (position) => <strong>#{position.rank}</strong>,
-      },
-      {
-        id: "board",
-        header: "Board",
-        cell: (position) => playerBoardLabel(position.leaderboard_type),
-      },
-      {
-        id: "score",
-        header: "Score",
-        align: "end",
-        cell: (position) => formatProfileNumber(position.score),
-      },
-      {
-        id: "rating",
-        header: "Rating",
-        align: "end",
-        cell: (position) => formatProfileDecimal(position.rating),
-      },
-      {
-        id: "fps",
-        header: "FPS",
-        align: "end",
-        cell: (position) => fpsLabel(position.fps),
-      },
-    ],
-    [],
-  );
-
   return (
     <ProfileSection
+      actions={
+        <SegmentedControl
+          ariaLabel="Leaderboard FPS"
+          className="cjs-player-profile__fps-chips"
+          onChange={onFpsChange}
+          options={FPS_VALUES.map((value) => ({
+            accessibleLabel: fpsLabel(value),
+            label: value === "0" ? "Mix" : value,
+            value,
+          }))}
+          value={fps}
+        />
+      }
       className="cjs-player-profile__section--position"
-      description={`Official placements across every published leaderboard at ${fpsLabel(fps)}.`}
+      description="Official placements on every published board."
       icon={<Medal size={19} />}
       id="player-position"
       title="Leaderboard positions"
@@ -735,12 +820,28 @@ function PositionSection({
       <ResourceState resource={resource} label="leaderboard position" onRetry={onRetry}>
         {(positions) =>
           positions.length ? (
-            <DataTable
-              caption={`All leaderboard positions at ${fpsLabel(fps)}`}
-              columns={columns}
-              getRowKey={(position) => `${position.leaderboard_type}-${position.fps}`}
-              rows={positions}
-            />
+            <ul
+              className="cjs-player-profile__board-grid"
+              aria-label={`Leaderboard positions at ${fpsLabel(fps)}`}
+            >
+              {positions.map((position) => (
+                <li key={`${position.leaderboard_type}-${position.fps}`}>
+                  <span className="cjs-player-profile__board-label">
+                    {playerBoardLabel(position.leaderboard_type)}
+                  </span>
+                  <span className="cjs-player-profile__board-rank">
+                    <RunRank rank={position.rank} />
+                  </span>
+                  <span className="cjs-player-profile__board-meta">
+                    Rating {formatProfileDecimal(position.rating)} · Score{" "}
+                    {formatProfileNumber(position.score)}
+                  </span>
+                  <Link href={leaderboardHref(position, source)} variant="standalone">
+                    View board
+                  </Link>
+                </li>
+              ))}
+            </ul>
           ) : (
             <EmptyState
               description="The leaderboard hasn't learned this player's name yet. A few more runs should get its attention."
@@ -764,6 +865,7 @@ function BestRunsSection({
   resource: ProfileResource<PlayerJumpScores>;
   source: Source;
 }) {
+  const maxScore = Math.max(0, ...(resource.data?.map_scores.map((run) => run.score) ?? []));
   const columns = useMemo<readonly DataTableColumn<PlayerMapScore>[]>(
     () => [
       {
@@ -781,7 +883,12 @@ function BestRunsSection({
         id: "skill-points",
         header: "Skill points",
         align: "end",
-        cell: (run) => <strong>{formatProfileNumber(run.score)}</strong>,
+        cell: (run) => (
+          <span className="cjs-player-profile__points">
+            <Meter value={maxScore > 0 ? (run.score / maxScore) * 100 : 0} />
+            <strong>{formatProfileNumber(run.score)}</strong>
+          </span>
+        ),
       },
       {
         id: "difficulty",
@@ -790,7 +897,7 @@ function BestRunsSection({
         cell: (run) => formatProfileDecimal(run.difficulty),
       },
     ],
-    [source],
+    [maxScore, source],
   );
 
   return (
@@ -877,33 +984,22 @@ function RouteCompletionSection({
         id: "map",
         header: "Map",
         priority: "primary",
-        cell: (route) => <Link href={mapDetailPath(route.mapId, { source })}>{route.mapName}</Link>,
-      },
-      {
-        id: "status",
-        header: "Status",
         cell: (route) => (
-          <span className="cjs-player-profile__route-status">
-            <Badge
-              icon={
-                route.completed ? (
-                  <CheckCircle2 aria-hidden="true" size={13} />
-                ) : (
-                  <Circle aria-hidden="true" size={13} />
-                )
-              }
-              tone={route.completed ? "success" : undefined}
-            >
-              {route.completed ? "Completed" : "Remaining"}
-            </Badge>
+          <span className="cjs-player-profile__route-map">
+            <Link href={mapDetailPath(route.mapId, { source })}>{route.mapName}</Link>
             {catalogAvailable && !route.published && <Badge>Historical</Badge>}
           </span>
         ),
       },
       {
         id: "fps",
-        header: "Completed FPS",
-        cell: (route) => (route.completed ? formatFpsList(route.fpsList) : "Not completed"),
+        header: "Finished at",
+        cell: (route) =>
+          route.completed ? (
+            formatFpsList(route.fpsList)
+          ) : (
+            <span className="cjs-player-profile__route-pending">Not yet</span>
+          ),
       },
       {
         id: "finishes",
@@ -915,11 +1011,6 @@ function RouteCompletionSection({
         id: "type",
         header: "Route type",
         cell: (route) => (route.routeType ? sentenceCase(route.routeType) : "Not provided"),
-      },
-      {
-        id: "ender",
-        header: "Ender",
-        cell: (route) => route.ender || "Not provided",
       },
     ],
     [catalogAvailable, source],
@@ -1140,55 +1231,6 @@ function RouteCompletionSection({
   );
 }
 
-function RankSection({
-  onRetry,
-  resource,
-}: {
-  onRetry: () => void;
-  resource: ProfileResource<PlayerRankInfo>;
-}) {
-  return (
-    <ProfileSection
-      className="cjs-player-profile__section--rank"
-      description="Jump4Life level, prestige, title, and cumulative XP."
-      icon={<Gauge size={19} />}
-      id="player-rank"
-      title="Jump4Life rank"
-    >
-      <ResourceState resource={resource} label="Jump4Life rank" onRetry={onRetry}>
-        {(rank) => {
-          const progress =
-            rank.maxed || rank.xp_for_level <= 0
-              ? 100
-              : Math.min(100, Math.max(0, (rank.xp_into_level / rank.xp_for_level) * 100));
-          return (
-            <>
-              <dl className="cjs-player-profile__stat-grid">
-                <ProfileStat label="Title" value={rank.title || "Not provided"} />
-                <ProfileStat label="Prestige" value={formatProfileNumber(rank.prestige)} />
-                <ProfileStat label="Total XP" value={formatProfileNumber(rank.total_xp)} />
-              </dl>
-              <div className="cjs-player-profile__progress">
-                <div>
-                  <span>Level {rank.level_display || rank.level} progress</span>
-                  <strong>
-                    {rank.maxed
-                      ? "Maximum level"
-                      : `${formatProfileNumber(rank.xp_to_next)} XP to next`}
-                  </strong>
-                </div>
-                <progress aria-label="Level progress" max="100" value={progress}>
-                  {Math.round(progress)}%
-                </progress>
-              </div>
-            </>
-          );
-        }}
-      </ResourceState>
-    </ProfileSection>
-  );
-}
-
 function ActivitySection({
   onRetry,
   resource,
@@ -1199,88 +1241,85 @@ function ActivitySection({
   return (
     <ProfileSection
       className="cjs-player-profile__section--activity"
-      description="All-time Jump4Life movement, session, run, and checkpoint totals."
+      description="Playing, spectating, and AFK time, plus movement totals."
       icon={<Activity size={19} />}
       id="player-activity"
-      title="Lifetime activity"
+      title="Time on Jump4Life"
     >
       <ResourceState resource={resource} label="lifetime activity" onRetry={onRetry}>
         {(activity) => (
           <div className="cjs-player-profile__activity">
-            <dl className="cjs-player-profile__tracking-grid" aria-label="Activity tracking range">
-              <ProfileStat
-                label="First tracked"
-                value={activity.first_activity_at ? formatDate(activity.first_activity_at) : "—"}
-              />
-              <ProfileStat
-                label="Last tracked"
-                value={activity.last_activity_at ? formatDate(activity.last_activity_at) : "—"}
-              />
-              <ProfileStat label="Updated" value={formatDate(activity.updated_at)} />
+            <TimeSplit activity={activity} />
+            <dl className="cjs-player-profile__activity-highlights">
+              <ProfileStat label="Jumps" value={formatProfileNumber(activity.jump_count)} />
+              <ProfileStat label="Loads" value={formatProfileNumber(activity.load_count)} />
+              <ProfileStat label="Saves" value={formatProfileNumber(activity.save_count)} />
+              <ProfileStat label="Nade jumps" value={formatProfileNumber(activity.nadejumps)} />
             </dl>
-            <dl className="cjs-player-profile__activity-grid">
-              <ActivityStat
-                icon={<Clock3 />}
-                label="Playing"
-                value={formatDuration(activity.playing_ms)}
-              />
-              <ActivityStat
-                icon={<Gauge />}
-                label="Run attempts"
-                value={formatDuration(activity.run_attempt_ms)}
-              />
-              <ActivityStat
-                icon={<Gauge />}
-                label="Run time"
-                value={formatDuration(activity.runtime_ms)}
-              />
-              <ActivityStat
-                icon={<Activity />}
-                label="Spectating"
-                value={formatDuration(activity.spectating_ms)}
-              />
-              <ActivityStat icon={<Clock3 />} label="AFK" value={formatDuration(activity.afk_ms)} />
-              <ActivityStat
-                icon={<Clock3 />}
-                label="Playing AFK"
-                value={formatDuration(activity.playing_afk_ms)}
-              />
-              <ActivityStat
-                icon={<Clock3 />}
-                label="Spectating AFK"
-                value={formatDuration(activity.spectating_afk_ms)}
-              />
-              <ActivityStat
-                icon={<Footprints />}
-                label="Jumps"
-                value={formatProfileNumber(activity.jump_count)}
-              />
-              <ActivityStat
-                icon={<Route />}
-                label="Nade throws"
-                value={formatProfileNumber(activity.nadethrows)}
-              />
-              <ActivityStat
-                icon={<Route />}
-                label="Nade jumps"
-                value={formatProfileNumber(activity.nadejumps)}
-              />
-              <ActivityStat
-                icon={<Route />}
-                label="Distance"
-                value={formatDistance(activity.distance_travelled)}
-              />
-              <ActivityStat
-                icon={<MapPinned />}
-                label="Loads"
-                value={formatProfileNumber(activity.load_count)}
-              />
-              <ActivityStat
-                icon={<Trophy />}
-                label="Saves"
-                value={formatProfileNumber(activity.save_count)}
-              />
-            </dl>
+            <details className="cjs-player-profile__activity-details">
+              <summary>All tracking totals</summary>
+              <dl
+                className="cjs-player-profile__tracking-grid"
+                aria-label="Activity tracking range"
+              >
+                <ProfileStat
+                  label="First tracked"
+                  value={activity.first_activity_at ? formatDate(activity.first_activity_at) : "—"}
+                />
+                <ProfileStat
+                  label="Last tracked"
+                  value={activity.last_activity_at ? formatDate(activity.last_activity_at) : "—"}
+                />
+                <ProfileStat label="Updated" value={formatDate(activity.updated_at)} />
+              </dl>
+              <dl className="cjs-player-profile__activity-grid">
+                <ActivityStat
+                  icon={<Clock3 />}
+                  label="Playing"
+                  value={formatDuration(activity.playing_ms)}
+                />
+                <ActivityStat
+                  icon={<Gauge />}
+                  label="Run attempts"
+                  value={formatDuration(activity.run_attempt_ms)}
+                />
+                <ActivityStat
+                  icon={<Gauge />}
+                  label="Run time"
+                  value={formatDuration(activity.runtime_ms)}
+                />
+                <ActivityStat
+                  icon={<Activity />}
+                  label="Spectating"
+                  value={formatDuration(activity.spectating_ms)}
+                />
+                <ActivityStat
+                  icon={<Clock3 />}
+                  label="AFK"
+                  value={formatDuration(activity.afk_ms)}
+                />
+                <ActivityStat
+                  icon={<Clock3 />}
+                  label="Playing AFK"
+                  value={formatDuration(activity.playing_afk_ms)}
+                />
+                <ActivityStat
+                  icon={<Clock3 />}
+                  label="Spectating AFK"
+                  value={formatDuration(activity.spectating_afk_ms)}
+                />
+                <ActivityStat
+                  icon={<Route />}
+                  label="Nade throws"
+                  value={formatProfileNumber(activity.nadethrows)}
+                />
+                <ActivityStat
+                  icon={<Route />}
+                  label="Distance"
+                  value={formatDistance(activity.distance_travelled)}
+                />
+              </dl>
+            </details>
           </div>
         )}
       </ResourceState>
@@ -1288,7 +1327,41 @@ function ActivitySection({
   );
 }
 
+function TimeSplit({ activity }: { activity: PlayerActivitySummary }) {
+  const segments = [
+    { key: "playing", label: "Playing", ms: activity.playing_ms },
+    { key: "spectating", label: "Spectating", ms: activity.spectating_ms },
+    { key: "afk", label: "AFK", ms: activity.afk_ms },
+  ];
+  const total = segments.reduce((sum, segment) => sum + Math.max(0, segment.ms), 0);
+
+  if (total <= 0) return null;
+
+  return (
+    <div className="cjs-player-profile__time-split">
+      <div className="cjs-player-profile__time-split-bar" aria-hidden="true">
+        {segments.map((segment) => (
+          <span
+            key={segment.key}
+            data-segment={segment.key}
+            style={{ width: `${(Math.max(0, segment.ms) / total) * 100}%` }}
+          />
+        ))}
+      </div>
+      <dl className="cjs-player-profile__time-split-legend" aria-label="Time split">
+        {segments.map((segment) => (
+          <div key={segment.key} data-segment={segment.key}>
+            <dt>{segment.label}</dt>
+            <dd>{formatDuration(segment.ms)}</dd>
+          </div>
+        ))}
+      </dl>
+    </div>
+  );
+}
+
 function ProfileSection({
+  actions,
   children,
   className,
   description,
@@ -1296,6 +1369,7 @@ function ProfileSection({
   id,
   title,
 }: {
+  actions?: ReactNode;
   children: ReactNode;
   className?: string;
   description: string;
@@ -1315,6 +1389,7 @@ function ProfileSection({
             <h2 id={`${id}-title`}>{title}</h2>
             <p>{description}</p>
           </div>
+          {actions && <div className="cjs-player-profile__section-actions">{actions}</div>}
         </header>
         {children}
       </Panel>

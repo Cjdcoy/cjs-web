@@ -32,10 +32,12 @@ export function navigate(to: string | URL, options: NavigateOptions = {}): void 
   const href = `${target.pathname}${target.search}${target.hash}`;
   if (href === getBrowserHref()) return;
 
+  const changedPage = target.pathname !== window.location.pathname;
   setNavigationPending(true);
   const method = options.replace ? "replaceState" : "pushState";
   window.history[method](null, "", href);
   window.dispatchEvent(new Event(navigationEvent));
+  if (changedPage && !target.hash) window.scrollTo({ top: 0 });
 }
 
 export function markNavigationComplete(): void {

@@ -1,8 +1,51 @@
-import { Menu, X } from "lucide-react";
+import { Menu, Palette, X } from "lucide-react";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { IconButton, VisuallyHidden } from "../../components/ui";
-import { useNavigationPending, type RouteMatch } from "../../lib/routing";
+import { useNavigationPending, useSourceContext, type RouteMatch } from "../../lib/routing";
+import {
+  THEME_PREFERENCES,
+  applyTheme,
+  readStoredPreference,
+  resolveTheme,
+  storePreference,
+  type ThemePreference,
+} from "../../lib/theme";
 import { primaryNavigation, type PrimaryNavigationItem } from "./navigation";
+
+function ThemePicker() {
+  const { source } = useSourceContext();
+  const [preference, setPreference] = useState<ThemePreference>(readStoredPreference);
+
+  // "Match source" has to re-resolve whenever the viewer switches source.
+  useEffect(() => {
+    applyTheme(resolveTheme(preference, source));
+  }, [preference, source]);
+
+  return (
+    <span className="cjs-theme-picker">
+      <Palette aria-hidden="true" size={17} />
+      <label className="cjs-visually-hidden" htmlFor="cjs-theme-picker">
+        Colour theme
+      </label>
+      <select
+        className="cjs-select"
+        id="cjs-theme-picker"
+        onChange={(event) => {
+          const next = event.target.value as ThemePreference;
+          setPreference(next);
+          storePreference(next);
+        }}
+        value={preference}
+      >
+        {THEME_PREFERENCES.map((option) => (
+          <option key={option.id} value={option.id}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </span>
+  );
+}
 
 export function AppShell({ children, route }: { children: ReactNode; route: RouteMatch }) {
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
@@ -55,6 +98,7 @@ export function AppShell({ children, route }: { children: ReactNode; route: Rout
           </nav>
 
           <div className="cjs-site-header__actions">
+            <ThemePicker />
             <IconButton
               ref={mobileNavigationButton}
               className="cjs-mobile-navigation__toggle"

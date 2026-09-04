@@ -1,12 +1,10 @@
 import {
   Button,
   CodPlayerName,
-  DataTable,
   Link,
   Panel,
   SkeletonGroup,
   VisuallyHidden,
-  type DataTableColumn,
 } from "../../components/ui";
 import type {
   ReplayWatchAggregate,
@@ -56,7 +54,6 @@ export function ReplayAnalyticsPanel({
     aggregate.replay_count === 0 &&
     rankings !== null &&
     rankings.length === 0;
-  const columns = createReplayColumns(source);
   const headingId = isPlayer ? "player-replay-reach" : "map-replay-activity";
 
   if (source !== "j4l") return null;
@@ -70,13 +67,7 @@ export function ReplayAnalyticsPanel({
       <Panel className="cjs-replay-analytics__panel cjs-stack" padding="small">
         <div className="cjs-replay-analytics__header cjs-cluster">
           <div>
-            {isPlayer && <strong>Jump4Life replay analytics</strong>}
             <h2 id={headingId}>{isPlayer ? "Replay reach" : "In-game Replay views"}</h2>
-            {isPlayer && (
-              <p className="cjs-replay-analytics__description">
-                Audience totals across this player&apos;s watched replays.
-              </p>
-            )}
           </div>
           {isPlayer && (
             <Button
@@ -135,19 +126,27 @@ export function ReplayAnalyticsPanel({
         {aggregate && !isEmpty && <ReplaySummary aggregate={aggregate} playerScope={isPlayer} />}
 
         {rankings && rankings.length > 0 && isPlayer && (
-          <div className="cjs-stack">
-            <div>
-              <h3>Most viewed runs</h3>
-              <p>Ranked by completed and partial replay watches.</p>
-            </div>
-            <DataTable
-              caption="Most viewed runs by this player"
-              columns={columns}
-              rows={rankings}
-              getRowKey={(entry) => entry.run_id}
-              getRowLabel={(entry) => `Replay rank ${entry.rank}, run ${entry.run_id}`}
-            />
-          </div>
+          <ol className="cjs-replay-analytics__runs" aria-label="Most viewed runs by this player">
+            {rankings.map((entry) => (
+              <li key={entry.run_id}>
+                <span className="cjs-replay-analytics__run-rank">#{entry.rank}</span>
+                <span className="cjs-replay-analytics__run-map">
+                  <Link href={mapDetailPath(entry.mapid, { source })}>
+                    {entry.mapname || `Map #${entry.mapid}`}
+                  </Link>
+                  <span>
+                    {formatNumber(entry.unique_viewer_count)}{" "}
+                    {entry.unique_viewer_count === 1 ? "viewer" : "viewers"} ·{" "}
+                    {formatWatchTime(entry.total_watch_ms)}
+                  </span>
+                </span>
+                <span className="cjs-replay-analytics__run-watches">
+                  <strong>{formatNumber(entry.watch_count)}</strong>
+                  <span>{entry.watch_count === 1 ? "watch" : "watches"}</span>
+                </span>
+              </li>
+            ))}
+          </ol>
         )}
 
         {topRanking && !isPlayer && <CompactReplayRanking entry={topRanking} source={source} />}
@@ -166,7 +165,9 @@ function ReplaySummary({
   return (
     <div className="cjs-stack">
       <dl
-        className={playerScope ? "cjs-grid" : "cjs-replay-analytics__map-summary"}
+        className={
+          playerScope ? "cjs-replay-analytics__totals" : "cjs-replay-analytics__map-summary"
+        }
         aria-label="Replay audience summary"
       >
         <ReplayStat
@@ -229,42 +230,6 @@ function CompactReplayRanking({
       </span>
     </div>
   );
-}
-
-function createReplayColumns(source: Source): readonly DataTableColumn<ReplayWatchRankingEntry>[] {
-  return [
-    {
-      id: "rank",
-      header: "Rank",
-      priority: "primary" as const,
-      cell: (entry: ReplayWatchRankingEntry) => <strong>#{entry.rank}</strong>,
-    },
-    {
-      id: "replay",
-      header: "Map",
-      priority: "primary" as const,
-      cell: (entry: ReplayWatchRankingEntry) => (
-        <Link href={mapDetailPath(entry.mapid, { source })} variant="standalone">
-          {entry.mapname || `Map #${entry.mapid}`}
-        </Link>
-      ),
-    },
-    {
-      id: "watches",
-      header: "Watches",
-      cell: (entry: ReplayWatchRankingEntry) => formatNumber(entry.watch_count),
-    },
-    {
-      id: "viewers",
-      header: "Viewers",
-      cell: (entry: ReplayWatchRankingEntry) => formatNumber(entry.unique_viewer_count),
-    },
-    {
-      id: "watch-time",
-      header: "Watch time",
-      cell: (entry: ReplayWatchRankingEntry) => formatWatchTime(entry.total_watch_ms),
-    },
-  ];
 }
 
 function formatNumber(value: number): string {

@@ -1,46 +1,50 @@
+/*
+ * Theme palettes live at the end of this file. Everything here is either shared
+ * across themes or derived from the active theme's own colours, so adding a
+ * theme means adding one block of base colours, not restating the whole set.
+ */
 :root {
   color-scheme: dark;
 
-  /* Color */
-  --cjs-color-page: #080b09;
-  --cjs-color-elevated: #0c110e;
-  --cjs-color-panel: #111713;
-  --cjs-color-panel-strong: #17201b;
-  --cjs-color-panel-warm: #1c1b16;
+  /* Colour: shared across every theme. */
   --cjs-color-panel-soft: rgb(255 255 255 / 0.04);
   --cjs-color-panel-hover: rgb(255 255 255 / 0.07);
-  --cjs-color-border: rgb(216 231 222 / 0.38);
-  --cjs-color-border-strong: rgb(216 231 222 / 0.52);
-  --cjs-color-text: #eef4f0;
-  --cjs-color-text-muted: #9ca9a1;
-  --cjs-color-text-subtle: #8f9d95;
-  --cjs-color-accent: #61d69d;
-  --cjs-color-accent-strong: #98edc3;
-  --cjs-color-accent-secondary: #d4b267;
   --cjs-color-podium-gold: #ffc107;
   --cjs-color-podium-silver: #c0c0c0;
   --cjs-color-podium-bronze: #cd7f32;
   --cjs-color-danger: #ef8178;
+  /* Server up/down reads as green/red in every theme, never as the accent. */
+  --cjs-color-status-online: #3ecf7f;
+  --cjs-color-status-offline: #ef5f57;
   --cjs-color-information: #8fb8e8;
-  --cjs-color-on-accent: #07130d;
   --cjs-color-on-danger: #210706;
-  --cjs-color-accent-surface: rgb(97 214 157 / 0.13);
-  --cjs-color-accent-surface-strong: rgb(97 214 157 / 0.2);
-  --cjs-color-warning-surface: rgb(212 178 103 / 0.14);
-  --cjs-color-danger-surface: rgb(239 129 120 / 0.13);
-  --cjs-color-information-surface: rgb(143 184 232 / 0.13);
-  --cjs-color-selection: rgb(97 214 157 / 0.28);
   --cjs-color-backdrop: rgb(0 0 0 / 0.68);
-  --cjs-color-cod-0: #aeb8b2;
-  --cjs-color-cod-1: #ff6674;
+
+  /* Colour: derived from the active theme, so a theme never restates these. */
+  --cjs-color-accent-surface: color-mix(in srgb, var(--cjs-color-accent) 13%, transparent);
+  --cjs-color-accent-surface-strong: color-mix(in srgb, var(--cjs-color-accent) 20%, transparent);
+  --cjs-color-selection: color-mix(in srgb, var(--cjs-color-accent) 28%, transparent);
+  --cjs-color-warning-surface: color-mix(
+    in srgb,
+    var(--cjs-color-accent-secondary) 14%,
+    transparent
+  );
+  --cjs-color-danger-surface: color-mix(in srgb, var(--cjs-color-danger) 13%, transparent);
+  --cjs-color-information-surface: color-mix(
+    in srgb,
+    var(--cjs-color-information) 13%,
+    transparent
+  );
+  --cjs-color-cod-0: #000;
+  --cjs-color-cod-1: #da0120;
   --cjs-color-cod-2: #00b906;
   --cjs-color-cod-3: #e8ff19;
-  --cjs-color-cod-4: #7d8cff;
+  --cjs-color-cod-4: #170bdb;
   --cjs-color-cod-5: #23c2c6;
-  --cjs-color-cod-6: #ff60fa;
+  --cjs-color-cod-6: #e201db;
   --cjs-color-cod-7: #eee;
   --cjs-color-cod-8: #8080fe;
-  --cjs-color-cod-9: #9ca9a1;
+  --cjs-color-cod-9: #757575;
 
   /* Type */
   --cjs-font-sans:
@@ -79,10 +83,12 @@
   --cjs-radius-lg: 18px;
   --cjs-radius-pill: 999px;
   --cjs-border-width: 1px;
-  --cjs-shadow-card: 0 18px 46px rgb(0 0 0 / 0.26);
+  --cjs-shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 12px 32px rgb(0 0 0 / 0.5);
   --cjs-shadow-elevated: 0 26px 70px rgb(0 0 0 / 0.42);
-  --cjs-shadow-accent: 0 10px 28px rgb(97 214 157 / 0.18);
-  --cjs-focus-ring: 0 0 0 3px rgb(8 11 9 / 0.92), 0 0 0 5px var(--cjs-color-accent-strong);
+  --cjs-shadow-accent: 0 10px 28px color-mix(in srgb, var(--cjs-color-accent) 18%, transparent);
+  --cjs-focus-ring:
+    0 0 0 3px color-mix(in srgb, var(--cjs-color-page) 92%, transparent),
+    0 0 0 5px var(--cjs-color-accent-strong);
 
   /* Motion */
   --cjs-duration-instant: 1ms;
@@ -119,4 +125,61 @@
     --cjs-duration-slow: var(--cjs-duration-instant);
     --cjs-duration-skeleton: var(--cjs-duration-instant);
   }
+}
+
+/*
+ * Theme palettes. Each theme defines only its base colours; surfaces, the
+ * selection tint, the accent shadow and the focus ring are derived above.
+ * Jade is the default and is also applied when no theme has been chosen.
+ */
+:root,
+:root[data-theme="jade"] {
+  --cjs-color-page: #080b09;
+  --cjs-color-elevated: #0c110e;
+  --cjs-color-panel: #111713;
+  --cjs-color-panel-strong: #17201b;
+  --cjs-color-panel-warm: #1c1b16;
+  --cjs-color-border: rgb(216 231 222 / 0.14);
+  --cjs-color-border-strong: rgb(216 231 222 / 0.52);
+  --cjs-color-text: #eef4f0;
+  --cjs-color-text-muted: #9ca9a1;
+  --cjs-color-text-subtle: #8f9d95;
+  --cjs-color-accent: #61d69d;
+  --cjs-color-accent-strong: #98edc3;
+  --cjs-color-accent-secondary: #d4b267;
+  --cjs-color-on-accent: #07130d;
+}
+
+:root[data-theme="ember"] {
+  --cjs-color-page: #0b0907;
+  --cjs-color-elevated: #110d0a;
+  --cjs-color-panel: #17120d;
+  --cjs-color-panel-strong: #211a12;
+  --cjs-color-panel-warm: #241b10;
+  --cjs-color-border: rgb(238 226 214 / 0.14);
+  --cjs-color-border-strong: rgb(238 226 214 / 0.52);
+  --cjs-color-text: #f5efe8;
+  --cjs-color-text-muted: #b3a595;
+  --cjs-color-text-subtle: #a5978a;
+  --cjs-color-accent: #f2a35c;
+  --cjs-color-accent-strong: #ffc68d;
+  --cjs-color-accent-secondary: #7fc9ba;
+  --cjs-color-on-accent: #1a0d03;
+}
+
+:root[data-theme="cobalt"] {
+  --cjs-color-page: #07090d;
+  --cjs-color-elevated: #0a0e14;
+  --cjs-color-panel: #0f141b;
+  --cjs-color-panel-strong: #151c26;
+  --cjs-color-panel-warm: #1e1b16;
+  --cjs-color-border: rgb(214 226 244 / 0.14);
+  --cjs-color-border-strong: rgb(214 226 244 / 0.52);
+  --cjs-color-text: #eaf0f8;
+  --cjs-color-text-muted: #99a5b8;
+  --cjs-color-text-subtle: #8b97ab;
+  --cjs-color-accent: #6aa8ff;
+  --cjs-color-accent-strong: #a9ccff;
+  --cjs-color-accent-secondary: #e0b978;
+  --cjs-color-on-accent: #04101f;
 }

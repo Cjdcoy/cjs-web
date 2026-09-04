@@ -315,3 +315,29 @@
     transform: none;
   }
 }
+
+.cjs-theme-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cjs-space-2);
+  padding-inline: var(--cjs-space-2);
+  border: var(--cjs-border-width) solid var(--cjs-color-border);
+  border-radius: var(--cjs-radius-sm);
+  color: var(--cjs-color-text-muted);
+}
+
+.cjs-theme-picker > .cjs-select {
+  min-height: var(--cjs-control-height-sm);
+  padding-inline: 0 var(--cjs-space-1);
+  border: 0;
+  background: transparent;
+  color: var(--cjs-color-text);
+  font-size: var(--cjs-font-size-sm);
+  font-weight: var(--cjs-font-weight-semibold);
+}
+
+@media (max-width: 47.999rem) {
+  .cjs-theme-picker > .cjs-select {
+    width: 5.5rem;
+  }
+}

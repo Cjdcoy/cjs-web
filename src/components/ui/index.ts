@@ -28,5 +28,7 @@ export type { PaginationProps } from "./Pagination";
 export { VisuallyHidden } from "./VisuallyHidden";
 export { CodPlayerName } from "./CodPlayerName";
 export type { CodPlayerNameProps } from "./CodPlayerName";
+export { RankEmblem } from "./RankEmblem";
+export type { RankEmblemProps } from "./RankEmblem";
 export { CountryFlag } from "./CountryFlag";
 export type { CountryFlagProps } from "./CountryFlag";

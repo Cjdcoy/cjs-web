@@ -83,6 +83,7 @@ describe("PlayersPage", () => {
     expect(screen.getByText(/Showing 50 of 75 players/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Directory 25.*25/i })).not.toBeInTheDocument();
 
+    await waitFor(() => expect(intersect).not.toBeNull());
     act(() => intersect?.());
 
     expect(await screen.findByRole("link", { name: /Directory 25.*25/i })).toBeInTheDocument();

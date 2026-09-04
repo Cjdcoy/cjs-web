@@ -1,6 +1,6 @@
 import { BookOpen, Code2, Database, ExternalLink, HardDrive, ShieldCheck } from "lucide-react";
 import { Page } from "../../components";
-import { Badge, Card, Link, VisuallyHidden } from "../../components/ui";
+import { Card, Link, VisuallyHidden } from "../../components/ui";
 import "./about.css";
 
 const projectLinks = [
@@ -42,7 +42,6 @@ export function AboutPage() {
               CodJumper Stats is an independent public frontend for exploring player, map,
               leaderboard, and live-server data from JumpersHeaven and Jump4Life.
             </p>
-            <Badge tone="warning">Independent community project</Badge>
           </div>
 
           <img

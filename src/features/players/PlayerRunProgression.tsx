@@ -1,5 +1,12 @@
 import { ChartNoAxesCombined, CircleGauge, ListChecks, Search } from "lucide-react";
-import { useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  useMemo,
+  useState,
+  type CSSProperties,
+  type KeyboardEvent,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import {
   Badge,
   Button,
@@ -8,6 +15,7 @@ import {
   ErrorState,
   Input,
   Panel,
+  SegmentedControl,
   Select,
   SkeletonGroup,
   type DataTableColumn,
@@ -113,10 +121,13 @@ export function PlayerRunProgression({
     <div className="cjs-run-progress" data-map-selected={mapSelected}>
       {filters}
       {mapId === 0 ? (
-        <EmptyState
-          description="Choose a map to compare every recorded finish in chronological order."
-          title="Pick a map"
-        />
+        <>
+          <EmptyState
+            description="Choose a map to compare every recorded finish in chronological order, or start from a top-ranked map below."
+            title="Pick a map"
+          />
+          <QuickPicks maps={maps} onMapChange={onMapChange} />
+        </>
       ) : (
         <RunHistory
           mapName={selectedMap?.map_name ?? runs.data?.[0]?.mapname ?? `Map #${mapId}`}
@@ -125,6 +136,31 @@ export function PlayerRunProgression({
         />
       )}
     </div>
+  );
+}
+
+function QuickPicks({
+  maps,
+  onMapChange,
+}: {
+  maps: readonly PlayerMapScore[];
+  onMapChange: (mapId: number) => void;
+}) {
+  const picks = [...maps].sort((left, right) => left.rank - right.rank).slice(0, 6);
+  if (picks.length === 0) return null;
+  return (
+    <nav className="cjs-run-progress__quick-picks" aria-label="Best ranked maps">
+      {picks.map((map) => (
+        <Button
+          key={map.map_id}
+          onClick={() => onMapChange(map.map_id)}
+          size="small"
+          variant="secondary"
+        >
+          {map.map_name} <span aria-hidden="true">·</span> #{map.rank}
+        </Button>
+      ))}
+    </nav>
   );
 }
 
@@ -220,6 +256,7 @@ function RunHistory({
     );
   }
 
+  const { summary } = progression;
   const columns: readonly DataTableColumn<RunProgressPoint>[] = [
     {
       id: "run",
@@ -255,7 +292,7 @@ function RunHistory({
         ) : point.personalBestGainMs !== null ? (
           <Badge tone="success">−{formatRunDurationMs(point.personalBestGainMs)}</Badge>
         ) : (
-          "—"
+          formatBehindBest(point)
         ),
     },
     {
@@ -285,6 +322,34 @@ function RunHistory({
         </p>
       )}
 
+      <div className="cjs-run-progress__overview">
+        <div className="cjs-run-progress__ledger-heading">
+          <span aria-hidden="true">
+            <ChartNoAxesCombined size={20} />
+          </span>
+          <div>
+            <h2 id="run-progress-title">{mapName} progression</h2>
+            <p>
+              {summary.runCount === 1
+                ? "One recorded finish so far."
+                : `${summary.runCount} finishes from ${formatRunDurationMs(summary.firstTimeMs)} down to ${formatRunDurationMs(summary.bestTimeMs)}.`}
+            </p>
+          </div>
+        </div>
+
+        <dl className="cjs-run-progress__summary" aria-label="Run improvement summary">
+          <SummaryStat hero label="Best time" value={formatRunDurationMs(summary.bestTimeMs)} />
+          <SummaryStat
+            label="Total improvement"
+            value={`${formatRunDurationMs(summary.improvementMs)} · ${Math.round(summary.improvementPercent * 100)}%`}
+          />
+          <SummaryStat label="Finishes" value={String(summary.runCount)} />
+          <SummaryStat label="PB improvements" value={String(summary.personalBestCount)} />
+          <SummaryStat label="Biggest leap" value={formatRunDurationMs(summary.biggestGainMs)} />
+          <SummaryStat label="Median finish" value={formatRunDurationMs(summary.medianTimeMs)} />
+        </dl>
+      </div>
+
       <div className="cjs-run-progress__analytics">
         <RunProgressChart
           onSelect={setSelectedKey}
@@ -296,50 +361,15 @@ function RunHistory({
       </div>
 
       <div className="cjs-run-progress__ledger">
-        <div className="cjs-run-progress__ledger-headings">
-          <div className="cjs-run-progress__ledger-heading">
-            <span aria-hidden="true">
-              <ChartNoAxesCombined size={20} />
-            </span>
-            <div>
-              <h2 id="run-progress-title">{mapName} progression</h2>
-              <p>Every finish in recorded order, with personal-best gains tracked over time.</p>
-            </div>
-          </div>
-          <div className="cjs-run-progress__ledger-heading">
-            <span aria-hidden="true">
-              <ListChecks size={19} />
-            </span>
-            <div>
-              <h3>Run-by-run improvement</h3>
-              <p>The table is the complete text alternative to the chart.</p>
-            </div>
+        <div className="cjs-run-progress__ledger-heading">
+          <span aria-hidden="true">
+            <ListChecks size={19} />
+          </span>
+          <div>
+            <h3>Run-by-run improvement</h3>
+            <p>The table is the complete text alternative to the chart.</p>
           </div>
         </div>
-
-        <dl className="cjs-run-progress__summary" aria-label="Run improvement summary">
-          <SummaryStat label="Finishes" value={String(progression.summary.runCount)} />
-          <SummaryStat
-            label="Best time"
-            value={formatRunDurationMs(progression.summary.bestTimeMs)}
-          />
-          <SummaryStat
-            label="Total improvement"
-            value={`${formatRunDurationMs(progression.summary.improvementMs)} · ${Math.round(progression.summary.improvementPercent * 100)}%`}
-          />
-          <SummaryStat
-            label="PB improvements"
-            value={String(progression.summary.personalBestCount)}
-          />
-          <SummaryStat
-            label="Biggest leap"
-            value={formatRunDurationMs(progression.summary.biggestGainMs)}
-          />
-          <SummaryStat
-            label="Median finish"
-            value={formatRunDurationMs(progression.summary.medianTimeMs)}
-          />
-        </dl>
 
         <DataTable
           caption={`${mapName} run progression from oldest to newest`}
@@ -354,6 +384,29 @@ function RunHistory({
   );
 }
 
+type AxisMode = "sequence" | "date";
+type RangeMode = "all" | "focus";
+
+const CHART_WIDTH = 800;
+const CHART_HEIGHT = 340;
+const CHART_PADDING = { bottom: 56, left: 76, right: 28, top: 32 };
+const PLOT_WIDTH = CHART_WIDTH - CHART_PADDING.left - CHART_PADDING.right;
+const PLOT_HEIGHT = CHART_HEIGHT - CHART_PADDING.top - CHART_PADDING.bottom;
+const PLOT_BOTTOM = CHART_PADDING.top + PLOT_HEIGHT;
+const TICK_STEPS_MS = [
+  100, 250, 500, 1_000, 2_000, 5_000, 10_000, 15_000, 30_000, 60_000, 120_000, 300_000, 600_000,
+  900_000, 1_800_000, 3_600_000,
+];
+
+interface ChartCoordinate {
+  bestY: number;
+  clipped: boolean;
+  index: number;
+  point: RunProgressPoint;
+  x: number;
+  y: number;
+}
+
 function RunProgressChart({
   onSelect,
   points,
@@ -363,32 +416,120 @@ function RunProgressChart({
   points: readonly RunProgressPoint[];
   selectedPoint: RunProgressPoint | null;
 }) {
-  const width = 800;
-  const height = 340;
-  const padding = { bottom: 64, left: 72, right: 28, top: 28 };
+  const [axisMode, setAxisMode] = useState<AxisMode>("sequence");
+  const [rangeMode, setRangeMode] = useState<RangeMode>("all");
+  const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+
+  const timestamps = points.map((point) => point.timestamp);
+  const minTimestamp = Math.min(...timestamps.map((value) => value ?? Number.POSITIVE_INFINITY));
+  const maxTimestamp = Math.max(...timestamps.map((value) => value ?? Number.NEGATIVE_INFINITY));
+  const dateAxisAvailable =
+    points.length > 1 && timestamps.every((value) => value !== null) && maxTimestamp > minTimestamp;
+  const useDateAxis = axisMode === "date" && dateAxisAvailable;
+
   const times = points.map((point) => point.timeMs);
-  const minimum = Math.min(...times);
-  const maximum = Math.max(...times);
-  const sameTime = maximum === minimum;
-  const span = sameTime ? Math.max(maximum * 0.08, 1) : maximum - minimum;
-  const plotWidth = width - padding.left - padding.right;
-  const plotHeight = height - padding.top - padding.bottom;
-  const coordinates = points.map((point, index) => ({
+  const sortedTimes = [...times].sort((left, right) => left - right);
+  const fastest = sortedTimes[0] ?? 0;
+  const slowest = sortedTimes.at(-1) ?? 0;
+  const focusCeiling = sortedTimes[Math.floor(0.85 * (sortedTimes.length - 1))] ?? slowest;
+  const focusAvailable = points.length >= 5 && slowest > focusCeiling * 1.15;
+  const useFocus = rangeMode === "focus" && focusAvailable;
+  const ticks = niceTicks(fastest, useFocus ? focusCeiling : slowest);
+  const tickStep = (ticks[1] ?? 0) - (ticks[0] ?? 0);
+  const yMin = ticks[0] ?? fastest;
+  const yMax = ticks.at(-1) ?? slowest;
+  const ySpan = Math.max(yMax - yMin, 1);
+  const toY = (value: number) =>
+    CHART_PADDING.top + ((yMax - Math.min(value, yMax)) / ySpan) * PLOT_HEIGHT;
+
+  const coordinates: ChartCoordinate[] = points.map((point, index) => ({
+    bestY: toY(point.personalBestMs),
+    clipped: point.timeMs > yMax,
+    index,
     point,
     x:
-      padding.left +
-      (points.length === 1 ? plotWidth / 2 : (index / (points.length - 1)) * plotWidth),
-    y: sameTime
-      ? padding.top + plotHeight / 2
-      : padding.top + ((maximum - point.timeMs) / span) * plotHeight,
-    bestY: sameTime
-      ? padding.top + plotHeight / 2
-      : padding.top + ((maximum - point.personalBestMs) / span) * plotHeight,
+      CHART_PADDING.left +
+      (points.length === 1
+        ? PLOT_WIDTH / 2
+        : useDateAxis
+          ? (((point.timestamp ?? minTimestamp) - minTimestamp) / (maxTimestamp - minTimestamp)) *
+            PLOT_WIDTH
+          : (index / (points.length - 1)) * PLOT_WIDTH),
+    y: toY(point.timeMs),
   }));
+  const clippedCount = coordinates.filter((coordinate) => coordinate.clipped).length;
+
   const runLine = coordinates.map(({ x, y }) => `${x},${y}`).join(" ");
-  const bestLine = coordinates.map(({ bestY, x }) => `${x},${bestY}`).join(" ");
-  const dateTickIndexes = getChartDateTickIndexes(points.length);
-  const plotBottom = padding.top + plotHeight;
+  const bestPath = coordinates
+    .map(({ bestY, x }, index) => (index === 0 ? `M${x},${bestY}` : `H${x} V${bestY}`))
+    .join(" ");
+  const dateTicks = useDateAxis
+    ? evenlySpacedTimestamps(minTimestamp, maxTimestamp).map((timestamp) => ({
+        key: String(timestamp),
+        label: formatDate(new Date(timestamp).toISOString()),
+        x:
+          CHART_PADDING.left +
+          ((timestamp - minTimestamp) / (maxTimestamp - minTimestamp)) * PLOT_WIDTH,
+      }))
+    : getChartDateTickIndexes(points.length).flatMap((index) => {
+        const coordinate = coordinates[index];
+        return coordinate
+          ? [
+              {
+                key: `date-${pointKey(coordinate.point)}`,
+                label: formatDate(coordinate.point.run.time_created),
+                x: coordinate.x,
+              },
+            ]
+          : [];
+      });
+  const dedupedDateTicks = dateTicks.filter(
+    (tick, index) => index === 0 || tick.label !== dateTicks[index - 1]?.label,
+  );
+
+  const selectedCoordinate =
+    selectedPoint === null
+      ? null
+      : (coordinates.find(({ point }) => pointKey(point) === pointKey(selectedPoint)) ?? null);
+  const hoveredCoordinate = hoveredIndex === null ? null : (coordinates[hoveredIndex] ?? null);
+  const bestCoordinate = coordinates.find(({ point }) => point.timeMs === fastest) ?? null;
+
+  const handlePointerMove = (event: PointerEvent<HTMLDivElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    if (bounds.width === 0) return;
+    const svgX = ((event.clientX - bounds.left) / bounds.width) * CHART_WIDTH;
+    let nearest = 0;
+    let nearestDistance = Number.POSITIVE_INFINITY;
+    coordinates.forEach(({ x }, index) => {
+      const distance = Math.abs(x - svgX);
+      if (distance < nearestDistance) {
+        nearest = index;
+        nearestDistance = distance;
+      }
+    });
+    setHoveredIndex(nearest);
+  };
+
+  const handlePointKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
+    const step =
+      event.key === "ArrowRight" || event.key === "ArrowUp"
+        ? 1
+        : event.key === "ArrowLeft" || event.key === "ArrowDown"
+          ? -1
+          : event.key === "Home"
+            ? -index
+            : event.key === "End"
+              ? points.length - 1 - index
+              : 0;
+    if (step === 0) return;
+    event.preventDefault();
+    const buttons =
+      event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+        ".cjs-run-progress__point",
+      ) ?? [];
+    const target = buttons[(index + step + points.length) % points.length];
+    target?.focus();
+  };
 
   return (
     <div className="cjs-run-progress__chart-block">
@@ -396,7 +537,7 @@ function RunProgressChart({
         <div>
           <h2>Finish-time trend</h2>
           <p id="run-progress-chart-help">
-            Lower points are faster. Select a finish to inspect it.
+            Lower is faster. Hover or use arrow keys to compare finishes; select one to inspect it.
           </p>
         </div>
         <div className="cjs-run-progress__legend" aria-hidden="true">
@@ -404,103 +545,173 @@ function RunProgressChart({
           <span data-series="best">Personal best</span>
         </div>
       </div>
+
+      <div className="cjs-run-progress__chart-controls">
+        <SegmentedControl
+          ariaLabel="Chart horizontal axis"
+          onChange={setAxisMode}
+          options={[
+            { value: "sequence", label: "By run" },
+            { value: "date", label: "By date", disabled: !dateAxisAvailable },
+          ]}
+          value={useDateAxis ? "date" : "sequence"}
+        />
+        <SegmentedControl
+          ariaLabel="Chart time range"
+          onChange={setRangeMode}
+          options={[
+            { value: "all", label: "All finishes" },
+            {
+              value: "focus",
+              label: "Hide slow outliers",
+              disabled: !focusAvailable,
+            },
+          ]}
+          value={useFocus ? "focus" : "all"}
+        />
+        {useFocus && (
+          <p className="cjs-run-progress__chart-note" role="status">
+            {clippedCount} slower {clippedCount === 1 ? "finish" : "finishes"} pinned to the top
+            edge.
+          </p>
+        )}
+      </div>
+
       <div
         className="cjs-run-progress__chart"
         role="group"
         aria-describedby="run-progress-chart-help"
         aria-label="Interactive finish-time chart"
       >
-        <div className="cjs-run-progress__chart-canvas">
-          <svg aria-hidden="true" viewBox={`0 0 ${width} ${height}`}>
-            {(sameTime ? [0.5] : [0, 0.25, 0.5, 0.75, 1]).map((ratio) => {
-              const y = padding.top + ratio * plotHeight;
-              const value = sameTime ? minimum : maximum - ratio * span;
+        <div
+          className="cjs-run-progress__chart-canvas"
+          onPointerLeave={() => setHoveredIndex(null)}
+          onPointerMove={handlePointerMove}
+        >
+          <svg aria-hidden="true" viewBox={`0 0 ${CHART_WIDTH} ${CHART_HEIGHT}`}>
+            {ticks.map((value) => {
+              const y = toY(value);
               return (
-                <g key={ratio}>
+                <g key={value}>
                   <line
                     className="cjs-run-progress__grid-line"
-                    x1={padding.left}
-                    x2={width - padding.right}
+                    x1={CHART_PADDING.left}
+                    x2={CHART_WIDTH - CHART_PADDING.right}
                     y1={y}
                     y2={y}
                   />
                   <text
                     className="cjs-run-progress__axis-label"
-                    x={padding.left - 12}
+                    x={CHART_PADDING.left - 12}
                     y={y + 4}
                     textAnchor="end"
                   >
-                    {formatRunDurationMs(value)}
+                    {formatAxisTick(value, tickStep)}
                   </text>
                 </g>
               );
             })}
             <line
-              className="cjs-run-progress__grid-line"
-              x1={padding.left}
-              x2={width - padding.right}
-              y1={plotBottom}
-              y2={plotBottom}
+              className="cjs-run-progress__grid-line cjs-run-progress__grid-line--axis"
+              x1={CHART_PADDING.left}
+              x2={CHART_WIDTH - CHART_PADDING.right}
+              y1={PLOT_BOTTOM}
+              y2={PLOT_BOTTOM}
             />
-            {dateTickIndexes.map((index) => {
-              const coordinate = coordinates[index];
-              if (!coordinate) return null;
+            {dedupedDateTicks.map((tick, index) => (
+              <g key={tick.key}>
+                <line
+                  className="cjs-run-progress__grid-line"
+                  x1={tick.x}
+                  x2={tick.x}
+                  y1={PLOT_BOTTOM}
+                  y2={PLOT_BOTTOM + 6}
+                />
+                <text
+                  className="cjs-run-progress__axis-label"
+                  data-axis="date"
+                  x={tick.x}
+                  y={CHART_HEIGHT - 14}
+                  textAnchor={
+                    dedupedDateTicks.length === 1
+                      ? "middle"
+                      : index === 0
+                        ? "start"
+                        : index === dedupedDateTicks.length - 1
+                          ? "end"
+                          : "middle"
+                  }
+                >
+                  {tick.label}
+                </text>
+              </g>
+            ))}
 
-              const textAnchor =
-                points.length === 1
-                  ? "middle"
-                  : index === 0
-                    ? "start"
-                    : index === points.length - 1
-                      ? "end"
-                      : "middle";
+            {hoveredCoordinate && (
+              <line
+                className="cjs-run-progress__crosshair"
+                x1={hoveredCoordinate.x}
+                x2={hoveredCoordinate.x}
+                y1={CHART_PADDING.top}
+                y2={PLOT_BOTTOM}
+              />
+            )}
+            {selectedCoordinate && (
+              <line
+                className="cjs-run-progress__guide"
+                x1={selectedCoordinate.x}
+                x2={selectedCoordinate.x}
+                y1={selectedCoordinate.y}
+                y2={PLOT_BOTTOM}
+              />
+            )}
 
-              return (
-                <g key={`date-${pointKey(coordinate.point)}`}>
-                  <line
-                    className="cjs-run-progress__grid-line"
-                    x1={coordinate.x}
-                    x2={coordinate.x}
-                    y1={plotBottom}
-                    y2={plotBottom + 6}
-                  />
-                  <text
-                    className="cjs-run-progress__axis-label"
-                    data-axis="date"
-                    style={{
-                      fill: "var(--cjs-color-text)",
-                      fontSize: "var(--cjs-font-size-sm)",
-                      fontWeight: "var(--cjs-font-weight-medium)",
-                    }}
-                    x={coordinate.x}
-                    y={height - 14}
-                    textAnchor={textAnchor}
-                  >
-                    {formatDate(coordinate.point.run.time_created)}
-                  </text>
-                </g>
-              );
-            })}
+            <path className="cjs-run-progress__line cjs-run-progress__line--best" d={bestPath} />
             <polyline
               className="cjs-run-progress__line cjs-run-progress__line--finish"
               points={runLine}
             />
-            <polyline
-              className="cjs-run-progress__line cjs-run-progress__line--best"
-              points={bestLine}
-            />
-            {coordinates.map(({ point, x, y }) => (
-              <circle
-                key={pointKey(point)}
-                className="cjs-run-progress__dot"
-                cx={x}
-                cy={y}
-                data-personal-best={point.isPersonalBest || undefined}
-                r={point.isPersonalBest ? 6 : 4}
-              />
-            ))}
+            {coordinates.map(({ clipped, point, x, y }) =>
+              clipped ? (
+                <path
+                  key={pointKey(point)}
+                  className="cjs-run-progress__dot cjs-run-progress__dot--clipped"
+                  d={`M${x - 6},${y + 10} L${x + 6},${y + 10} L${x},${y} Z`}
+                />
+              ) : (
+                <circle
+                  key={pointKey(point)}
+                  className="cjs-run-progress__dot"
+                  cx={x}
+                  cy={y}
+                  data-personal-best={point.isPersonalBest || undefined}
+                  r={point.isPersonalBest ? 6 : 4}
+                />
+              ),
+            )}
+            {bestCoordinate && (
+              <text
+                className="cjs-run-progress__annotation"
+                x={bestCoordinate.x}
+                y={
+                  bestCoordinate.y - 14 < CHART_PADDING.top
+                    ? bestCoordinate.y + 22
+                    : bestCoordinate.y - 14
+                }
+                textAnchor={
+                  bestCoordinate.x > CHART_WIDTH - CHART_PADDING.right - 60
+                    ? "end"
+                    : bestCoordinate.x < CHART_PADDING.left + 60
+                      ? "start"
+                      : "middle"
+                }
+              >
+                Best {formatRunDurationMs(bestCoordinate.point.timeMs)}
+              </text>
+            )}
           </svg>
-          {coordinates.map(({ point, x, y }) => (
+
+          {coordinates.map(({ index, point, x, y }) => (
             <button
               key={pointKey(point)}
               className="cjs-run-progress__point"
@@ -509,20 +720,98 @@ function RunProgressChart({
                   ? true
                   : undefined
               }
+              onBlur={() => setHoveredIndex((current) => (current === index ? null : current))}
               onClick={() => onSelect(pointKey(point))}
+              onFocus={() => setHoveredIndex(index)}
+              onKeyDown={(event) => handlePointKeyDown(event, index)}
               style={
                 {
-                  "--cjs-run-x": `${(x / width) * 100}%`,
-                  "--cjs-run-y": `${(y / height) * 100}%`,
+                  "--cjs-run-x": `${(x / CHART_WIDTH) * 100}%`,
+                  "--cjs-run-y": `${(y / CHART_HEIGHT) * 100}%`,
                 } as CSSProperties
               }
               type="button"
               aria-label={`Run ${point.sequence}: ${formatRunDurationMs(point.timeMs)}${point.isPersonalBest ? ", personal best" : ""}`}
             />
           ))}
+
+          {hoveredCoordinate && (
+            <ChartTooltip
+              coordinate={hoveredCoordinate}
+              flip={hoveredCoordinate.x > CHART_WIDTH * 0.6}
+            />
+          )}
         </div>
       </div>
     </div>
+  );
+}
+
+function ChartTooltip({ coordinate, flip }: { coordinate: ChartCoordinate; flip: boolean }) {
+  const { clipped, point, x, y } = coordinate;
+  return (
+    <div
+      aria-hidden="true"
+      className="cjs-run-progress__tooltip"
+      data-flip={flip || undefined}
+      style={
+        {
+          "--cjs-run-x": `${(x / CHART_WIDTH) * 100}%`,
+          "--cjs-run-y": `${(y / CHART_HEIGHT) * 100}%`,
+        } as CSSProperties
+      }
+    >
+      <p>
+        Run #{point.sequence} · {formatDate(point.run.time_created)}
+      </p>
+      <strong>{formatRunDurationMs(point.timeMs)}</strong>
+      <ul>
+        <li data-series="best">
+          {point.isPersonalBest
+            ? point.personalBestGainMs === null
+              ? "First finish"
+              : `Personal best, −${formatRunDurationMs(point.personalBestGainMs)}`
+            : formatBehindBest(point)}
+        </li>
+        {point.previousFinishDeltaMs !== null && (
+          <li data-series="finish">
+            {formatFinishDelta(point.previousFinishDeltaMs)} than previous
+          </li>
+        )}
+        {clipped && <li>Slower than the visible range</li>}
+      </ul>
+    </div>
+  );
+}
+
+function niceTicks(minimum: number, maximum: number, target = 4): number[] {
+  const span = maximum - minimum;
+  const fallbackStep = TICK_STEPS_MS.find((step) => step >= maximum * 0.05) ?? 1_000;
+  const step =
+    span <= 0
+      ? fallbackStep
+      : (TICK_STEPS_MS.find((candidate) => span / candidate <= target) ??
+        (TICK_STEPS_MS.at(-1) ?? 3_600_000) * Math.ceil(span / (3_600_000 * target)));
+  let start = Math.floor(minimum / step) * step;
+  let end = Math.ceil(maximum / step) * step;
+  if (start === end) {
+    start = Math.max(0, start - step);
+    end += step;
+  }
+  const ticks: number[] = [];
+  for (let value = start; value <= end + step / 2; value += step) ticks.push(value);
+  return ticks;
+}
+
+function formatAxisTick(valueMs: number, stepMs: number): string {
+  const label = formatRunDurationMs(valueMs);
+  return stepMs >= 1_000 && label.endsWith(".00") ? label.slice(0, -3) : label;
+}
+
+function evenlySpacedTimestamps(minimum: number, maximum: number, count = 5): number[] {
+  return Array.from(
+    { length: count },
+    (_, index) => minimum + ((maximum - minimum) * index) / (count - 1),
   );
 }
 
@@ -556,9 +845,16 @@ function RunDetails({ point }: { point: RunProgressPoint }) {
           label="Recorded"
           value={point.run.time_created ? formatDate(point.run.time_created) : "Unknown"}
         />
+        <DetailStat label="vs previous" value={formatFinishDelta(point.previousFinishDeltaMs)} />
         <DetailStat
-          label="Run ID"
-          value={point.run.run_id ? `#${point.run.run_id}` : "Not provided"}
+          label="vs personal best"
+          value={
+            point.isPersonalBest
+              ? point.personalBestGainMs === null
+                ? "Baseline"
+                : `−${formatRunDurationMs(point.personalBestGainMs)}`
+              : formatBehindBest(point)
+          }
         />
         <DetailStat label="Time rank" value={`#${point.run.rank}`} />
         <DetailStat label="Loads" value={formatCount(point.run.load_count)} />
@@ -566,14 +862,18 @@ function RunDetails({ point }: { point: RunProgressPoint }) {
         <DetailStat label="Nade throws" value={formatCount(point.run.nade_throws)} />
         <DetailStat label="Nade jumps" value={formatCount(point.run.nadejumps)} />
         <DetailStat label="Run type" value={point.run.type || "Not provided"} />
+        <DetailStat
+          label="Run ID"
+          value={point.run.run_id ? `#${point.run.run_id}` : "Not provided"}
+        />
       </dl>
     </Panel>
   );
 }
 
-function SummaryStat({ label, value }: { label: string; value: string }) {
+function SummaryStat({ hero, label, value }: { hero?: boolean; label: string; value: string }) {
   return (
-    <div>
+    <div data-hero={hero || undefined}>
       <dt>{label}</dt>
       <dd>{value}</dd>
     </div>
@@ -603,6 +903,11 @@ function formatFinishDelta(deltaMs: number | null): string {
   if (deltaMs === null) return "Baseline";
   if (deltaMs === 0) return "Same time";
   return `${formatRunDurationMs(Math.abs(deltaMs))} ${deltaMs < 0 ? "faster" : "slower"}`;
+}
+
+function formatBehindBest(point: RunProgressPoint): string {
+  const behindMs = point.timeMs - point.personalBestMs;
+  return behindMs === 0 ? "Matches best" : `+${formatRunDurationMs(behindMs)} behind best`;
 }
 
 function formatCount(value: number | undefined): string {

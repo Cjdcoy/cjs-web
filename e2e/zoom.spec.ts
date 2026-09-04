@@ -13,7 +13,7 @@ test("critical pages retain content and avoid horizontal overflow at a 200% scal
   const routes = [
     { path: "/", heading: "Live servers" },
     { path: "/leaderboards", heading: "Leaderboards" },
-    { path: "/maps", heading: "Find your next route" },
+    { path: "/maps", heading: "Browse maps" },
     { path: "/maps/101", heading: "mp_cjs_training" },
     { path: "/players?q=Runner", heading: "Find a player" },
     { path: "/players/501", heading: "Runner" },

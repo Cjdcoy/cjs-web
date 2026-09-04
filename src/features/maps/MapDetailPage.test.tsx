@@ -152,8 +152,10 @@ describe("MapDetailPage", () => {
       "https://media.example.invalid/maps/mp_alpha",
     );
     expect(await screen.findByRole("heading", { name: "In-game Replay views" })).toBeVisible();
-    expect(api.replayWatchAggregate).toHaveBeenCalledWith(
-      expect.objectContaining({ mapId: 1, source: "j4l" }),
+    await waitFor(() =>
+      expect(api.replayWatchAggregate).toHaveBeenCalledWith(
+        expect.objectContaining({ mapId: 1, source: "j4l" }),
+      ),
     );
     expect(api.replayWatchRankings).toHaveBeenCalledWith(
       expect.objectContaining({ limit: 1, mapId: 1, metric: "watch_count", source: "j4l" }),

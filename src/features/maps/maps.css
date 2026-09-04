@@ -1,6 +1,5 @@
 .cjs-maps {
   --cjs-stack-space: var(--cjs-space-4);
-  padding-block: var(--cjs-space-5) var(--cjs-space-10);
 }
 
 .cjs-maps__header {
@@ -135,6 +134,25 @@
   grid-template-columns: clamp(15rem, 22vw, 18rem) minmax(17rem, 1fr) minmax(22rem, 1.2fr);
   min-width: 0;
   overflow: hidden;
+  transition:
+    border-color var(--cjs-duration-fast) var(--cjs-ease-standard),
+    transform var(--cjs-duration-fast) var(--cjs-ease-standard);
+}
+
+.cjs-map-card:hover {
+  border-color: var(--cjs-color-accent);
+  transform: translateY(-2px);
+}
+
+.cjs-map-card:hover .cjs-map-card__image {
+  transform: scale(1.04);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cjs-map-card:hover,
+  .cjs-map-card:hover .cjs-map-card__image {
+    transform: none;
+  }
 }
 
 .cjs-map-card__art {
@@ -157,7 +175,8 @@
   display: block;
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
+  transition: transform var(--cjs-duration-fast) var(--cjs-ease-standard);
 }
 
 .cjs-map-card__art span {
@@ -270,7 +289,9 @@
 
 .cjs-map-card__difficulty-list li {
   display: inline-flex;
+  min-width: 4.5rem;
   align-items: baseline;
+  justify-content: center;
   gap: var(--cjs-space-2);
   padding: var(--cjs-space-1) var(--cjs-space-2);
   border: var(--cjs-border-width) solid var(--cjs-color-border);
@@ -282,6 +303,21 @@
 .cjs-map-card__difficulty-list li[data-selected="true"] {
   border-color: var(--cjs-color-accent);
   background: var(--cjs-color-accent-surface);
+}
+
+/* Dimmed with a token rather than opacity: opacity composites the text down
+   to 3.09:1 against the panel, below the WCAG AA 4.5:1 minimum. */
+.cjs-map-card__difficulty-list li[data-unrated] {
+  background: none;
+}
+
+.cjs-map-card__difficulty-list li[data-unrated] span,
+.cjs-map-card__difficulty-list li[data-unrated] strong {
+  color: var(--cjs-color-text-subtle);
+}
+
+.cjs-map-card__difficulty-list li[data-unrated] strong {
+  font-weight: var(--cjs-font-weight-regular);
 }
 
 .cjs-map-card__difficulty-list span,
@@ -307,8 +343,8 @@
   min-width: 0;
   flex-direction: column;
   justify-content: center;
-  gap: var(--cjs-space-2);
-  padding: var(--cjs-space-4);
+  gap: var(--cjs-space-1);
+  padding: var(--cjs-space-3) var(--cjs-space-4);
 }
 
 .cjs-map-card__metrics > div + div {
@@ -351,8 +387,55 @@
   font-size: var(--cjs-font-size-xs);
 }
 
+/* Compact list rows only where the row has room; narrower viewports keep
+   the stacked card layout from the breakpoints below. */
+@media (min-width: 68rem) {
+  /* List view is a dense scan of 600+ maps: one short row per map. */
+  .cjs-maps__results[data-view="list"] .cjs-map-card {
+    /* Fixed tracks so every row's columns line up down the page. */
+    grid-template-columns: 10rem minmax(0, 1fr) 21rem;
+    align-items: center;
+  }
+
+  .cjs-maps__results[data-view="list"] .cjs-map-card__art {
+    min-height: 0;
+    aspect-ratio: 16 / 9;
+  }
+
+  .cjs-maps__results[data-view="list"] .cjs-map-card__identity {
+    flex-direction: row;
+    align-items: center;
+    gap: var(--cjs-space-4);
+    padding: var(--cjs-space-2) var(--cjs-space-4);
+  }
+
+  .cjs-maps__results[data-view="list"] .cjs-map-card__heading {
+    flex: 1;
+    align-items: center;
+  }
+
+  .cjs-maps__results[data-view="list"] .cjs-map-card__difficulty-label {
+    display: none;
+  }
+
+  /* Fixed width so the chips and the favourite button line up down the column. */
+  .cjs-maps__results[data-view="list"] .cjs-map-card__difficulty {
+    flex: 0 0 24rem;
+  }
+
+  .cjs-maps__results[data-view="list"] .cjs-map-card__difficulty-list {
+    flex-wrap: nowrap;
+  }
+
+  .cjs-maps__results[data-view="list"] .cjs-map-card__metrics > div {
+    gap: 0;
+    padding: var(--cjs-space-2) var(--cjs-space-4);
+  }
+}
+
 .cjs-maps__results[data-view="grid"] .cjs-map-card {
   grid-template-columns: 1fr;
+  grid-template-rows: auto 1fr auto;
 }
 
 .cjs-maps__results[data-view="grid"] .cjs-map-card__art {
