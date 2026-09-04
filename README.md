@@ -108,8 +108,8 @@ accessibility scans, console-error checks, small-screen reflow, reduced motion, 
 equivalent. See [the CJS-015 validation record](docs/CJS-015-VALIDATION.md) for the current matrix and
 bundle measurements.
 
-GitHub Actions installs the locked dependencies, runs `npm run verify`, executes
-the three-browser E2E matrix, and validates a Cloudflare dry run for every pull
+GitHub Actions installs the locked dependencies, runs `npm run verify`, validates
+a Cloudflare dry run, and executes the three-browser E2E matrix for every pull
 request and push to `main`. The stable required check is named
 `Build and validate`. A separate, disabled-by-default workflow can publish the
 exact successful `main` revision as the `cjs-web` Cloudflare Worker.

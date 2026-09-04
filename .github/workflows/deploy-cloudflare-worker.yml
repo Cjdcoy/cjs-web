@@ -39,15 +39,6 @@ jobs:
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
-      - name: Set up Node.js
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 26
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
       - name: Validate release configuration
         env:
           CJS_PRODUCTION_URL: ${{ vars.CJS_PRODUCTION_URL }}
@@ -56,11 +47,41 @@ jobs:
           RELEASE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
         run: node scripts/check-release-config.mjs
 
+      # Normal path: ship the exact dist/ that CI built and dry-ran for this commit.
+      - name: Restore production build from CI
+        if: github.event_name == 'workflow_run'
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: dist
+          key: dist-${{ github.event.workflow_run.head_sha }}
+          fail-on-cache-miss: true
+
+      # Wrangler needs Node 22+, so do not rely on the runner's preinstalled Node.
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 26
+
+      # Same cache CI fills on main: with it, wrangler-action finds the pinned
+      # Wrangler already installed and skips its own npm install.
+      - name: Restore node_modules
+        id: node-modules
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules
+          key: node-modules-${{ runner.os }}-node26-${{ hashFiles('package-lock.json') }}
+
+      - name: Install dependencies
+        if: github.event_name == 'workflow_dispatch' && steps.node-modules.outputs.cache-hit != 'true'
+        run: npm ci
+
       - name: Build production site
+        if: github.event_name == 'workflow_dispatch'
         run: npm run build
 
-      - name: Validate Cloudflare package without deploying
-        run: npm run deploy:dry-run
+      - name: Resolve pinned Wrangler version
+        id: wrangler
+        run: echo "version=$(node -p "require('./package.json').devDependencies.wrangler")" >> "$GITHUB_OUTPUT"
 
       - name: Deploy to Cloudflare Workers
         id: deploy
@@ -68,7 +89,7 @@ jobs:
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          wranglerVersion: "4.114.0"
+          wranglerVersion: ${{ steps.wrangler.outputs.version }}
           command: >-
             deploy --strict --config wrangler.jsonc
             --message "GitHub ${{ github.event.workflow_run.head_sha || github.sha }}"

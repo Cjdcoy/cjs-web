@@ -45,8 +45,9 @@ token, or custom domain. `workers_dev` and preview URLs remain disabled.
 5. Obtain explicit owner approval. Set `CLOUDFLARE_DEPLOY_ENABLED=true` only when ongoing
    merge-to-production releases are intended.
 6. Merge through the protected branch. The deploy workflow starts only after CI succeeds for the
-   exact `main` commit, rebuilds, dry-runs, deploys with Wrangler strict mode, and checks public SPA
-   routes, security headers, and immutable asset caching.
+   exact `main` commit. It deploys the exact `dist/` that CI built, dry-ran, and cached for that
+   commit with Wrangler strict mode, then checks public SPA routes, security headers, and immutable
+   asset caching. An explicitly authorized manual dispatch rebuilds `dist/` instead.
 7. Watch both workflows through completion. Verify the configured production origin manually at `/`,
    `/leaderboards`, `/maps`, `/players`, `/favorites`, and `/about`.
 
@@ -61,12 +62,12 @@ gh workflow run deploy-cloudflare-worker.yml --ref main --repo Cjdcoy/cjs-web
 A rollback is a production mutation and requires explicit owner authorization.
 
 1. Identify the last known-good version in Cloudflare **Workers & Pages → cjs-web → Deployments** or
-   with `npx --yes wrangler@4.114.0 deployments list --config wrangler.jsonc`.
+   with `npx wrangler deployments list --config wrangler.jsonc`.
 2. Record the incident, bad commit/deployment, chosen version ID, and reason for rollback.
 3. Roll back through the Cloudflare dashboard, or run this only after approval:
 
    ```sh
-   npx --yes wrangler@4.114.0 rollback VERSION_ID --config wrangler.jsonc --message "Rollback: REASON"
+   npx wrangler rollback VERSION_ID --config wrangler.jsonc --message "Rollback: REASON"
    ```
 
 4. Run the production smoke checks using `CJS_PRODUCTION_URL=https://… npm run smoke:production` and

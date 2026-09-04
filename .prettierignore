@@ -7,3 +7,4 @@ dist
 graphify-out
 node_modules
 package-lock.json
+dist-e2e
