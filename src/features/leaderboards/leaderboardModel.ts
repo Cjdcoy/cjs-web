@@ -47,6 +47,7 @@ export interface LeaderboardRow {
   score?: number;
   topList?: Record<string, number>;
   totalXp?: number;
+  level?: number;
   levelDisplay?: string;
   prestige?: number;
   metric: number | null;
@@ -116,6 +117,7 @@ export function createLeaderboardRows(
         region: entry.region,
         lastSeen: entry.last_seen,
         totalXp: entry.total_xp,
+        level: entry.level,
         levelDisplay: entry.level_display,
         prestige: entry.prestige,
         metric: entry.total_xp,

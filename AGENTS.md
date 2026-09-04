@@ -19,11 +19,15 @@
 
 ## Codebase discovery
 
-- Prefer the codebase-memory MCP graph over text search for code discovery:
-  `search_graph`, `trace_path`, `get_code_snippet`, `query_graph`, then
-  `get_architecture`.
-- Use `rg` for literals, error messages, configuration, documentation, and cases
-  where the graph has insufficient coverage.
+- Use `rg` for code discovery: literals, error messages, identifiers,
+  configuration, and documentation.
+- Before edits spanning a large amount of existing code, delegate an
+  implementation-context synthesis to the `local-qwen` MCP server
+  (`delegate_to_qwen`, `task_kind: implementation-context`) with the relevant
+  files named as `source_files`; it runs locally and costs no model quota.
+  Delegate large test or build logs and pre-commit diffs the same way. Always
+  make one targeted verification read of the claims the answer turns on, and
+  keep every decision and edit here.
 - Consult the live [API docs](https://api.jump4life.org/docs) and
   [OpenAPI contract](https://api.jump4life.org/openapi.yaml) before adding or
   changing an endpoint. Do not infer unsupported parameters from the UI.

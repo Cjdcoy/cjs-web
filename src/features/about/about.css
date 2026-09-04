@@ -40,7 +40,7 @@
 }
 
 .cjs-about__section-heading .cjs-about__eyebrow {
-  color: var(--cjs-color-accent-secondary);
+  color: var(--cjs-color-accent-strong);
   font-size: var(--cjs-font-size-xs);
   font-weight: var(--cjs-font-weight-bold);
   letter-spacing: 0.12em;
@@ -49,6 +49,13 @@
 
 .cjs-about__introduction > .cjs-badge {
   margin-block-start: var(--cjs-space-4);
+}
+
+.cjs-about__hero > img {
+  justify-self: center;
+  width: clamp(12rem, 35vw, 18rem);
+  height: auto;
+  display: block;
 }
 
 .cjs-about__facts {

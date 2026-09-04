@@ -31,10 +31,11 @@ export function MapCard({ favorite, fps, item, onToggleFavorite, source }: MapCa
   const mediaUrl = getSafeMediaUrl(map.video);
   const mapVideos = getMapVideos(map.mapname, map.video);
   const [failedImagePath, setFailedImagePath] = useState<string | null>(null);
-  const difficultyRatings = DISPLAY_FPS_VALUES.flatMap((ratingFps) => {
-    const value = getMapDifficulty(map, ratingFps);
-    return value === null ? [] : [{ fps: ratingFps, value }];
-  });
+  const difficultyRatings = DISPLAY_FPS_VALUES.map((ratingFps) => ({
+    fps: ratingFps,
+    value: getMapDifficulty(map, ratingFps),
+  }));
+  const hasAnyRating = difficultyRatings.some((rating) => rating.value !== null);
   const detailsPath = mapDetailPath(map.mapid, { source });
 
   return (
@@ -113,16 +114,21 @@ export function MapCard({ favorite, fps, item, onToggleFavorite, source }: MapCa
             <Trophy aria-hidden="true" size={14} />
             Difficulty by FPS
           </span>
-          {difficultyRatings.length > 0 ? (
+          {hasAnyRating ? (
             <ul className="cjs-map-card__difficulty-list" aria-label="Difficulty ratings by FPS">
               {difficultyRatings.map((rating) => (
                 <li
                   key={rating.fps}
                   data-selected={rating.fps === fps || undefined}
-                  aria-label={`${rating.fps} FPS difficulty ${rating.value.toFixed(2)} out of 10`}
+                  data-unrated={rating.value === null || undefined}
+                  aria-label={
+                    rating.value === null
+                      ? `${rating.fps} FPS difficulty not rated`
+                      : `${rating.fps} FPS difficulty ${rating.value.toFixed(2)} out of 10`
+                  }
                 >
                   <span>{rating.fps}</span>
-                  <strong>{rating.value.toFixed(2)}</strong>
+                  <strong>{rating.value === null ? "n/a" : rating.value.toFixed(2)}</strong>
                 </li>
               ))}
             </ul>

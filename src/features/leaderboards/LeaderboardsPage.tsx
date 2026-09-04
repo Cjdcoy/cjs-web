@@ -8,6 +8,7 @@ import {
   Input,
   Link,
   Panel,
+  RankEmblem,
   SegmentedControl,
   Select,
   SkeletonGroup,
@@ -555,11 +556,23 @@ function CountryFlag({ row }: { row: LeaderboardRow }) {
 
 function RankProgress({ row }: { row: LeaderboardRow }) {
   return (
-    <span className="cjs-leaderboards__details">
-      <span>{row.levelDisplay || "Level unavailable"}</span>
-      {row.prestige !== undefined && <small>Prestige {numberFormatter.format(row.prestige)}</small>}
+    <span className="cjs-leaderboards__rank-progress">
+      <RankEmblem fixedSlot level={row.level} prestige={row.prestige} size="small" />
+      <span className="cjs-leaderboards__details">
+        {row.prestige !== undefined && row.prestige > 0 && (
+          <small className="cjs-leaderboards__prestige">
+            Prestige {numberFormatter.format(row.prestige)}
+          </small>
+        )}
+        {formatRankLevel(row)}
+      </span>
     </span>
   );
+}
+
+function formatRankLevel(row: LeaderboardRow): string {
+  const level = row.levelDisplay?.trim() || (row.level === undefined ? "" : String(row.level));
+  return level ? `Lv ${level}` : "Level unavailable";
 }
 
 function TopPlaceDistribution({ row }: { row: LeaderboardRow }) {

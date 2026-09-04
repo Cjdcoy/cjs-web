@@ -3,14 +3,21 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { act } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { markNavigationComplete, navigate, type AppRouteId } from "../../lib/routing";
+import {
+  SourceProvider,
+  markNavigationComplete,
+  navigate,
+  type AppRouteId,
+} from "../../lib/routing";
 import { AppShell } from "./AppShell";
 
 function renderShell(routeId: AppRouteId = "maps") {
   return render(
-    <AppShell route={{ id: routeId, params: {} }}>
-      <h1>Route content</h1>
-    </AppShell>,
+    <SourceProvider>
+      <AppShell route={{ id: routeId, params: {} }}>
+        <h1>Route content</h1>
+      </AppShell>
+    </SourceProvider>,
   );
 }
 

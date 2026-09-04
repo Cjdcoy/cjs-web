@@ -4,6 +4,8 @@ import { expect, test } from "./fixtures/test";
 import {
   playerActivityFixture,
   playerPerformanceFixture,
+  replayWatchAggregateFixture,
+  replayWatchRankingsFixture,
   playerPositionsFixture,
   playerRankFixture,
   playersFixture,
@@ -15,6 +17,8 @@ const j4lProfileResponses: Readonly<Record<string, unknown>> = {
   "/api/v1/player/leaderboard-positions": playerPositionsFixture,
   "/api/v1/player/performance-stats": playerPerformanceFixture,
   "/api/v1/player/rank": playerRankFixture,
+  "/api/v1/replay/watch-aggregate": replayWatchAggregateFixture,
+  "/api/v1/replay/watch-rankings": replayWatchRankingsFixture,
 };
 
 test.use({
@@ -114,7 +118,7 @@ test("best runs expose jump-skill points without mobile or desktop overflow", as
 test("J4L lifetime activity leads the overview and keeps metric values below labels", async ({
   page,
 }) => {
-  await page.route("**/__api/api/v1/player/**", async (route) => {
+  await page.route("**/__api/api/v1/**", async (route) => {
     const path = new URL(route.request().url()).pathname.replace(/^\/__api/, "");
     const response = j4lProfileResponses[path];
     await route.fulfill(
@@ -131,11 +135,13 @@ test("J4L lifetime activity leads the overview and keeps metric values below lab
   const lifetimeActivity = page.locator(".cjs-player-profile__section--activity");
   const metricCards = lifetimeActivity.locator(".cjs-player-profile__activity-grid > div");
   const recentActivity = page.locator(".cjs-player-profile__overview-column--recent");
-  await expect(page.getByRole("heading", { level: 2, name: "Lifetime activity" })).toBeVisible();
-  await expect(metricCards).toHaveCount(13);
-  expect(
-    await lifetimeActivity.evaluate((section) => section.previousElementSibling === null),
-  ).toBe(true);
+  await expect(page.getByRole("heading", { level: 2, name: "Time on Jump4Life" })).toBeVisible();
+  await expect(lifetimeActivity.locator(".cjs-player-profile__time-split-bar")).toBeVisible();
+  await expect(
+    lifetimeActivity.locator(".cjs-player-profile__activity-highlights > div"),
+  ).toHaveCount(4);
+  await lifetimeActivity.getByText("All tracking totals").click();
+  await expect(metricCards).toHaveCount(9);
   expect(await horizontalPositions(metricCards)).toHaveLength(5);
   expect(await valuesFollowLabels(metricCards)).toBe(true);
   expect((await recentActivity.boundingBox())?.width).toBeGreaterThan(300);

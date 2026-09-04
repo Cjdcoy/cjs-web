@@ -38,6 +38,15 @@
   color: var(--cjs-color-cod-9);
 }
 
+/* Tokens hold the true CoD palette. Black and dark blue are unreadable on dark panels,
+   so only their lightness is lifted here; hue and chroma stay the game's own. */
+.cjs-player-name__segment[data-cod-color="0"] {
+  color: oklch(from var(--cjs-color-cod-0) 0.62 c h);
+}
+
+.cjs-player-name__segment[data-cod-color="4"] {
+  color: oklch(from var(--cjs-color-cod-4) 0.68 c h);
+}
 .cjs-button,
 .cjs-icon-button,
 .cjs-segmented-control__option,
@@ -285,6 +294,11 @@
 
 .cjs-field__adornment[data-position="trailing"] {
   inset-inline-end: var(--cjs-space-3);
+}
+
+.cjs-select option {
+  background: var(--cjs-color-elevated);
+  color: var(--cjs-color-text);
 }
 
 .cjs-input,
@@ -815,4 +829,37 @@
     animation: none;
     background-position: 0 0;
   }
+}
+
+.cjs-rank-emblem {
+  display: inline-flex;
+  height: var(--cjs-rank-emblem-size, 3rem);
+  flex: none;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Level art is square and prestige art is 2:1, so the image is fitted to the
+   box rather than sized directly; that keeps both variants the same height. */
+.cjs-rank-emblem > img {
+  display: block;
+  width: auto;
+  max-width: calc(var(--cjs-rank-emblem-size, 3rem) * 2);
+  height: auto;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.cjs-rank-emblem[data-size="small"] {
+  --cjs-rank-emblem-size: 2.5rem;
+}
+
+.cjs-rank-emblem[data-size="large"] {
+  --cjs-rank-emblem-size: 4.25rem;
+}
+
+/* In a list the emblem gets a fixed slot wide enough for the 2:1 prestige art,
+   so text after it starts at the same place on every row. */
+.cjs-rank-emblem[data-slot="fixed"] {
+  width: calc(var(--cjs-rank-emblem-size, 3rem) * 2);
 }

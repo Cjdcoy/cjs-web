@@ -11,6 +11,7 @@ test-results/
 !.env.example
 
 # Local agent and code-index metadata.
+.logs/
 .agents/
 .codex/
 .codebase-memory/

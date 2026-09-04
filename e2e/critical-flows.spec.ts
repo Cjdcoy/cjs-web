@@ -61,7 +61,7 @@ test("player discovery, profile, and favorites work as one flow", async ({ page 
 
   await expect(page).toHaveURL(/\/players\/501\?source=jh$/);
   await expect(page.getByRole("heading", { level: 1, name: "Runner" })).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Performance" })).toBeVisible();
+  await expect(page.getByRole("heading", { level: 2, name: "Records by FPS" })).toBeVisible();
   await expect(page.getByRole("link", { name: "mp_cjs_training" }).first()).toBeVisible();
 
   await page.goto("/favorites?tab=players");

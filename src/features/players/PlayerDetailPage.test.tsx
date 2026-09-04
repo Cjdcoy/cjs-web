@@ -66,38 +66,40 @@ describe("PlayerDetailPage", () => {
     expect(apiClient.playerRoutes).not.toHaveBeenCalled();
     expect(apiClient.playerRank).toHaveBeenCalledOnce();
     expect(apiClient.playerActivitySummary).toHaveBeenCalledOnce();
+    expect(await screen.findByRole("heading", { name: "Replay reach" })).toBeInTheDocument();
     expect(apiClient.replayWatchAggregate).toHaveBeenCalledWith(
       expect.objectContaining({ ownerPlayerId: 42, source: "j4l" }),
     );
     expect(apiClient.replayWatchRankings).toHaveBeenCalledWith(
       expect.objectContaining({ ownerPlayerId: 42, metric: "watch_count", source: "j4l" }),
     );
-    expect(await screen.findByRole("heading", { name: "Replay reach" })).toBeInTheDocument();
     const refreshButton = screen.getByRole("button", { name: "Refresh profile" });
     expect(refreshButton).toHaveAttribute("title", "Refresh profile");
     expect(refreshButton).toHaveAttribute("data-variant", "ghost");
     expect(refreshButton).toHaveTextContent("");
-    const performanceHeading = screen.getByRole("heading", { level: 2, name: "Performance" });
-    const recentActivity = screen.getByRole("heading", { level: 2, name: "Recent activity" });
-    expect(performanceHeading).toBeInTheDocument();
-    expect(recentActivity).toBeInTheDocument();
+    const recordsHeading = screen.getByRole("heading", { level: 2, name: "Records by FPS" });
+    const recentRecords = screen.getByRole("heading", { level: 2, name: "Last records" });
+    expect(recordsHeading).toBeInTheDocument();
+    expect(recentRecords).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 2, name: "Leaderboard positions" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { level: 2, name: "Jump4Life rank" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Player highlights")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Performance" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Jump4Life rank" })).not.toBeInTheDocument();
     const accountDetails = screen.getByLabelText("Account details");
     expect(accountDetails).toHaveTextContent("SupporterAdministrator · Level 101");
     expect(accountDetails.querySelector(".cjs-badge")).toBeNull();
     expect(accountDetails).not.toHaveTextContent("best FPS");
-    const performanceSummary = screen.getByLabelText("Performance summary");
-    expect(performanceSummary).toHaveTextContent("Route completion20 completed · 50%");
-    expect(performanceSummary).toHaveTextContent("Best leaderboard placement#1");
-    expect(performanceSummary).toHaveTextContent("Top-10 leaderboard placements5");
-    expect(performanceSummary).toHaveTextContent("#1 leaderboard placements1");
-    expect(performanceSummary).toHaveTextContent("Average leaderboard placement4.5");
-    expect(performanceSummary).toHaveTextContent("Best record FPS250 FPS");
-    expect(screen.getByRole("heading", { level: 3, name: "Records by FPS" })).toBeInTheDocument();
+    const highlights = screen.getByLabelText("Player highlights");
+    expect(highlights).toHaveTextContent("Route completion50%20 routes completed");
+    expect(highlights).toHaveTextContent("Best board#3 Surf skill");
+    expect(highlights).toHaveTextContent("Top-10 placements 5 · #1 placements 1");
+    expect(highlights).toHaveTextContent("Best at 250 FPS · avg placement 4.5");
+    expect(highlights).toHaveTextContent("Jump4Life rank");
+    expect(highlights).not.toHaveTextContent("Recent records");
+    expect(screen.getByLabelText("Record counts by FPS")).toBeInTheDocument();
+    expect(screen.getByLabelText("Time split")).toHaveTextContent("Playing");
+    expect(screen.getByText("All tracking totals")).toBeInTheDocument();
     expect(screen.getByText("Run attempts")).toBeInTheDocument();
     expect(screen.getByText("Playing AFK")).toBeInTheDocument();
     expect(screen.getByText("Nade throws")).toBeInTheDocument();
@@ -111,7 +113,9 @@ describe("PlayerDetailPage", () => {
       "/maps/655?source=j4l&lookup=cpid",
     );
     expect(screen.getByTitle("Second place achievement")).toHaveTextContent("#2");
-    expect(screen.getByTitle("Top 10 achievement")).toHaveTextContent("#7");
+    expect(
+      screen.getAllByTitle("Top 10 achievement").map((element) => element.textContent),
+    ).toContain("#7");
     expect(screen.getByRole("link", { name: "mp_recent" }).closest("li")).not.toHaveAttribute(
       "data-achievement",
     );
@@ -123,22 +127,27 @@ describe("PlayerDetailPage", () => {
       "/players/42?fps=250&source=j4l&view=runs",
     );
     expect(screen.queryByRole("combobox", { name: "Leaderboard" })).not.toBeInTheDocument();
-    expect(screen.getByRole("cell", { name: "Surf skill" })).toBeInTheDocument();
-    expect(screen.getByRole("cell", { name: "Speed skill" })).toBeInTheDocument();
+    const boards = screen.getByRole("list", { name: "Leaderboard positions at 250 FPS" });
+    expect(boards).toHaveTextContent("Surf skill");
+    expect(boards).toHaveTextContent("Speed skill");
+    expect(screen.getAllByRole("link", { name: "View board" })[0]).toHaveAttribute(
+      "href",
+      "/leaderboards?source=j4l&board=surf-skill&fps=250",
+    );
+    expect(screen.getByRole("radio", { name: "250 FPS" })).toHaveAttribute("aria-checked", "true");
     expect(screen.queryByText("Active")).not.toBeInTheDocument();
 
-    const lifetimeActivity = screen.getByRole("heading", { name: "Lifetime activity" });
+    const lifetimeActivity = screen.getByRole("heading", { name: "Time on Jump4Life" });
     const leaderboardPositions = screen.getByRole("heading", { name: "Leaderboard positions" });
     expect(
-      lifetimeActivity.compareDocumentPosition(performanceHeading) &
+      leaderboardPositions.compareDocumentPosition(recordsHeading) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      lifetimeActivity.compareDocumentPosition(recentActivity) & Node.DOCUMENT_POSITION_FOLLOWING,
+      recordsHeading.compareDocumentPosition(lifetimeActivity) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
     expect(
-      lifetimeActivity.compareDocumentPosition(leaderboardPositions) &
-        Node.DOCUMENT_POSITION_FOLLOWING,
+      lifetimeActivity.compareDocumentPosition(recentRecords) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
 
     const parameters = new URLSearchParams(window.location.search);
@@ -166,7 +175,7 @@ describe("PlayerDetailPage", () => {
 
     renderProfile(apiClient);
 
-    const recentRecords = await screen.findByRole("region", { name: "50 recent records" });
+    const recentRecords = await screen.findByRole("region", { name: "50 last records" });
     expect(recentRecords).toHaveClass("cjs-player-profile__recent-scroll");
     expect(screen.getByRole("list", { name: "Recent personal records" }).children).toHaveLength(50);
     expect(screen.getByRole("link", { name: "mp_recent_50" })).toBeInTheDocument();
@@ -183,9 +192,8 @@ describe("PlayerDetailPage", () => {
     expect(apiClient.playerActivitySummary).not.toHaveBeenCalled();
     expect(apiClient.replayWatchAggregate).not.toHaveBeenCalled();
     expect(apiClient.replayWatchRankings).not.toHaveBeenCalled();
-    expect(
-      screen.getByRole("heading", { level: 2, name: "JumpersHeaven profile" }),
-    ).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Time on Jump4Life" })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Player highlights")).not.toHaveTextContent("Jump4Life rank");
     expect(screen.getByRole("link", { name: "Find this player in Jump4Life" })).toHaveAttribute(
       "href",
       "/players?source=j4l",
@@ -241,9 +249,11 @@ describe("PlayerDetailPage", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "RunnerOne" })).toBeInTheDocument();
     expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: /unavailable/i })).not.toBeInTheDocument();
-    expect(screen.getAllByText("Not ranked yet")).toHaveLength(3);
-    expect(screen.getByText("3 completed · 0.47%")).toBeInTheDocument();
-    expect(screen.getByText("Today")).toBeInTheDocument();
+    const highlights = screen.getByLabelText("Player highlights");
+    expect(highlights).toHaveTextContent("Best boardNot ranked yet");
+    expect(highlights).toHaveTextContent("0.47%3 routes completed");
+    expect(highlights).toHaveTextContent("No ranked records yet");
+    expect(highlights).not.toHaveTextContent("Recent records");
     expect(screen.getByText(/expected for new players/i)).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Not on the board… yet" })).toBeInTheDocument();
   });
@@ -257,9 +267,8 @@ describe("PlayerDetailPage", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "RunnerOne" })).toBeInTheDocument();
     expect(screen.getByText("Some profile data is unavailable.")).toBeInTheDocument();
-    expect(
-      screen.getByRole("heading", { name: "Performance statistics unavailable" }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Records by FPS unavailable" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Player highlights")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Leaderboard positions" })).toBeInTheDocument();
   });
 
@@ -465,9 +474,11 @@ describe("PlayerDetailPage", () => {
     expect(
       screen.getByRole("progressbar", { name: "50% of published routes completed" }),
     ).toHaveValue(50);
-    expect(screen.getByRole("columnheader", { name: "Status" })).toBeInTheDocument();
-    expect(screen.getByRole("columnheader", { name: "Completed FPS" })).toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Status" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("columnheader", { name: "Ender" })).not.toBeInTheDocument();
+    expect(screen.getByRole("columnheader", { name: "Finished at" })).toBeInTheDocument();
     expect(screen.getByRole("cell", { name: "125, 250 FPS" })).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "Not yet" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "mp_route" })).toHaveAttribute(
       "href",
       "/maps/17?source=j4l",

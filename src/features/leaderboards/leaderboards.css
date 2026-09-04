@@ -299,6 +299,19 @@
   gap: var(--cjs-space-1);
 }
 
+.cjs-leaderboards__rank-progress .cjs-leaderboards__details {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--cjs-space-1);
+}
+
+.cjs-leaderboards__details small.cjs-leaderboards__prestige {
+  color: var(--cjs-color-accent-secondary);
+  font-size: inherit;
+  font-weight: var(--cjs-font-weight-bold);
+}
+
 .cjs-leaderboards__details small,
 .cjs-leaderboards__muted {
   color: var(--cjs-color-text-muted);
@@ -478,4 +491,10 @@
   .cjs-leaderboards__mobile-sort {
     grid-template-columns: minmax(0, 1fr);
   }
+}
+
+.cjs-leaderboards__rank-progress {
+  display: flex;
+  align-items: center;
+  gap: var(--cjs-space-3);
 }
