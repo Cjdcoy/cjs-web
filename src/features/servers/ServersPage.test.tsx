@@ -72,6 +72,10 @@ describe("ServersPage", () => {
       "/maps/101?source=j4l&lookup=cpid",
     );
     expect(screen.getByText("Runner")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Runner" })).toHaveAttribute(
+      "href",
+      "/players/501?source=j4l",
+    );
     expect(container.querySelector('[data-cod-color="2"]')).toHaveTextContent("Runner");
     expect(container.querySelector(".servers-page__hero")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Live server summary")).not.toBeInTheDocument();

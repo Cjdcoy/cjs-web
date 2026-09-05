@@ -443,10 +443,16 @@
   line-height: var(--cjs-line-height-tight);
 }
 
+.server-card__roster li .cjs-link,
 .server-card__roster li span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.server-card__roster li .cjs-link {
+  min-width: 0;
+  font-weight: inherit;
 }
 
 .server-card__roster > p,

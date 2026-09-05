@@ -17,6 +17,7 @@ import {
   EmptyState,
   ErrorState,
   IconButton,
+  Link,
   SegmentedControl,
 } from "../../components/ui";
 import { getMapImageSources } from "../../lib/mapImages";
@@ -25,6 +26,7 @@ import {
   defineQuerySchema,
   enumQueryParam,
   mapDetailPath,
+  playerDetailPath,
   useQueryState,
   type SourceId,
 } from "../../lib/routing";
@@ -519,6 +521,7 @@ function ServerCard({ server, source }: { server: ServerViewModel; source: Sourc
         <ServerRoster
           players={visiblePlayers}
           rosterKnown={server.players !== null}
+          source={source}
           totalPlayers={server.playerCount}
         />
 
@@ -544,10 +547,12 @@ function getServerCountry(domain: string) {
 function ServerRoster({
   players,
   rosterKnown,
+  source,
   totalPlayers,
 }: {
   players: readonly ServerPlayerViewModel[];
   rosterKnown: boolean;
+  source: SourceId;
   totalPlayers: number;
 }) {
   if (!rosterKnown || players.length === 0) {
@@ -560,7 +565,13 @@ function ServerRoster({
       <ul>
         {players.map((player, index) => (
           <li key={`${player.id ?? player.name}:${index}`}>
-            <CodPlayerName value={player.name} />
+            {player.id === null ? (
+              <CodPlayerName value={player.name} />
+            ) : (
+              <Link href={playerDetailPath(player.id, source)} variant="player">
+                <CodPlayerName value={player.name} />
+              </Link>
+            )}
             {player.ping !== null && <small>{player.ping} ms</small>}
           </li>
         ))}
