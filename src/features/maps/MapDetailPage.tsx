@@ -412,16 +412,25 @@ function useRunColumns(source: SourceId): readonly DataTableColumn<TopRun>[] {
       {
         id: "time",
         header: "Time",
+        align: "center" as const,
         cell: (run: TopRun) => formatRunTime(run),
+      },
+      {
+        id: "nadejumps",
+        header: "Nade jumps",
+        align: "center" as const,
+        cell: (run: TopRun) => formatCount(run.nadejumps),
       },
       {
         id: "loads",
         header: "Loads / saves",
+        align: "center" as const,
         cell: (run: TopRun) => formatLoadsAndSaves(run),
       },
       {
         id: "date",
         header: "Recorded",
+        align: "center" as const,
         cell: (run: TopRun) => formatRunDate(run.time_created),
       },
     ],
