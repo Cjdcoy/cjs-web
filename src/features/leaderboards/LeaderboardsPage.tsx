@@ -606,6 +606,7 @@ function DifficultySplit({ row }: { row: LeaderboardRow }) {
         {split.bands.map(({ band, points }) => (
           <span
             key={band}
+            data-band={band}
             title={`Difficulty ${band}: ${numberFormatter.format(points)} points`}
             style={{ flexGrow: points, "--cjs-band": band } as CSSProperties}
           />

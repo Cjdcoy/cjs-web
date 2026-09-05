@@ -420,13 +420,32 @@
   background: var(--cjs-color-elevated);
 }
 
-/* Easy bands stay muted; each harder band mixes in more accent. */
+/* 0–5 neutral greys, 6 hints at the accent, 7–9 are increasingly bright accent tiers. */
 .cjs-leaderboards__difficulty-bar span {
   min-width: 1px;
   background: color-mix(
     in srgb,
-    var(--cjs-color-accent) calc(var(--cjs-band) * 11%),
+    var(--cjs-color-text-muted) calc(var(--cjs-band) * 9%),
     var(--cjs-color-border-strong)
+  );
+}
+
+.cjs-leaderboards__difficulty-bar span[data-band="6"] {
+  background: color-mix(in srgb, var(--cjs-color-accent) 55%, var(--cjs-color-border-strong));
+}
+
+.cjs-leaderboards__difficulty-bar span[data-band="7"] {
+  background: var(--cjs-color-accent);
+}
+
+.cjs-leaderboards__difficulty-bar span[data-band="8"] {
+  background: var(--cjs-color-accent-strong);
+}
+
+.cjs-leaderboards__difficulty-bar span[data-band="9"] {
+  background: linear-gradient(
+    color-mix(in srgb, var(--cjs-color-text) 45%, var(--cjs-color-accent-strong)),
+    var(--cjs-color-accent-strong)
   );
 }
 
