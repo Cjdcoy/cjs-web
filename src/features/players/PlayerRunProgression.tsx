@@ -1,4 +1,4 @@
-import { ChartNoAxesCombined, CircleGauge, ListChecks, Search } from "lucide-react";
+import { ChartNoAxesCombined, CircleGauge, ListChecks, Map as MapIcon, Search } from "lucide-react";
 import {
   useMemo,
   useState,
@@ -16,12 +16,12 @@ import {
   Input,
   Panel,
   SegmentedControl,
-  Select,
   SkeletonGroup,
   type DataTableColumn,
 } from "../../components/ui";
-import type { Fps, PlayerJumpScores, PlayerMapScore, TopRun } from "../../lib/api";
+import type { Fps, PlayerMapScore, TopRun } from "../../lib/api";
 import { formatDate } from "../../lib/format";
+import { getMapImageSources } from "../../lib/mapImages";
 import { fpsLabel } from "./playerProfileModel";
 import {
   createRunProgression,
@@ -30,6 +30,8 @@ import {
 } from "./runProgressionModel";
 import type { ProfileResource } from "./usePlayerProfile";
 
+type PickerMap = Pick<PlayerMapScore, "map_id" | "map_name" | "rank">;
+
 interface PlayerRunProgressionProps {
   fps: Fps;
   fpsFilter: ReactNode;
@@ -37,7 +39,7 @@ interface PlayerRunProgressionProps {
   onMapChange: (mapId: number) => void;
   onRetry: () => void;
   runs: ProfileResource<TopRun[]>;
-  scores: ProfileResource<PlayerJumpScores>;
+  tops: ProfileResource<TopRun[]>;
 }
 
 export function PlayerRunProgression({
@@ -47,10 +49,10 @@ export function PlayerRunProgression({
   onMapChange,
   onRetry,
   runs,
-  scores,
+  tops,
 }: PlayerRunProgressionProps) {
   const [mapFilter, setMapFilter] = useState("");
-  const maps = useMemo(() => scores.data?.map_scores ?? [], [scores.data]);
+  const maps = useMemo(() => pickerMaps(tops.data ?? []), [tops.data]);
   const filteredMaps = useMemo(() => filterMaps(maps, mapFilter), [mapFilter, maps]);
   const mapSelected = mapId > 0;
   const selectedMap = maps.find((map) => map.map_id === mapId) ?? null;
@@ -83,7 +85,7 @@ export function PlayerRunProgression({
     </Panel>
   );
 
-  if (scores.status === "loading" && mapId === 0) {
+  if (tops.status === "loading" && mapId === 0) {
     return (
       <div className="cjs-run-progress" data-map-selected={mapSelected}>
         {filters}
@@ -92,7 +94,7 @@ export function PlayerRunProgression({
     );
   }
 
-  if (scores.status === "error" && scores.data === null && mapId === 0) {
+  if (tops.status === "error" && tops.data === null && mapId === 0) {
     return (
       <div className="cjs-run-progress" data-map-selected={mapSelected}>
         {filters}
@@ -121,13 +123,10 @@ export function PlayerRunProgression({
     <div className="cjs-run-progress" data-map-selected={mapSelected}>
       {filters}
       {mapId === 0 ? (
-        <>
-          <EmptyState
-            description="Choose a map to compare every recorded finish in chronological order, or start from a top-ranked map below."
-            title="Pick a map"
-          />
-          <QuickPicks maps={maps} onMapChange={onMapChange} />
-        </>
+        <EmptyState
+          description="Choose a map to compare every recorded finish in chronological order."
+          title="Pick a map"
+        />
       ) : (
         <RunHistory
           mapName={selectedMap?.map_name ?? runs.data?.[0]?.mapname ?? `Map #${mapId}`}
@@ -136,31 +135,6 @@ export function PlayerRunProgression({
         />
       )}
     </div>
-  );
-}
-
-function QuickPicks({
-  maps,
-  onMapChange,
-}: {
-  maps: readonly PlayerMapScore[];
-  onMapChange: (mapId: number) => void;
-}) {
-  const picks = [...maps].sort((left, right) => left.rank - right.rank).slice(0, 6);
-  if (picks.length === 0) return null;
-  return (
-    <nav className="cjs-run-progress__quick-picks" aria-label="Best ranked maps">
-      {picks.map((map) => (
-        <Button
-          key={map.map_id}
-          onClick={() => onMapChange(map.map_id)}
-          size="small"
-          variant="secondary"
-        >
-          {map.map_name} <span aria-hidden="true">·</span> #{map.rank}
-        </Button>
-      ))}
-    </nav>
   );
 }
 
@@ -175,43 +149,97 @@ function MapPicker({
   selectedMap,
   totalCount,
 }: {
-  displayedMaps: readonly PlayerMapScore[];
+  displayedMaps: readonly PickerMap[];
   filteredCount: number;
   fps: Fps;
   mapFilter: string;
   mapId: number;
   onFilterChange: (value: string) => void;
   onMapChange: (mapId: number) => void;
-  selectedMap: PlayerMapScore | null;
+  selectedMap: PickerMap | null;
   totalCount: number;
 }) {
+  const [hoveredMapId, setHoveredMapId] = useState<number | null>(null);
+  const [failedImagePath, setFailedImagePath] = useState<string | null>(null);
+  const previewMap = displayedMaps.find((map) => map.map_id === hoveredMapId) ?? selectedMap;
+  // Card art is keyed by the bare map name; the tops feed appends the route, e.g. "jm_plazma(Hard)".
+  const previewSources =
+    previewMap === null ? null : getMapImageSources(previewMap.map_name.replace(/\(.*\)$/, ""));
+
   return (
     <div className="cjs-run-progress__map-picker">
-      <Input
-        label="Find a ranked map"
-        leading={<Search size={17} />}
-        onChange={(event) => onFilterChange(event.currentTarget.value)}
-        placeholder="Search map name"
-        type="search"
-        value={mapFilter}
-      />
-      <Select
-        helperText={`${filteredCount} of ${totalCount} ranked maps shown at ${fpsLabel(fps)}.`}
-        id="player-progress-map"
-        label="Map"
-        onChange={(event) => onMapChange(Number(event.currentTarget.value))}
-        value={mapId || ""}
-      >
-        <option value="" disabled>
-          Select a map
-        </option>
-        {mapId > 0 && !selectedMap && <option value={mapId}>Map #{mapId}</option>}
-        {displayedMaps.map((map) => (
-          <option key={map.map_id} value={map.map_id}>
-            {map.map_name} · #{map.rank}
-          </option>
-        ))}
-      </Select>
+      <div className="cjs-run-progress__map-search">
+        <Input
+          helperText={`${filteredCount} of ${totalCount} ranked maps shown at ${fpsLabel(fps)}.`}
+          id="player-progress-map"
+          label="Find a ranked map"
+          leading={<Search size={17} />}
+          onChange={(event) => onFilterChange(event.currentTarget.value)}
+          placeholder="Search map name"
+          type="search"
+          value={mapFilter}
+        />
+        <div
+          aria-label="Finished maps"
+          className="cjs-run-progress__map-list"
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget)) setHoveredMapId(null);
+          }}
+          onPointerLeave={() => setHoveredMapId(null)}
+          role="group"
+        >
+          {mapId > 0 && !selectedMap && (
+            <Button aria-pressed size="small" type="button" variant="secondary">
+              Map #{mapId}
+            </Button>
+          )}
+          {displayedMaps.map((map) => (
+            <Button
+              key={map.map_id}
+              aria-pressed={map.map_id === mapId}
+              onClick={() => onMapChange(map.map_id)}
+              onFocus={() => setHoveredMapId(map.map_id)}
+              onPointerEnter={() => setHoveredMapId(map.map_id)}
+              size="small"
+              type="button"
+              variant="secondary"
+            >
+              {map.map_name} <span className="cjs-run-progress__map-rank">#{map.rank}</span>
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      <figure className="cjs-run-progress__map-preview">
+        {previewMap && previewSources ? (
+          <>
+            <span className="cjs-run-progress__map-preview-art">
+              {failedImagePath === previewSources.card ? (
+                <>
+                  <span aria-hidden="true">{previewMap.map_name.slice(0, 2).toUpperCase()}</span>
+                  <MapIcon aria-hidden="true" size={28} />
+                </>
+              ) : (
+                <img
+                  key={previewMap.map_id}
+                  alt={`${previewMap.map_name} preview`}
+                  decoding="async"
+                  loading="lazy"
+                  onError={() => setFailedImagePath(previewSources.card)}
+                  sizes="(max-width: 48rem) 100vw, 40rem"
+                  src={previewSources.card}
+                  srcSet={previewSources.srcSet}
+                />
+              )}
+            </span>
+            <figcaption>
+              {previewMap.map_name} · #{previewMap.rank}
+            </figcaption>
+          </>
+        ) : (
+          <figcaption>Hover a map to preview it.</figcaption>
+        )}
+      </figure>
     </div>
   );
 }
@@ -889,7 +917,7 @@ function DetailStat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function filterMaps(maps: readonly PlayerMapScore[], query: string): PlayerMapScore[] {
+function filterMaps(maps: readonly PickerMap[], query: string): PickerMap[] {
   const normalizedQuery = query.trim().toLocaleLowerCase();
   if (!normalizedQuery) return [...maps];
   return maps.filter(
@@ -897,6 +925,17 @@ function filterMaps(maps: readonly PlayerMapScore[], query: string): PlayerMapSc
       map.map_name.toLocaleLowerCase().includes(normalizedQuery) ||
       String(map.map_id).includes(normalizedQuery),
   );
+}
+
+function pickerMaps(tops: readonly TopRun[]): PickerMap[] {
+  const byMap = new Map<number, PickerMap>();
+  for (const run of tops) {
+    const existing = byMap.get(run.cpid);
+    if (existing === undefined || run.rank < existing.rank) {
+      byMap.set(run.cpid, { map_id: run.cpid, map_name: run.mapname, rank: run.rank });
+    }
+  }
+  return [...byMap.values()];
 }
 
 function formatFinishDelta(deltaMs: number | null): string {

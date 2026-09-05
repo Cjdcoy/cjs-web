@@ -28,8 +28,10 @@ import {
   Panel,
   RankEmblem,
   SegmentedControl,
+  Select,
   SkeletonGroup,
   type DataTableColumn,
+  type SortOrder,
 } from "../../components/ui";
 import {
   FPS_VALUES,
@@ -39,18 +41,19 @@ import {
   type PlayerActivitySummary,
   type PlayerJumpScores,
   type PlayerLeaderboardPosition,
-  type PlayerMapScore,
   type PlayerPerformanceStats,
   type PlayerRankInfo,
   type PlayerRouteCompletion,
   type Source,
   type SimpleTop,
+  type TopRun,
 } from "../../lib/api";
 import { mapDetailPath, useQueryState, useSourceContext } from "../../lib/routing";
 import { formatDate, timeAgo } from "../../lib/format";
 import {
   createPlayerProfileIdentity,
   createPlayerRouteInventory,
+  defaultBestRunOrder,
   filterPlayerRouteInventory,
   formatDistance,
   formatDuration,
@@ -58,15 +61,18 @@ import {
   formatProfileDecimal,
   formatProfileNumber,
   formatProfilePercent,
+  formatRunTime,
   fpsLabel,
   getRunAchievement,
   hasProfileIdentity,
   playerBoardLabel,
   playerProfileQuerySchema,
   playerSourceLabel,
+  sortBestRuns,
   summarizePlayerRouteInventory,
   type PlayerRouteInventoryItem,
   type PlayerProfileView,
+  type BestRunSort,
   type RouteCompletionStatus,
 } from "./playerProfileModel";
 import { usePlayerProfile, type PlayerProfileApi, type ProfileResource } from "./usePlayerProfile";
@@ -344,8 +350,12 @@ function PlayerProfile({
             {queryState.view === "runs" && (
               <BestRunsSection
                 fps={queryState.fps}
-                resource={resources.scores}
+                order={queryState.order}
+                scores={resources.scores}
+                sort={queryState.sort}
+                onSortChange={(next) => setQueryState(next)}
                 source={source}
+                tops={resources.tops}
                 onRetry={resources.reload}
               />
             )}
@@ -363,7 +373,7 @@ function PlayerProfile({
                 onMapChange={(map) => setQueryState({ map })}
                 onRetry={resources.reload}
                 runs={resources.mapRuns}
-                scores={resources.scores}
+                tops={resources.tops}
               />
             )}
             {queryState.view === "routes" && (
@@ -857,79 +867,164 @@ function PositionSection({
 function BestRunsSection({
   fps,
   onRetry,
-  resource,
+  onSortChange,
+  order,
+  scores,
+  sort,
   source,
+  tops,
 }: {
   fps: (typeof FPS_VALUES)[number];
   onRetry: () => void;
-  resource: ProfileResource<PlayerJumpScores>;
+  onSortChange: (next: { sort: BestRunSort; order: SortOrder }) => void;
+  order: SortOrder;
+  scores: ProfileResource<PlayerJumpScores>;
+  sort: BestRunSort;
   source: Source;
+  tops: ProfileResource<TopRun[]>;
 }) {
-  const maxScore = Math.max(0, ...(resource.data?.map_scores.map((run) => run.score) ?? []));
-  const columns = useMemo<readonly DataTableColumn<PlayerMapScore>[]>(
+  const changeSort = (key: string) => {
+    const next = key as BestRunSort;
+    onSortChange({
+      sort: next,
+      order: next === sort ? (order === "asc" ? "desc" : "asc") : defaultBestRunOrder(next),
+    });
+  };
+  const skillPoints = useMemo(
+    () =>
+      new Map(
+        scores.status === "success"
+          ? scores.data?.map_scores.map((score) => [score.map_id, score.score] as const)
+          : undefined,
+      ),
+    [scores.data, scores.status],
+  );
+  const maxScore = Math.max(0, ...skillPoints.values());
+  const columns = useMemo<readonly DataTableColumn<TopRun>[]>(
     () => [
       {
         id: "rank",
         header: "Rank",
-        cell: (run) => <RunRank rank={run.rank} />,
+        sortKey: "rank",
+        cell: (run) => (
+          <>
+            <RunRank rank={run.rank} />
+            {run.totalNr === undefined ? null : ` / ${run.totalNr}`}
+          </>
+        ),
       },
       {
         id: "map",
         header: "Map",
         priority: "primary",
-        cell: (run) => <Link href={mapDetailPath(run.map_id, { source })}>{run.map_name}</Link>,
+        cell: (run) => <Link href={mapDetailPath(run.cpid, { source })}>{run.mapname}</Link>,
+      },
+      {
+        id: "time",
+        header: "Time",
+        align: "end",
+        cell: (run) => formatRunTime(run),
+      },
+      {
+        id: "nade-jumps",
+        header: "Nade jumps",
+        align: "end",
+        cell: (run) => formatProfileNumber(run.nadejumps),
+      },
+      {
+        id: "loads",
+        header: "Loads",
+        align: "end",
+        cell: (run) => formatProfileNumber(run.load_count),
       },
       {
         id: "skill-points",
         header: "Skill points",
         align: "end",
-        cell: (run) => (
-          <span className="cjs-player-profile__points">
-            <Meter value={maxScore > 0 ? (run.score / maxScore) * 100 : 0} />
-            <strong>{formatProfileNumber(run.score)}</strong>
-          </span>
-        ),
+        sortKey: "points",
+        defaultOrder: "desc",
+        cell: (run) => {
+          const score = skillPoints.get(run.cpid);
+          if (score === undefined) return null;
+          return (
+            <span className="cjs-player-profile__points">
+              <Meter value={maxScore > 0 ? (score / maxScore) * 100 : 0} />
+              <strong>{formatProfileNumber(score)}</strong>
+            </span>
+          );
+        },
       },
       {
-        id: "difficulty",
-        header: "Difficulty",
-        align: "end",
-        cell: (run) => formatProfileDecimal(run.difficulty),
+        id: "date",
+        header: "Date",
+        sortKey: "date",
+        defaultOrder: "desc",
+        cell: (run) => (run.time_created ? formatDate(run.time_created) : "—"),
       },
     ],
-    [maxScore, source],
+    [maxScore, skillPoints, source],
   );
 
   return (
     <ProfileSection
       className="cjs-player-profile__section--wide"
-      description={`The player's highest-value ${fpsLabel(fps)} maps from the jump-skill leaderboard, ordered by contributed skill points.`}
+      description={`Every ${fpsLabel(fps)} personal best this player holds, ordered by ${sort === "rank" ? "rank" : sort === "points" ? "skill points" : "date"}.`}
       icon={<Trophy size={19} />}
       id="player-top-runs"
       title="Best runs"
     >
-      <ResourceState resource={resource} label="best runs" onRetry={onRetry}>
-        {(scores) =>
-          scores.map_scores.length ? (
+      <ResourceState resource={tops} label="best runs" onRetry={onRetry}>
+        {(runs) =>
+          runs.length ? (
             <div className="cjs-player-profile__best-runs">
-              <dl className="cjs-player-profile__stat-grid cjs-player-profile__skill-summary">
-                <ProfileStat label="Jump-skill rank" value={`#${scores.rank}`} />
-                <ProfileStat label="Total skill points" value={formatProfileNumber(scores.score)} />
-                <ProfileStat
-                  label="Scoring maps"
-                  value={formatProfileNumber(scores.map_scores.length)}
-                />
-              </dl>
+              {scores.data && skillPoints.size > 0 && (
+                <dl className="cjs-player-profile__stat-grid cjs-player-profile__skill-summary">
+                  <ProfileStat label="Jump-skill rank" value={`#${scores.data.rank}`} />
+                  <ProfileStat
+                    label="Total skill points"
+                    value={formatProfileNumber(scores.data.score)}
+                  />
+                  <ProfileStat label="Scoring maps" value={formatProfileNumber(skillPoints.size)} />
+                </dl>
+              )}
+              <div className="cjs-data-table__mobile-sort" aria-label="Best runs sorting">
+                <Select
+                  label="Sort best runs"
+                  value={sort}
+                  onChange={(event) => {
+                    const next = event.target.value as BestRunSort;
+                    onSortChange({
+                      sort: next,
+                      order: next === sort ? order : defaultBestRunOrder(next),
+                    });
+                  }}
+                >
+                  <option value="rank">Rank</option>
+                  <option value="points">Points</option>
+                  <option value="date">Date</option>
+                </Select>
+                <Select
+                  label="Sort direction"
+                  value={order}
+                  onChange={(event) =>
+                    onSortChange({ sort, order: event.target.value as SortOrder })
+                  }
+                >
+                  <option value="asc">Ascending</option>
+                  <option value="desc">Descending</option>
+                </Select>
+              </div>
               <DataTable
-                caption={`Best jump-skill runs at ${fpsLabel(fps)}`}
+                caption={`Personal bests at ${fpsLabel(fps)}`}
                 columns={columns}
-                getRowKey={(run) => run.map_id}
-                rows={scores.map_scores}
+                getRowKey={(run) => run.run_id ?? run.cpid}
+                rows={sortBestRuns(runs, sort, order)}
+                sort={{ key: sort, order, onSort: changeSort }}
               />
             </div>
           ) : (
             <EmptyState
-              description={`This player has not earned jump-skill points at ${fpsLabel(fps)} yet. New ranked runs will appear here.`}
+              description={`This player has no recorded ${fpsLabel(fps)} personal bests yet. New runs will appear here.`}
               title="No ranked runs yet"
             />
           )

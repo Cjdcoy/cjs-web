@@ -30,8 +30,12 @@ export type PlayerProfileApi = Pick<
   | "replayWatchAggregate"
   | "replayWatchRankings"
   | "playerRoutes"
+  | "playerTops"
   | "players"
 >;
+
+// Matches the backend live cache's per-route history limit, so this returns every personal best.
+const PERSONAL_BESTS_LIMIT = 1000;
 
 export type ProfileResourceStatus = "error" | "loading" | "refreshing" | "success" | "unsupported";
 
@@ -56,6 +60,7 @@ export interface PlayerProfileResources {
   rank: ProfileResource<PlayerRankInfo>;
   routes: ProfileResource<PlayerRouteCompletion[]>;
   scores: ProfileResource<PlayerJumpScores>;
+  tops: ProfileResource<TopRun[]>;
 }
 
 interface UsePlayerProfileOptions {
@@ -79,6 +84,7 @@ interface ResourceDataMap {
   rank: PlayerRankInfo;
   routes: PlayerRouteCompletion[];
   scores: PlayerJumpScores;
+  tops: TopRun[];
 }
 
 interface ResourceState<Data> extends ProfileResource<Data> {
@@ -125,6 +131,14 @@ export function usePlayerProfile({
   const scores = useProfileResource(
     "scores",
     `${baseKey}:scores:${fps}`,
+    view === "runs",
+    apiClient,
+    options,
+    reloadVersion,
+  );
+  const tops = useProfileResource(
+    "tops",
+    `${baseKey}:tops:${fps}`,
     view === "runs" || view === "progress",
     apiClient,
     options,
@@ -183,6 +197,7 @@ export function usePlayerProfile({
     reload,
     routes,
     scores,
+    tops,
   };
 }
 
@@ -298,6 +313,12 @@ function loadResource<Kind extends ResourceKind>(
       return apiClient.playerJumpScores({
         ...context,
         fps: options.fps,
+      }) as Promise<ResourceDataMap[Kind]>;
+    case "tops":
+      return apiClient.playerTops({
+        ...context,
+        fps: options.fps,
+        limit: PERSONAL_BESTS_LIMIT,
       }) as Promise<ResourceDataMap[Kind]>;
   }
 }

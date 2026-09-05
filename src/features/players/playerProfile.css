@@ -860,13 +860,6 @@
   gap: var(--cjs-space-4);
 }
 
-.cjs-run-progress__quick-picks {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: var(--cjs-space-2);
-}
-
 .cjs-run-progress__filters {
   display: grid;
   width: min(100%, var(--cjs-content-width));
@@ -885,9 +878,83 @@
 
 .cjs-run-progress__map-picker {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   align-items: start;
   gap: var(--cjs-space-3);
+}
+
+.cjs-run-progress__map-search {
+  display: grid;
+  min-width: 0;
+  gap: var(--cjs-space-2);
+}
+
+.cjs-run-progress__map-list {
+  display: grid;
+  /* Six rows: 6 row heights + 5 gaps + list padding, so the list lines up with the preview. */
+  max-height: calc(
+    6 * var(--cjs-control-height-sm) + 5 * var(--cjs-space-1) + 2 * var(--cjs-space-1)
+  );
+  gap: var(--cjs-space-1);
+  padding: var(--cjs-space-1);
+  overflow-y: auto;
+}
+
+.cjs-run-progress__map-list .cjs-button {
+  width: 100%;
+}
+
+.cjs-run-progress__map-list .cjs-button__label {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: var(--cjs-space-2);
+}
+
+.cjs-run-progress__map-rank {
+  margin-inline-start: auto;
+  color: var(--cjs-color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.cjs-run-progress__map-list .cjs-button[aria-pressed="true"] {
+  border-color: var(--cjs-color-border-strong);
+  background: var(--cjs-color-panel-hover);
+  color: var(--cjs-color-text);
+  box-shadow: var(--cjs-shadow-card);
+}
+
+.cjs-run-progress__map-preview {
+  display: grid;
+  margin: 0;
+  gap: var(--cjs-space-2);
+}
+
+.cjs-run-progress__map-preview-art {
+  position: relative;
+  display: grid;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  place-content: center;
+  place-items: center;
+  gap: var(--cjs-space-2);
+  border-radius: var(--cjs-radius-md);
+  background: var(--cjs-color-elevated);
+  color: var(--cjs-color-text-muted);
+}
+
+.cjs-run-progress__map-preview-art img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.cjs-run-progress__map-preview figcaption {
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-sm);
 }
 
 .cjs-run-progress__analytics {
