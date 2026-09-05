@@ -34,10 +34,11 @@ describe("RecentPage", () => {
     window.history.replaceState(null, "", "/recent");
   });
 
-  it("merges both sources newest first and tags every row", async () => {
+  it("merges both sources by real instant, newest first, and tags every row", async () => {
     const recentRuns = vi.spyOn(api, "recentRuns").mockImplementation(async ({ source }) =>
       source === "jh"
-        ? page([run({ mapname: "jh_older", time_created: "2026-09-05T01:00:00Z" })])
+        ? // Sorts after the J4L row by instant (01:30Z) even though the raw string sorts first.
+          page([run({ mapname: "jh_older", time_created: "2026-09-05T03:30:00+02:00" })])
         : page([
             run({
               run_id: 8001,

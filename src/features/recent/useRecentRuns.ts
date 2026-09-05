@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { api, type TopRun } from "../../lib/api";
+import { parseApiDate } from "../../lib/format";
 import { sourceOptions, type SourceId } from "../../lib/routing";
 
 const SOURCES = sourceOptions.map(({ value }) => value);
@@ -131,8 +132,13 @@ export function useRecentRuns() {
 }
 
 function compareEntries(left: RecentRunEntry, right: RecentRunEntry): number {
-  const byDate = (right.run.time_created ?? "").localeCompare(left.run.time_created ?? "");
+  const byDate = finishedAt(right.run) - finishedAt(left.run);
   return byDate === 0 ? (right.run.run_id ?? 0) - (left.run.run_id ?? 0) : byDate;
+}
+
+function finishedAt(run: TopRun): number {
+  const time = run.time_created ? parseApiDate(run.time_created).getTime() : Number.NaN;
+  return Number.isNaN(time) ? 0 : time;
 }
 
 function initialStates(): SourceStates {

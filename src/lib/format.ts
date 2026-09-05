@@ -3,9 +3,14 @@ export function formatNumber(value: unknown): string {
   return Number.isFinite(number) ? new Intl.NumberFormat().format(number) : "0";
 }
 
+export function parseApiDate(value: string): Date {
+  const normalized = value.replace(" ", "T");
+  return new Date(/(?:Z|[+-]\d{2}:\d{2})$/.test(normalized) ? normalized : `${normalized}Z`);
+}
+
 export function formatDate(value?: string | null): string {
   if (!value) return "Unknown";
-  const parsed = new Date(value.replace(" ", "T") + (value.includes("Z") ? "" : "Z"));
+  const parsed = parseApiDate(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return new Intl.DateTimeFormat(undefined, {
     year: "numeric",
@@ -16,9 +21,9 @@ export function formatDate(value?: string | null): string {
 
 export function timeAgo(value?: string): string {
   if (!value) return "Never";
-  const date = new Date(value.replace(" ", "T") + (value.includes("Z") ? "" : "Z"));
-  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  const seconds = Math.floor((Date.now() - parseApiDate(value).getTime()) / 1000);
   if (!Number.isFinite(seconds)) return value;
+  if (seconds < -60) return formatDate(value);
   if (seconds < 60) return "Just now";
   if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
   if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;

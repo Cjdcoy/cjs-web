@@ -1,5 +1,6 @@
 import type { Player } from "../../lib/api";
 import { parseCodName } from "../../lib/codName";
+import { parseApiDate } from "../../lib/format";
 import { defineQuerySchema, enumQueryParam, stringQueryParam } from "../../lib/routing";
 
 export { parseCodName } from "../../lib/codName";
@@ -107,6 +108,6 @@ function sortableNumber(value: number | undefined): number {
 
 function sortableDate(value: string | undefined): number {
   if (!value) return Number.NEGATIVE_INFINITY;
-  const parsed = Date.parse(value.replace(" ", "T") + (value.includes("Z") ? "" : "Z"));
+  const parsed = parseApiDate(value).getTime();
   return Number.isNaN(parsed) ? Number.NEGATIVE_INFINITY : parsed;
 }
