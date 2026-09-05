@@ -49,7 +49,11 @@ describe("server dashboard normalizer", () => {
           map: "mp_partial",
           mapid: -1,
           game_type: 42,
-          players: [null, { playername: "^2Runner", playerid: 7, ping: 38 }],
+          players: [
+            null,
+            { playername: "^2Runner", playerid: 7, ping: 38 },
+            { playername: "Ghost", playerid: 0, ping: 12 },
+          ],
           player_count: "two",
           online: "yes",
         },
@@ -59,15 +63,18 @@ describe("server dashboard normalizer", () => {
     });
 
     expect(dashboard.omittedServerCount).toBe(2);
-    expect(dashboard.totalPlayers).toBe(1);
+    expect(dashboard.totalPlayers).toBe(2);
     expect(dashboard.onlineServers).toBe(0);
     expect(dashboard.servers[0]).toMatchObject({
       connectionAddress: null,
       game: "cod2",
       mapId: null,
       online: false,
-      playerCount: 1,
-      players: [{ id: 7, name: "^2Runner", ping: 38 }],
+      playerCount: 2,
+      players: [
+        { id: 7, name: "^2Runner", ping: 38 },
+        { id: null, name: "Ghost", ping: 12 },
+      ],
       port: null,
     });
   });

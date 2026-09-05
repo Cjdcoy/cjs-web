@@ -6,7 +6,6 @@ import { api } from "../../lib/api";
 import { sourceOptions, useQueryState, useSourceContext, type SourceId } from "../../lib/routing";
 import { PlayerResults } from "./PlayerResults";
 import {
-  PLAYER_SEARCH_LIMIT,
   PLAYER_SEARCH_MIN_LENGTH,
   filterPlayers,
   normalizePlayerCountry,
@@ -143,13 +142,6 @@ export function PlayersPage({
             {source === "j4l" && <option value="level">Player level</option>}
           </Select>
         </Panel>
-
-        <p className="cjs-player-discovery__note">
-          Directory players are revealed in batches as you scroll. Name searches use the documented
-          lookup and are limited to {PLAYER_SEARCH_LIMIT} results. Country, visits, admin level, and
-          last-seen values appear only when the API supplies them. Player level is available for
-          Jump4Life. Player ID and country filters apply to the loaded results.
-        </p>
 
         <PlayerResults
           error={error}

@@ -41,13 +41,6 @@
   font-weight: var(--cjs-font-weight-semibold);
 }
 
-.cjs-player-discovery__note {
-  max-width: var(--cjs-reading-width);
-  margin: 0;
-  color: var(--cjs-color-text-subtle);
-  font-size: var(--cjs-font-size-sm);
-}
-
 .cjs-player-results {
   display: grid;
   gap: var(--cjs-space-4);

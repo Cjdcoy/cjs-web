@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, ArrowUpDown, Globe2, RefreshCw, Search, Trophy } from "lucide-react";
+import { Globe2, RefreshCw, Search, Trophy } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Button,
@@ -12,6 +12,7 @@ import {
   SegmentedControl,
   Select,
   SkeletonGroup,
+  SortableHeader,
 } from "../../components/ui";
 import { stripCodColorCodes } from "../../lib/codName";
 import {
@@ -405,6 +406,7 @@ function LeaderboardTable({ board, onSort, order, rows, sort, source }: Leaderbo
               sortKey="rank"
               activeSort={sort}
               order={order}
+              defaultOrder={defaultOrder("rank")}
               onSort={onSort}
             />
             <SortableHeader
@@ -412,6 +414,7 @@ function LeaderboardTable({ board, onSort, order, rows, sort, source }: Leaderbo
               sortKey="player"
               activeSort={sort}
               order={order}
+              defaultOrder={defaultOrder("player")}
               onSort={onSort}
             />
             <SortableHeader
@@ -419,6 +422,7 @@ function LeaderboardTable({ board, onSort, order, rows, sort, source }: Leaderbo
               sortKey="value"
               activeSort={sort}
               order={order}
+              defaultOrder={defaultOrder("value")}
               onSort={onSort}
               align="end"
             />
@@ -479,53 +483,6 @@ function LeaderboardTable({ board, onSort, order, rows, sort, source }: Leaderbo
         </tbody>
       </table>
     </div>
-  );
-}
-
-interface SortableHeaderProps {
-  label: string;
-  sortKey: LeaderboardSort;
-  activeSort: LeaderboardSort;
-  order: SortOrder;
-  onSort: (sort: LeaderboardSort) => void;
-  align?: "start" | "end";
-}
-
-function SortableHeader({
-  activeSort,
-  align = "start",
-  label,
-  onSort,
-  order,
-  sortKey,
-}: SortableHeaderProps) {
-  const active = activeSort === sortKey;
-  const nextOrder = active ? toggleOrder(order) : defaultOrder(sortKey);
-
-  return (
-    <th
-      scope="col"
-      aria-sort={active ? (order === "asc" ? "ascending" : "descending") : "none"}
-      data-align={align}
-    >
-      <button
-        type="button"
-        className="cjs-leaderboards__sort-button"
-        aria-label={`Sort by ${label.toLocaleLowerCase()}, ${nextOrder === "asc" ? "ascending" : "descending"}`}
-        onClick={() => onSort(sortKey)}
-      >
-        <span>{label}</span>
-        {active ? (
-          order === "asc" ? (
-            <ArrowUp size={14} aria-hidden="true" />
-          ) : (
-            <ArrowDown size={14} aria-hidden="true" />
-          )
-        ) : (
-          <ArrowUpDown size={14} aria-hidden="true" />
-        )}
-      </button>
-    </th>
   );
 }
 

@@ -12,6 +12,7 @@ import type {
   TopRun,
 } from "../../lib/api";
 import { FPS_VALUES } from "../../lib/api";
+import type { SortOrder } from "../../components/ui";
 import {
   defineQuerySchema,
   enumQueryParam,
@@ -22,13 +23,18 @@ import {
 export const PLAYER_PROFILE_VIEWS = ["overview", "runs", "progress", "routes"] as const;
 export type PlayerProfileView = (typeof PLAYER_PROFILE_VIEWS)[number];
 
+export const BEST_RUN_SORTS = ["rank", "points", "date"] as const;
+export type BestRunSort = (typeof BEST_RUN_SORTS)[number];
+
 export const ROUTE_COMPLETION_STATUSES = ["all", "completed", "remaining"] as const;
 export type RouteCompletionStatus = (typeof ROUTE_COMPLETION_STATUSES)[number];
 
 export const playerProfileQuerySchema = defineQuerySchema({
   fps: enumQueryParam(FPS_VALUES, "125"),
   map: integerQueryParam({ min: 1 }),
+  order: enumQueryParam(["asc", "desc"] as const, "asc"),
   q: stringQueryParam({ maxLength: 80, trim: true }),
+  sort: enumQueryParam(BEST_RUN_SORTS, "rank"),
   status: enumQueryParam(ROUTE_COMPLETION_STATUSES, "all"),
   view: enumQueryParam(PLAYER_PROFILE_VIEWS, "overview"),
 });
@@ -270,6 +276,27 @@ export function formatDistance(distance: number): string {
   return `${numberFormatter.format(Math.round(distance))} units`;
 }
 
+export function sortBestRuns(
+  runs: readonly TopRun[],
+  sort: BestRunSort,
+  order: SortOrder,
+): TopRun[] {
+  const direction = order === "desc" ? -1 : 1;
+  return [...runs].sort((left, right) => {
+    const ascending =
+      sort === "points"
+        ? left.score - right.score || left.rank - right.rank
+        : sort === "date"
+          ? runTimestamp(left) - runTimestamp(right)
+          : left.rank - right.rank || right.score - left.score;
+    return ascending * direction;
+  });
+}
+
+export function defaultBestRunOrder(sort: BestRunSort): SortOrder {
+  return sort === "rank" ? "asc" : "desc";
+}
+
 export function formatRunTime(run: TopRun): string {
   if (run.time_played_string?.trim()) return run.time_played_string;
   if (!Number.isFinite(run.time_played)) return "Not available";
@@ -284,6 +311,12 @@ export function formatFpsList(values: readonly Fps[]): string {
   if (values.length === 0) return "Not available";
   const labels = values.map((fps) => (fps === "0" ? "Mix" : fps));
   return `${labels.join(", ")}${values.some((fps) => fps !== "0") ? " FPS" : ""}`;
+}
+
+function runTimestamp(run: TopRun): number {
+  // ponytail: epoch 0 stands in for "no date" so undated runs sort last in a plain numeric compare.
+  const parsed = Date.parse(run.time_created ?? "");
+  return Number.isNaN(parsed) ? 0 : parsed;
 }
 
 function firstText(...values: Array<string | null | undefined>): string {

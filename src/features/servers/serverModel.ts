@@ -127,7 +127,8 @@ function normalizePlayers(value: unknown): readonly ServerPlayerViewModel[] | nu
     const name = displayText(player.playername);
     return [
       {
-        id: nonNegativeInteger(player.playerid),
+        // The API sends 0 when it could not resolve the player to a profile.
+        id: nonNegativeInteger(player.playerid) || null,
         name: name || "Unknown player",
         ping: nonNegativeInteger(player.ping),
       },
