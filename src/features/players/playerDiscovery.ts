@@ -11,6 +11,8 @@ export const PLAYER_SEARCH_DEBOUNCE_MS = 300;
 export const PLAYER_DIRECTORY_BATCH_SIZE = 50;
 
 export const playerDiscoveryQuerySchema = defineQuerySchema({
+  country: stringQueryParam({ maxLength: 8, trim: true }),
+  id: stringQueryParam({ maxLength: 12, trim: true }),
   q: stringQueryParam({ maxLength: 64, trim: true }),
   sort: enumQueryParam(["last-seen", "name", "visits"] as const, "last-seen"),
 });
@@ -21,6 +23,51 @@ const playerNameCollator = new Intl.Collator("en", {
   numeric: true,
   sensitivity: "base",
 });
+const countryLabelCollator = new Intl.Collator("en");
+const countryDisplayNames = new Intl.DisplayNames(["en"], { type: "region" });
+
+export function normalizePlayerCountry(country: string | undefined): string | null {
+  const code = country?.trim().toLocaleUpperCase();
+  if (!code) return null;
+  return code === "UK" ? "GB" : code;
+}
+
+export function playerCountryLabel(code: string): string {
+  try {
+    return countryDisplayNames.of(code) ?? code;
+  } catch {
+    return code;
+  }
+}
+
+export function filterPlayers(
+  players: readonly Player[],
+  filters: { country: string; id: string },
+): Player[] {
+  const id = /^\d+$/.test(filters.id) ? Number(filters.id) : null;
+  const country = normalizePlayerCountry(filters.country);
+  if (id === null && country === null) return players as Player[];
+
+  return players.filter(
+    (player) =>
+      (id === null || player.player_id === id) &&
+      (country === null || normalizePlayerCountry(player.country) === country),
+  );
+}
+
+export function playerCountryOptions(
+  players: readonly Player[],
+): { code: string; label: string }[] {
+  const codes = new Set<string>();
+  for (const player of players) {
+    const code = normalizePlayerCountry(player.country);
+    if (code !== null) codes.add(code);
+  }
+
+  return [...codes]
+    .map((code) => ({ code, label: playerCountryLabel(code) }))
+    .sort((left, right) => countryLabelCollator.compare(left.label, right.label));
+}
 
 export function playerDisplayName(player: Player): string {
   return player.pref_name?.trim() || player.playername;

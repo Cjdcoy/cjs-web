@@ -17,7 +17,12 @@
 
 .cjs-player-search {
   display: grid;
-  grid-template-columns: minmax(7.5rem, 0.75fr) minmax(15rem, 2fr) minmax(10rem, 1fr);
+  grid-template-columns:
+    minmax(7.5rem, 0.75fr)
+    minmax(12rem, 2fr)
+    minmax(7rem, 0.8fr)
+    minmax(9rem, 1fr)
+    minmax(9rem, 1fr);
   align-items: start;
   gap: var(--cjs-space-4);
 }
@@ -144,7 +149,14 @@
 }
 
 .cjs-player-favorite[aria-pressed="true"] {
-  box-shadow: var(--cjs-shadow-accent);
+  border-color: var(--cjs-color-accent);
+  color: var(--cjs-color-accent-strong);
+}
+
+@media (min-width: 48rem) and (max-width: 63.999rem) {
+  .cjs-player-search {
+    grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  }
 }
 
 @media (max-width: 47.999rem) {

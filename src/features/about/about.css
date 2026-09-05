@@ -9,9 +9,7 @@
   padding: var(--cjs-space-6);
   border: var(--cjs-border-width) solid var(--cjs-color-border);
   border-radius: var(--cjs-radius-lg);
-  background:
-    radial-gradient(circle at 12% 12%, var(--cjs-color-warning-surface), transparent 24rem),
-    var(--cjs-color-panel-strong);
+  background: var(--cjs-color-panel-strong);
   box-shadow: var(--cjs-shadow-card);
 }
 
@@ -73,11 +71,9 @@
 
 .cjs-about__facts dt {
   margin-block-end: var(--cjs-space-1);
-  color: var(--cjs-color-text-subtle);
+  color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
-  font-weight: var(--cjs-font-weight-bold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: var(--cjs-font-weight-medium);
 }
 
 .cjs-about__facts dd {

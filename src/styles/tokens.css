@@ -7,8 +7,6 @@
   color-scheme: dark;
 
   /* Colour: shared across every theme. */
-  --cjs-color-panel-soft: rgb(255 255 255 / 0.04);
-  --cjs-color-panel-hover: rgb(255 255 255 / 0.07);
   --cjs-color-podium-gold: #ffc107;
   --cjs-color-podium-silver: #c0c0c0;
   --cjs-color-podium-bronze: #cd7f32;
@@ -21,8 +19,11 @@
   --cjs-color-backdrop: rgb(0 0 0 / 0.68);
 
   /* Colour: derived from the active theme, so a theme never restates these. */
+  --cjs-color-border: color-mix(in srgb, var(--cjs-color-text) 10%, transparent);
+  --cjs-color-border-strong: color-mix(in srgb, var(--cjs-color-text) 18%, transparent);
+  --cjs-color-panel-soft: color-mix(in srgb, var(--cjs-color-text) 4%, transparent);
+  --cjs-color-panel-hover: color-mix(in srgb, var(--cjs-color-text) 7%, transparent);
   --cjs-color-accent-surface: color-mix(in srgb, var(--cjs-color-accent) 13%, transparent);
-  --cjs-color-accent-surface-strong: color-mix(in srgb, var(--cjs-color-accent) 20%, transparent);
   --cjs-color-selection: color-mix(in srgb, var(--cjs-color-accent) 28%, transparent);
   --cjs-color-warning-surface: color-mix(
     in srgb,
@@ -60,9 +61,9 @@
   --cjs-line-height-normal: 1.5;
   --cjs-line-height-relaxed: 1.7;
   --cjs-font-weight-regular: 400;
-  --cjs-font-weight-medium: 550;
-  --cjs-font-weight-semibold: 650;
-  --cjs-font-weight-bold: 750;
+  --cjs-font-weight-medium: 500;
+  --cjs-font-weight-semibold: 600;
+  --cjs-font-weight-bold: 700;
 
   /* Space */
   --cjs-space-0: 0;
@@ -78,14 +79,13 @@
   --cjs-space-16: 4rem;
 
   /* Shape, borders, and elevation */
-  --cjs-radius-sm: 9px;
-  --cjs-radius-md: 14px;
-  --cjs-radius-lg: 18px;
+  --cjs-radius-sm: 0.375rem;
+  --cjs-radius-md: 0.5rem;
+  --cjs-radius-lg: 0.75rem;
   --cjs-radius-pill: 999px;
   --cjs-border-width: 1px;
-  --cjs-shadow-card: inset 0 1px 0 rgb(255 255 255 / 0.05), 0 12px 32px rgb(0 0 0 / 0.5);
-  --cjs-shadow-elevated: 0 26px 70px rgb(0 0 0 / 0.42);
-  --cjs-shadow-accent: 0 10px 28px color-mix(in srgb, var(--cjs-color-accent) 18%, transparent);
+  --cjs-shadow-card: 0 1px 2px rgb(0 0 0 / 0.35);
+  --cjs-shadow-elevated: 0 8px 24px rgb(0 0 0 / 0.4);
   --cjs-focus-ring:
     0 0 0 3px color-mix(in srgb, var(--cjs-color-page) 92%, transparent),
     0 0 0 5px var(--cjs-color-accent-strong);
@@ -112,9 +112,9 @@
   --cjs-breakpoint-wide: 90rem;
   --cjs-content-width: 78rem;
   --cjs-reading-width: 46rem;
-  --cjs-control-height-sm: 2.25rem;
-  --cjs-control-height-md: 2.75rem;
-  --cjs-control-height-lg: 3rem;
+  --cjs-control-height-sm: 2rem;
+  --cjs-control-height-md: 2.5rem;
+  --cjs-control-height-lg: 2.75rem;
   --cjs-touch-target: 2.75rem;
 }
 
@@ -128,8 +128,8 @@
 }
 
 /*
- * Theme palettes. Each theme defines only its base colours; surfaces, the
- * selection tint, the accent shadow and the focus ring are derived above.
+ * Theme palettes. Each theme defines only its 12 base colours; borders, neutral
+ * overlays, surfaces, the selection tint and the focus ring are derived above.
  * Jade is the default and is also applied when no theme has been chosen.
  */
 :root,
@@ -139,8 +139,6 @@
   --cjs-color-panel: #111713;
   --cjs-color-panel-strong: #17201b;
   --cjs-color-panel-warm: #1c1b16;
-  --cjs-color-border: rgb(216 231 222 / 0.14);
-  --cjs-color-border-strong: rgb(216 231 222 / 0.52);
   --cjs-color-text: #eef4f0;
   --cjs-color-text-muted: #9ca9a1;
   --cjs-color-text-subtle: #8f9d95;
@@ -156,8 +154,6 @@
   --cjs-color-panel: #17120d;
   --cjs-color-panel-strong: #211a12;
   --cjs-color-panel-warm: #241b10;
-  --cjs-color-border: rgb(238 226 214 / 0.14);
-  --cjs-color-border-strong: rgb(238 226 214 / 0.52);
   --cjs-color-text: #f5efe8;
   --cjs-color-text-muted: #b3a595;
   --cjs-color-text-subtle: #a5978a;
@@ -173,8 +169,6 @@
   --cjs-color-panel: #0f141b;
   --cjs-color-panel-strong: #151c26;
   --cjs-color-panel-warm: #1e1b16;
-  --cjs-color-border: rgb(214 226 244 / 0.14);
-  --cjs-color-border-strong: rgb(214 226 244 / 0.52);
   --cjs-color-text: #eaf0f8;
   --cjs-color-text-muted: #99a5b8;
   --cjs-color-text-subtle: #8b97ab;

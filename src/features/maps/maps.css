@@ -10,11 +10,9 @@
   display: inline-flex;
   align-items: center;
   gap: var(--cjs-space-2);
-  color: var(--cjs-color-accent-strong);
+  color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
-  font-weight: var(--cjs-font-weight-bold);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+  font-weight: var(--cjs-font-weight-medium);
 }
 
 .cjs-maps__filters {
@@ -134,25 +132,11 @@
   grid-template-columns: clamp(15rem, 22vw, 18rem) minmax(17rem, 1fr) minmax(22rem, 1.2fr);
   min-width: 0;
   overflow: hidden;
-  transition:
-    border-color var(--cjs-duration-fast) var(--cjs-ease-standard),
-    transform var(--cjs-duration-fast) var(--cjs-ease-standard);
+  transition: border-color var(--cjs-duration-fast) var(--cjs-ease-standard);
 }
 
 .cjs-map-card:hover {
-  border-color: var(--cjs-color-accent);
-  transform: translateY(-2px);
-}
-
-.cjs-map-card:hover .cjs-map-card__image {
-  transform: scale(1.04);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .cjs-map-card:hover,
-  .cjs-map-card:hover .cjs-map-card__image {
-    transform: none;
-  }
+  border-color: var(--cjs-color-border-strong);
 }
 
 .cjs-map-card__art {
@@ -165,7 +149,7 @@
   gap: var(--cjs-space-2);
   border-inline-end: var(--cjs-border-width) solid var(--cjs-color-border);
   background: var(--cjs-color-elevated);
-  color: var(--cjs-color-accent-strong);
+  color: var(--cjs-color-text-muted);
   text-decoration: none;
 }
 
@@ -176,7 +160,6 @@
   width: 100%;
   height: 100%;
   object-fit: cover;
-  transition: transform var(--cjs-duration-fast) var(--cjs-ease-standard);
 }
 
 .cjs-map-card__art span {
@@ -272,16 +255,16 @@
   display: flex;
   align-items: center;
   gap: var(--cjs-space-2);
-  color: var(--cjs-color-text-subtle);
+  color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
-  font-weight: var(--cjs-font-weight-semibold);
-  text-transform: uppercase;
+  font-weight: var(--cjs-font-weight-medium);
 }
 
+/* Five equal slots on one line: the fifth rating wrapped as a flex row. */
 .cjs-map-card__difficulty-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--cjs-space-1);
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0;
   margin: 0;
   padding: 0;
   list-style: none;
@@ -289,28 +272,28 @@
 
 .cjs-map-card__difficulty-list li {
   display: inline-flex;
-  min-width: 4.5rem;
+  min-width: 0;
   align-items: baseline;
   justify-content: center;
-  gap: var(--cjs-space-2);
-  padding: var(--cjs-space-1) var(--cjs-space-2);
-  border: var(--cjs-border-width) solid var(--cjs-color-border);
-  border-radius: var(--cjs-radius-sm);
-  background: var(--cjs-color-panel-soft);
+  gap: var(--cjs-space-1);
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cjs-map-card__difficulty-list li + li {
+  border-inline-start: var(--cjs-border-width) solid var(--cjs-color-border);
 }
 
 .cjs-map-card__difficulty-list li[data-selected="true"] {
-  border-color: var(--cjs-color-accent);
-  background: var(--cjs-color-accent-surface);
+  color: var(--cjs-color-text);
+}
+
+.cjs-map-card__difficulty-list li[data-selected="true"] strong {
+  font-weight: var(--cjs-font-weight-semibold);
 }
 
 /* Dimmed with a token rather than opacity: opacity composites the text down
    to 3.09:1 against the panel, below the WCAG AA 4.5:1 minimum. */
-.cjs-map-card__difficulty-list li[data-unrated] {
-  background: none;
-}
-
 .cjs-map-card__difficulty-list li[data-unrated] span,
 .cjs-map-card__difficulty-list li[data-unrated] strong {
   color: var(--cjs-color-text-subtle);
@@ -328,6 +311,7 @@
 
 .cjs-map-card__difficulty-list strong {
   color: var(--cjs-color-accent-secondary);
+  /* xs, not sm: at 360px a fifth of the card is ~53px and "125 10.00" needs 60px at sm. */
   font-size: var(--cjs-font-size-xs);
 }
 
@@ -360,31 +344,15 @@
   display: flex;
   align-items: center;
   gap: var(--cjs-space-2);
-  color: var(--cjs-color-text-subtle);
+  color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
-  font-weight: var(--cjs-font-weight-semibold);
-  text-transform: uppercase;
-}
-
-.cjs-map-card__metrics dd {
-  display: flex;
-  min-width: 0;
-  flex-direction: column;
-}
-
-.cjs-map-card__metrics strong,
-.cjs-map-card__metrics span {
-  overflow-wrap: anywhere;
+  font-weight: var(--cjs-font-weight-medium);
 }
 
 .cjs-map-card__metrics strong {
+  overflow-wrap: anywhere;
   color: var(--cjs-color-text);
   font-size: var(--cjs-font-size-md);
-}
-
-.cjs-map-card__metrics span {
-  color: var(--cjs-color-text-muted);
-  font-size: var(--cjs-font-size-xs);
 }
 
 /* Compact list rows only where the row has room; narrower viewports keep
@@ -418,13 +386,9 @@
     display: none;
   }
 
-  /* Fixed width so the chips and the favourite button line up down the column. */
+  /* Fixed width so the ratings and the favourite button line up down the column. */
   .cjs-maps__results[data-view="list"] .cjs-map-card__difficulty {
     flex: 0 0 24rem;
-  }
-
-  .cjs-maps__results[data-view="list"] .cjs-map-card__difficulty-list {
-    flex-wrap: nowrap;
   }
 
   .cjs-maps__results[data-view="list"] .cjs-map-card__metrics > div {
@@ -497,8 +461,8 @@
   place-items: center;
   gap: var(--cjs-space-2);
   border-radius: var(--cjs-radius-md);
-  background: var(--cjs-color-accent-surface);
-  color: var(--cjs-color-accent-strong);
+  background: var(--cjs-color-panel-soft);
+  color: var(--cjs-color-text-muted);
 }
 
 .cjs-map-detail__art img {
@@ -751,10 +715,9 @@
 
 .cjs-map-videos__playlist > p {
   margin: 0 0 var(--cjs-space-2);
-  color: var(--cjs-color-text-subtle);
+  color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
-  font-weight: var(--cjs-font-weight-semibold);
-  text-transform: uppercase;
+  font-weight: var(--cjs-font-weight-medium);
 }
 
 .cjs-map-videos__playlist > div {
@@ -912,10 +875,9 @@
 
 .cjs-replay-analytics__map-highlight > p {
   margin: 0 0 var(--cjs-space-2);
-  color: var(--cjs-color-text-subtle);
+  color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
-  font-weight: var(--cjs-font-weight-semibold);
-  text-transform: uppercase;
+  font-weight: var(--cjs-font-weight-medium);
 }
 
 .cjs-replay-analytics__map-highlight > div {

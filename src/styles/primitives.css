@@ -57,7 +57,7 @@
   min-height: var(--cjs-control-height-md);
   border: var(--cjs-border-width) solid transparent;
   border-radius: var(--cjs-radius-sm);
-  font-weight: var(--cjs-font-weight-semibold);
+  font-weight: var(--cjs-font-weight-medium);
   line-height: var(--cjs-line-height-tight);
   text-decoration: none;
   cursor: pointer;
@@ -65,8 +65,7 @@
     color var(--cjs-duration-fast) var(--cjs-ease-standard),
     background-color var(--cjs-duration-fast) var(--cjs-ease-standard),
     border-color var(--cjs-duration-fast) var(--cjs-ease-standard),
-    box-shadow var(--cjs-duration-fast) var(--cjs-ease-standard),
-    transform var(--cjs-duration-fast) var(--cjs-ease-standard);
+    box-shadow var(--cjs-duration-fast) var(--cjs-ease-standard);
 }
 
 .cjs-button {
@@ -91,7 +90,7 @@
   border-color: var(--cjs-color-accent);
   background: var(--cjs-color-accent);
   color: var(--cjs-color-on-accent);
-  box-shadow: var(--cjs-shadow-accent);
+  box-shadow: var(--cjs-shadow-card);
 }
 
 .cjs-button[data-variant="primary"]:hover:not(:disabled) {
@@ -106,7 +105,6 @@
 }
 
 .cjs-button[data-variant="secondary"]:hover:not(:disabled) {
-  border-color: var(--cjs-color-accent);
   background: var(--cjs-color-panel-hover);
 }
 
@@ -129,12 +127,6 @@
 
 .cjs-button[data-variant="danger"]:hover:not(:disabled) {
   box-shadow: 0 0 0 var(--cjs-space-1) var(--cjs-color-danger-surface);
-}
-
-.cjs-button:active:not(:disabled),
-.cjs-icon-button:active:not(:disabled),
-.cjs-pagination__button:active:not(:disabled) {
-  transform: translateY(var(--cjs-border-width));
 }
 
 .cjs-button:disabled,
@@ -217,8 +209,8 @@
 
 .cjs-icon-button,
 .cjs-pagination__button {
-  width: var(--cjs-touch-target);
-  min-width: var(--cjs-touch-target);
+  width: var(--cjs-control-height-md);
+  min-width: var(--cjs-control-height-md);
   padding: 0;
   border-color: var(--cjs-color-border-strong);
   background: var(--cjs-color-panel-strong);
@@ -227,7 +219,6 @@
 
 .cjs-icon-button:hover:not(:disabled),
 .cjs-pagination__button:hover:not(:disabled) {
-  border-color: var(--cjs-color-accent);
   background: var(--cjs-color-panel-hover);
   color: var(--cjs-color-text);
 }
@@ -337,11 +328,6 @@
   opacity: 1;
 }
 
-.cjs-input:hover:not(:disabled),
-.cjs-select:hover:not(:disabled) {
-  border-color: var(--cjs-color-accent);
-}
-
 .cjs-input[aria-invalid="true"],
 .cjs-select[aria-invalid="true"] {
   border-color: var(--cjs-color-danger);
@@ -385,24 +371,24 @@
 }
 
 .cjs-segmented-control__option[aria-checked="true"] {
-  border-color: var(--cjs-color-accent);
-  background: var(--cjs-color-accent-surface-strong);
-  color: var(--cjs-color-accent-strong);
+  border-color: transparent;
+  background: var(--cjs-color-panel-strong);
+  color: var(--cjs-color-text);
+  box-shadow: var(--cjs-shadow-card);
 }
 
 .cjs-badge {
   display: inline-flex;
   align-items: center;
   gap: var(--cjs-space-1);
-  min-height: var(--cjs-control-height-sm);
-  padding-inline: var(--cjs-space-2);
+  padding: 0.125rem var(--cjs-space-2);
   border: var(--cjs-border-width) solid var(--cjs-color-border-strong);
-  border-radius: var(--cjs-radius-pill);
+  border-radius: var(--cjs-radius-sm);
   background: var(--cjs-color-panel-soft);
   color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
-  font-weight: var(--cjs-font-weight-semibold);
-  line-height: var(--cjs-line-height-tight);
+  font-weight: var(--cjs-font-weight-medium);
+  line-height: var(--cjs-line-height-normal);
 }
 
 .cjs-badge[data-tone="success"] {
@@ -495,25 +481,25 @@
   padding: var(--cjs-space-4);
   color: var(--cjs-color-text);
   font-size: var(--cjs-font-size-md);
-  font-weight: var(--cjs-font-weight-bold);
+  font-weight: var(--cjs-font-weight-semibold);
   text-align: start;
 }
 
 .cjs-table th,
 .cjs-table td {
-  padding: var(--cjs-space-3) var(--cjs-space-4);
+  padding: var(--cjs-space-2) var(--cjs-space-3);
   border-block-end: var(--cjs-border-width) solid var(--cjs-color-border);
   text-align: start;
   vertical-align: middle;
 }
 
 .cjs-table th {
-  background: var(--cjs-color-panel-strong);
+  background: transparent;
   color: var(--cjs-color-text-muted);
-  font-size: var(--cjs-font-size-xs);
-  font-weight: var(--cjs-font-weight-bold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-size: var(--cjs-font-size-sm);
+  font-weight: var(--cjs-font-weight-medium);
+  letter-spacing: normal;
+  text-transform: none;
 }
 
 .cjs-table tbody tr:last-child td {
@@ -657,9 +643,9 @@
 }
 
 .cjs-pagination__button[aria-current="page"] {
-  border-color: var(--cjs-color-accent);
-  background: var(--cjs-color-accent-surface-strong);
-  color: var(--cjs-color-accent-strong);
+  border-color: var(--cjs-color-border-strong);
+  background: var(--cjs-color-panel-strong);
+  color: var(--cjs-color-text);
 }
 
 .cjs-pagination__ellipsis {

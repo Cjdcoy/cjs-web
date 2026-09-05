@@ -26,7 +26,7 @@ export const SORT_ORDERS = ["asc", "desc"] as const;
 export type SortOrder = (typeof SORT_ORDERS)[number];
 
 export const leaderboardQuerySchema = defineQuerySchema({
-  board: enumQueryParam(LEADERBOARD_BOARDS, "speed-skill"),
+  board: enumQueryParam(LEADERBOARD_BOARDS, "jump-skill"),
   fps: enumQueryParam(FPS_VALUES, "125"),
   order: enumQueryParam(SORT_ORDERS, "asc"),
   query: stringQueryParam({ defaultValue: "", maxLength: 80, trim: true }),
@@ -58,6 +58,18 @@ export interface TopPlaceCount {
   count: number;
 }
 
+export interface DifficultyBand {
+  band: number;
+  points: number;
+}
+
+export interface DifficultySplit {
+  bands: DifficultyBand[];
+  average: number;
+}
+
+export type TopListKind = "places" | "difficulty";
+
 const unsupportedLegacyParameters = [
   "country",
   "limit",
@@ -75,7 +87,7 @@ export function normalizeLeaderboardState(
   state: LeaderboardQueryState,
   source: Source,
 ): LeaderboardQueryState {
-  const board = source === "jh" && state.board === "rank-xp" ? "speed-skill" : state.board;
+  const board = source === "jh" && state.board === "rank-xp" ? "jump-skill" : state.board;
 
   return {
     ...state,
@@ -206,6 +218,33 @@ export function createTopPlaceDistribution(
   });
 
   return hasKnownPlace ? distribution : null;
+}
+
+/**
+ * `top_list` means different things per board: jump-skill returns points earned per map
+ * difficulty band (key = floor(difficulty), 0–9, values sum to `score`); the other skill
+ * boards return top-place counts (key = finishing position, 1–10).
+ */
+export function topListKind(board: LeaderboardBoard): TopListKind {
+  return board === "jump-skill" ? "difficulty" : "places";
+}
+
+export function createDifficultySplit(
+  topList: Readonly<Record<string, number>> | undefined,
+): DifficultySplit | null {
+  if (!topList) return null;
+
+  const bands = Object.entries(topList)
+    .map(([key, points]) => ({ band: Number(key), points }))
+    .filter(({ band, points }) => Number.isInteger(band) && band >= 0 && band <= 9 && points > 0)
+    .sort((left, right) => left.band - right.band);
+  const total = bands.reduce((sum, { points }) => sum + points, 0);
+  if (total === 0) return null;
+
+  // Each band covers [n, n + 1), so its midpoint is the unbiased estimate of map difficulty.
+  const average = bands.reduce((sum, { band, points }) => sum + (band + 0.5) * points, 0) / total;
+
+  return { bands, average };
 }
 
 export function metricLabel(board: LeaderboardBoard): string {

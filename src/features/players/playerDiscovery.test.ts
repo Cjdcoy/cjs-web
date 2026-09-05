@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Player } from "../../lib/api";
-import { parseCodName, sortPlayers } from "./playerDiscovery";
+import { filterPlayers, parseCodName, playerCountryOptions, sortPlayers } from "./playerDiscovery";
 
 describe("parseCodName", () => {
   it("turns supported COD color controls into text-only segments", () => {
@@ -63,5 +63,57 @@ describe("sortPlayers", () => {
     const originalOrder = players.map((player) => player.player_id);
     sortPlayers(players, "name");
     expect(players.map((player) => player.player_id)).toEqual(originalOrder);
+  });
+});
+
+describe("filterPlayers", () => {
+  const players: Player[] = [
+    { player_id: 1, playername: "alpha", country: "de" },
+    { player_id: 2, playername: "beta", country: "UK" },
+    { player_id: 3, playername: "gamma" },
+  ];
+
+  it("keeps only the player matching an all-digit id", () => {
+    expect(filterPlayers(players, { country: "", id: "2" }).map((p) => p.player_id)).toEqual([2]);
+  });
+
+  it("ignores an id that is not all digits", () => {
+    expect(filterPlayers(players, { country: "", id: "2x" })).toBe(players);
+  });
+
+  it("compares countries case-insensitively and treats UK as GB", () => {
+    expect(filterPlayers(players, { country: "gb", id: "" }).map((p) => p.player_id)).toEqual([2]);
+    expect(filterPlayers(players, { country: "De", id: "" }).map((p) => p.player_id)).toEqual([1]);
+  });
+
+  it("applies the id and country filters together", () => {
+    expect(filterPlayers(players, { country: "GB", id: "1" })).toEqual([]);
+    expect(filterPlayers(players, { country: "DE", id: "1" }).map((p) => p.player_id)).toEqual([1]);
+  });
+
+  it("returns the same array instance when no filter applies", () => {
+    expect(filterPlayers(players, { country: "  ", id: "" })).toBe(players);
+  });
+});
+
+describe("playerCountryOptions", () => {
+  it("lists distinct known countries sorted by label and skips players without one", () => {
+    expect(
+      playerCountryOptions([
+        { player_id: 1, playername: "a", country: "US" },
+        { player_id: 2, playername: "b", country: "de" },
+        { player_id: 3, playername: "c", country: "DE" },
+        { player_id: 4, playername: "d" },
+      ]),
+    ).toEqual([
+      { code: "DE", label: "Germany" },
+      { code: "US", label: "United States" },
+    ]);
+  });
+
+  it("falls back to the code when it is not a known region", () => {
+    expect(
+      playerCountryOptions([{ player_id: 1, playername: "a", country: "Exampleland" }]),
+    ).toEqual([{ code: "EXAMPLELAND", label: "EXAMPLELAND" }]);
   });
 });
