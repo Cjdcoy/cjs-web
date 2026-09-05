@@ -2,6 +2,7 @@ import { Activity, RefreshCw } from "lucide-react";
 import {
   Badge,
   Button,
+  IconButton,
   CodPlayerName,
   EmptyState,
   ErrorState,
@@ -39,10 +40,15 @@ export function RecentPage() {
       </header>
 
       <div className="cjs-recent__toolbar">
-        <Button variant="ghost" size="small" isLoading={loading} onClick={reload}>
-          <RefreshCw size={16} aria-hidden="true" />
-          Refresh
-        </Button>
+        <IconButton
+          label={loading ? "Refreshing" : "Refresh"}
+          variant="ghost"
+          size="small"
+          onClick={reload}
+          isLoading={loading}
+        >
+          <RefreshCw size={17} aria-hidden="true" />
+        </IconButton>
       </div>
 
       {loading && runs.length === 0 && (

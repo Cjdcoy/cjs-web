@@ -38,6 +38,12 @@
   gap: var(--cjs-space-3);
 }
 
+.cjs-recent__toolbar {
+  justify-content: flex-end;
+  padding-bottom: var(--cjs-space-2);
+  border-bottom: var(--cjs-border-width) solid var(--cjs-color-border);
+}
+
 .cjs-recent__inline-error {
   padding: var(--cjs-space-3);
   border: var(--cjs-border-width) solid var(--cjs-color-border);
