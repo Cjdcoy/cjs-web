@@ -3,6 +3,7 @@ import { readQueryState } from "../../lib/routing";
 import {
   canonicalizeLeaderboardSearch,
   createLeaderboardRows,
+  createDifficultySplit,
   createTopPlaceDistribution,
   filterLeaderboardRows,
   leaderboardQuerySchema,
@@ -131,5 +132,17 @@ describe("leaderboard view transformations", () => {
     });
     expect(createTopPlaceDistribution({ unrelated: 3 })).toBeNull();
     expect(createTopPlaceDistribution(undefined)).toBeNull();
+  });
+
+  it("splits jump points by difficulty band and averages band midpoints", () => {
+    expect(createDifficultySplit({ "9": 300, "0": 0, "2": 100, top1: 5 })).toEqual({
+      bands: [
+        { band: 2, points: 100 },
+        { band: 9, points: 300 },
+      ],
+      average: 7.75,
+    });
+    expect(createDifficultySplit({ "0": 0 })).toBeNull();
+    expect(createDifficultySplit(undefined)).toBeNull();
   });
 });

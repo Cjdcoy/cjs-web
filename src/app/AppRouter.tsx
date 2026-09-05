@@ -77,6 +77,7 @@ const routeLabels = {
   "not-found": "Not found",
   "player-detail": "Player profile",
   players: "Players",
+  recent: "Recent updates",
   servers: "Live servers",
 } as const;
 

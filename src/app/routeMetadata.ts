@@ -48,6 +48,11 @@ const routeMetadata: Readonly<Record<AppRouteId, RouteMetadataResolver>> = {
     description:
       "Search supported JumpersHeaven and Jump4Life players and open source-aware player profiles.",
   }),
+  recent: () => ({
+    title: "Recent updates | CJS",
+    description:
+      "Follow a chronological feed of the latest JumpersHeaven and Jump4Life activity, with the map, route, time, and FPS of every finish.",
+  }),
   servers: () => ({
     title: "Live CodJumper servers | CJS",
     description:

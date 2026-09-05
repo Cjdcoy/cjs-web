@@ -24,6 +24,7 @@ import type {
   PlayerRouteCompletion,
   PlayerSort,
   RankLeaderboardEntry,
+  RecentRunsPage,
   ReplayWatchAggregate,
   ReplayWatchFilters,
   ReplayWatchMetric,
@@ -46,6 +47,7 @@ import {
   normalizePlayerRoutes,
   normalizePlayers,
   normalizeRankLeaderboard,
+  normalizeRecentRunsPage,
   normalizeReplayWatchAggregate,
   normalizeReplayWatchRankings,
   normalizeServerResponse,
@@ -56,6 +58,7 @@ const PATHS = {
   trackerServers: "/api/v1/tracker/servers",
   maps: "/api/v1/map/all",
   mapTops: "/api/v1/map/tops",
+  recentRuns: "/api/v1/runs/recent",
   players: "/api/v1/player/all",
   playerSearch: "/api/v1/player/id-from-name",
   playerPerformance: "/api/v1/player/performance-stats",
@@ -88,6 +91,9 @@ export interface CjsApi {
   mapTops(
     options: RequestContext & { checkpointId: number | string; fps: Fps; limit?: number },
   ): Promise<TopRun[]>;
+  recentRuns(
+    options: RequestContext & { fps?: Fps; limit?: number; cursor?: string },
+  ): Promise<RecentRunsPage>;
   players(options: RequestContext & { sort?: PlayerSort }): Promise<Player[]>;
   searchPlayers(options: RequestContext & { name: string; limit?: number }): Promise<Player[]>;
   playerPerformance(
@@ -192,6 +198,24 @@ export function createCjsApi(client: JsonClient, replayClient: JsonClient = clie
           limit: options.limit,
         }),
         PATHS.mapTops,
+      );
+    },
+
+    async recentRuns(options) {
+      const game = context(options, PATHS.recentRuns);
+      assertCapability("players", options.source, game);
+      if (options.fps !== undefined && !isFps(options.fps)) {
+        throw invalidArgument(PATHS.recentRuns, "fps");
+      }
+      limit(options.limit, PATHS.recentRuns);
+      return normalizeRecentRunsPage(
+        await get(client, PATHS.recentRuns, options, {
+          source: options.source,
+          fps: options.fps,
+          limit: options.limit,
+          cursor: options.cursor,
+        }),
+        PATHS.recentRuns,
       );
     },
 

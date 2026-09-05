@@ -156,7 +156,7 @@ describe("LeaderboardsPage", () => {
     await waitFor(() => expect(window.location.search).toBe(""));
     expect(leaderboard).toHaveBeenCalledWith(
       expect.objectContaining({
-        kind: "speed-skill",
+        kind: "jump-skill",
         source: "jh",
         fps: "125",
         signal: expect.any(AbortSignal),
@@ -174,7 +174,7 @@ describe("LeaderboardsPage", () => {
     });
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("speed-skill Alpha");
+    await screen.findByText("jump-skill Alpha");
 
     expect(
       screen.getByRole("heading", { level: 1, name: "JumpersHeaven leaderboards" }),
@@ -188,10 +188,10 @@ describe("LeaderboardsPage", () => {
     expect(screen.queryByText(/uses the API's official ranking/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Reset filters" })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("radio", { name: "Jump" }));
+    await user.click(screen.getByRole("radio", { name: "Speed" }));
     await user.click(screen.getByRole("radio", { name: "333" }));
-    expect(await screen.findByText("jump-skill Alpha")).toBeInTheDocument();
-    expect(window.location.search).toBe("?board=jump-skill&fps=333");
+    expect(await screen.findByText("speed-skill Alpha")).toBeInTheDocument();
+    expect(window.location.search).toBe("?board=speed-skill&fps=333");
     expect(screen.getByRole("button", { name: "Reset filters" })).toBeVisible();
 
     await user.click(screen.getByRole("radio", { name: "Completions" }));
@@ -214,7 +214,7 @@ describe("LeaderboardsPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Reset filters" }));
     await waitFor(() => expect(window.location.search).toBe(""));
-    expect(screen.getByRole("radio", { name: "Speed" })).toBeChecked();
+    expect(screen.getByRole("radio", { name: "Jump" })).toBeChecked();
     expect(screen.getByRole("radio", { name: "125" })).toBeChecked();
     expect(screen.getByRole("searchbox", { name: "Find a player or country" })).toHaveValue("");
     expect(screen.queryByRole("button", { name: "Reset filters" })).not.toBeInTheDocument();
@@ -270,6 +270,7 @@ describe("LeaderboardsPage", () => {
   });
 
   it("shows a compact country flag and the full top 1–10 distribution", async () => {
+    window.history.replaceState(null, "", "/leaderboards?board=speed-skill");
     vi.spyOn(api, "leaderboard").mockResolvedValue([
       standardEntry(1, {
         country: "United Kingdom",
@@ -304,10 +305,26 @@ describe("LeaderboardsPage", () => {
     expect(within(distribution).getByText("#10")).toBeVisible();
   });
 
+  it("shows points by map difficulty with an average on the jump board", async () => {
+    vi.spyOn(api, "leaderboard").mockResolvedValue([
+      standardEntry(1, { top_list: { "0": 0, "2": 100, "9": 300 } }),
+    ]);
+    renderPage();
+
+    const table = await screen.findByRole("table", { name: /jump skill rankings/i });
+    expect(within(table).getByRole("columnheader", { name: "Points by difficulty" })).toBeVisible();
+    expect(within(table).queryByText("#1")).not.toBeInTheDocument();
+    expect(
+      within(table).getByRole("img", {
+        name: "Average map difficulty 7.8. Points by difficulty: difficulty 2: 100, difficulty 9: 300",
+      }),
+    ).toBeVisible();
+  });
+
   it("cancels an obsolete board request so late data is not presented", async () => {
     let obsoleteSignal: AbortSignal | undefined;
     vi.spyOn(api, "leaderboard").mockImplementation(({ kind, signal }) => {
-      if (kind === "jump-skill") {
+      if (kind === "speed-skill") {
         return Promise.resolve([standardEntry(2, { player_name: "Current runner" })]);
       }
 
@@ -325,7 +342,7 @@ describe("LeaderboardsPage", () => {
     const user = userEvent.setup();
     renderPage();
 
-    await user.click(screen.getByRole("radio", { name: "Jump" }));
+    await user.click(screen.getByRole("radio", { name: "Speed" }));
 
     expect(await screen.findByText("Current runner")).toBeInTheDocument();
     expect(obsoleteSignal?.aborted).toBe(true);
@@ -354,7 +371,7 @@ describe("LeaderboardsPage", () => {
     ]);
     const { container } = renderPage();
 
-    const table = await screen.findByRole("table", { name: /speed skill rankings/i });
+    const table = await screen.findByRole("table", { name: /jump skill rankings/i });
     expect(within(table).getByRole("columnheader", { name: /rank/i })).toHaveAttribute(
       "aria-sort",
       "ascending",

@@ -44,7 +44,6 @@
   height: 100%;
   border-radius: var(--cjs-radius-pill);
   background: var(--cjs-color-accent-strong);
-  box-shadow: var(--cjs-shadow-accent);
   animation: cjs-route-progress var(--cjs-duration-slow) var(--cjs-ease-emphasized) infinite
     alternate;
 }
@@ -122,14 +121,14 @@
 .cjs-navigation-link {
   position: relative;
   display: inline-flex;
-  min-height: var(--cjs-touch-target);
+  min-height: var(--cjs-control-height-md);
   align-items: center;
   gap: var(--cjs-space-2);
   padding-inline: var(--cjs-space-3);
   border-radius: var(--cjs-radius-sm);
   color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-sm);
-  font-weight: var(--cjs-font-weight-semibold);
+  font-weight: var(--cjs-font-weight-medium);
   text-decoration: none;
   transition:
     color var(--cjs-duration-fast) var(--cjs-ease-standard),
@@ -142,8 +141,8 @@
 }
 
 .cjs-navigation-link[data-active="true"] {
-  background: var(--cjs-color-accent-surface);
-  color: var(--cjs-color-accent-strong);
+  background: var(--cjs-color-panel-strong);
+  color: var(--cjs-color-text);
 }
 
 .cjs-navigation-link__marker {
@@ -333,7 +332,7 @@
   background: transparent;
   color: var(--cjs-color-text);
   font-size: var(--cjs-font-size-sm);
-  font-weight: var(--cjs-font-weight-semibold);
+  font-weight: var(--cjs-font-weight-medium);
 }
 
 @media (max-width: 47.999rem) {

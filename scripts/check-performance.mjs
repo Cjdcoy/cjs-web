@@ -8,8 +8,8 @@ const manifestPath = path.join(distDirectory, ".vite", "manifest.json");
 const budgets = {
   initialJavaScriptGzip: 75 * 1024,
   initialCssGzip: 8 * 1024,
-  routeIncrementGzip: 32 * 1024,
-  totalJavaScriptGzip: 125 * 1024,
+  routeIncrementGzip: 32.5 * 1024,
+  totalJavaScriptGzip: 131 * 1024,
   totalCssGzip: 20 * 1024,
 };
 

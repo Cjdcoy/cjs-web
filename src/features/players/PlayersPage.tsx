@@ -8,6 +8,10 @@ import { PlayerResults } from "./PlayerResults";
 import {
   PLAYER_SEARCH_LIMIT,
   PLAYER_SEARCH_MIN_LENGTH,
+  filterPlayers,
+  normalizePlayerCountry,
+  playerCountryLabel,
+  playerCountryOptions,
   playerDiscoveryQuerySchema,
   sortPlayers,
 } from "./playerDiscovery";
@@ -40,10 +44,18 @@ export function PlayersPage({
     retry: retryLevels,
     status: levelStatus,
   } = usePlayerLevels({ listPlayerRanks, source });
-  const sortedPlayers = useMemo(
-    () => sortPlayers(players, queryState.sort),
-    [players, queryState.sort],
+  const filteredPlayers = useMemo(
+    () => filterPlayers(players, { country: queryState.country, id: queryState.id }),
+    [players, queryState.country, queryState.id],
   );
+  const sortedPlayers = useMemo(
+    () => sortPlayers(filteredPlayers, queryState.sort),
+    [filteredPlayers, queryState.sort],
+  );
+  const countryOptions = useMemo(() => playerCountryOptions(players), [players]);
+  const selectedCountry = normalizePlayerCountry(queryState.country);
+  const isMissingCountryOption =
+    selectedCountry !== null && !countryOptions.some((option) => option.code === selectedCountry);
   const { favoriteIds, toggleFavorite } = useFavoritePlayers(source);
   const normalizedQuery = queryState.q.trim();
 
@@ -89,6 +101,32 @@ export function PlayersPage({
             type="search"
             value={queryState.q}
           />
+          <Input
+            autoComplete="off"
+            inputMode="numeric"
+            label="Player ID"
+            maxLength={12}
+            onChange={(event) => setQueryState({ id: event.target.value }, { replace: true })}
+            pattern="[0-9]*"
+            placeholder="e.g. 128567"
+            type="text"
+            value={queryState.id}
+          />
+          <Select
+            label="Country"
+            onChange={(event) => setQueryState({ country: event.target.value })}
+            value={selectedCountry ?? ""}
+          >
+            <option value="">All countries</option>
+            {isMissingCountryOption && (
+              <option value={selectedCountry}>{playerCountryLabel(selectedCountry)}</option>
+            )}
+            {countryOptions.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.label}
+              </option>
+            ))}
+          </Select>
           <Select
             label="Sort results"
             onChange={(event) => {
@@ -109,12 +147,13 @@ export function PlayersPage({
           Directory players are revealed in batches as you scroll. Name searches use the documented
           lookup and are limited to {PLAYER_SEARCH_LIMIT} results. Country, visits, admin level, and
           last-seen values appear only when the API supplies them. Player level is available for
-          Jump4Life.
+          Jump4Life. Player ID and country filters apply to the loaded results.
         </p>
 
         <PlayerResults
           error={error}
           favoriteIds={favoriteIds}
+          filtered={filteredPlayers !== players}
           levelError={levelError}
           levelStatus={levelStatus}
           players={sortedPlayers}

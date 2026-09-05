@@ -220,20 +220,11 @@
   min-width: 0;
   grid-template-rows: minmax(0, 1fr) auto;
   overflow: hidden;
-  transition:
-    border-color var(--cjs-duration-fast) var(--cjs-ease-standard),
-    transform var(--cjs-duration-fast) var(--cjs-ease-standard);
+  transition: border-color var(--cjs-duration-fast) var(--cjs-ease-standard);
 }
 
 .server-card:hover {
-  border-color: var(--cjs-color-accent);
-  transform: translateY(-2px);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .server-card:hover {
-    transform: none;
-  }
+  border-color: var(--cjs-color-border-strong);
 }
 
 .server-card__visual {
@@ -430,8 +421,7 @@
 .server-card__roster h3 {
   color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
+  font-weight: var(--cjs-font-weight-medium);
 }
 
 .server-card__roster ul {

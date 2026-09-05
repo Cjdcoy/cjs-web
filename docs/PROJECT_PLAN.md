@@ -207,7 +207,8 @@ Rules:
 
 - Default `VITE_API_BASE_URL` to `https://api.jump4life.org` and permit an
   environment override.
-- Use JSON and `Accept: application/json`; MessagePack is outside MVP.
+- Keep v1 JSON as the default. Explicit v2 JSON and MessagePack are available for transport
+  benchmarks and share the same response normalization.
 - Build query strings with `URLSearchParams`. Omit absent values rather than
   sending empty strings.
 - Centralize timeout/cancellation, error mapping, and response parsing.

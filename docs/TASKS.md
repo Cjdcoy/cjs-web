@@ -2256,6 +2256,71 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   Expected steady-state: CI about 3.5 min, deploy about 1 min. Remaining floor: Playwright
   `install --with-deps` (about 55 s of apt) and the three-browser e2e run.
 
+### CJS-065 — Restyle the design system toward a clean, shadcn-like look
+
+- **Status:** done
+- **Owner/handoff:** Claude (Fable supervisor, Opus workers) / UI polish
+- **Dependencies:** CJS-004, CJS-062
+- **Primary boundary:** `src/styles/*.css`, feature stylesheets, `MapCard.tsx` metrics
+- **Goal:** the owner wants "clean and slick, with data easy to understand" rather than a
+  gamer look, using shadcn/ui as a visual reference without adopting its code (Tailwind and
+  Radix would duplicate the authored-CSS system and strain the bundle budgets).
+- **Acceptance:** three themes still work from one token file; no new dependencies; unit,
+  e2e (including axe), and bundle-budget checks pass; every in-page selected state reads
+  the same way across pages.
+- **Outcome:** tokens moved to 6/8/12 px radii, standard 500/600/700 weights, shorter
+  controls, one subtle card shadow, and borders plus neutral overlays derived from each
+  theme's text colour with `color-mix` (theme blocks now define 12 base colours; the accent
+  glow shadow and the accent-fill selection tint were deleted). The page background is flat.
+  Buttons, inputs, tables, badges, segmented controls, pagination, header navigation,
+  profile tabs, and leaderboard chips share a neutral selected/hover state; accent colour is
+  reserved for primary buttons, link hover, status/rank/podium colours, and page eyebrows.
+  Cards no longer lift or zoom on hover; micro-labels are sentence case; map difficulty
+  ratings render on one line in five fixed slots with dividers; map cards show the global
+  completion count and release date without the per-FPS "recorded tops" and caption lines.
+- **Related discovery updates:** players can filter loaded results by ID and country;
+  leaderboards default to Jump and show its points by difficulty distribution.
+- **Validation result:** `npm run verify` passes (41 files / 259 tests, CSS budgets with
+  more headroom than before); 11/11 chromium e2e tests pass; before/after screenshots at
+  360 and 1440 px across jade, ember, and cobalt.
+- **Remaining work/risks:** the map detail hero still shows a per-FPS "Recorded tops"
+  figure beside the global completion count; decide whether it should follow the card.
+
+### CJS-066 — Add opt-in API v2 JSON and MessagePack transports
+
+- **Status:** done
+- **Owner/handoff:** Codex (Sol frontend agent) / API transport benchmark switch
+- **Dependencies:** CJS-005
+- **Primary boundary:** `src/lib/api/*`, API transport docs/config, package manifest and lockfile,
+  JavaScript bundle budget
+- **Goal:** preserve legacy v1 JSON by default while making v2 JSON and v2 MessagePack easy to
+  select for like-for-like browser benchmarks.
+- **Acceptance:** both explicit formats use `/api/v2`; MessagePack has no silent JSON fallback;
+  cancellation and bounded retries remain intact; replay-base requests share the selected format;
+  Go-produced positional MessagePack normalizes to the same domain values as JSON; `npm run verify`
+  passes.
+- **Validation:** focused API tests and `npm run verify`.
+- **Outcome:** unset format keeps `/api/v1` JSON. `VITE_API_FORMAT=json|msgpack` and the per-tab
+  `cjs-api-format` session override select `/api/v2` across normal and replay bases. MessagePack uses
+  an exact pinned decoder preloaded alongside the first MessagePack request, requires its negotiated
+  media type, and reads backend positional struct arrays directly in the existing normalization pass.
+  Minimum tuple arities reject truncated payloads while trailing fields remain compatible. It preserves the
+  existing cancellation, retry, error-sanitization, and normalization paths without JSON fallback.
+- **Validation result:** supplied Go positional fixtures pass across maps, leaderboard, player info,
+  rank leaderboard, replay ranking, runs, performance, and jump scores (9/9 fixture tests).
+  Formatting, lint, 42 files / 284 tests with coverage, strict TypeScript, and the Vite build pass.
+  Direct tuple normalization and minimum-arity validation measured a 32.3 KiB maximum route
+  increment, so that budget is 32.5 KiB. Total JavaScript measured 130.4 KiB with the decoder,
+  so its budget is 131 KiB; initial JavaScript and CSS budgets retain their existing limits.
+- **Remaining work/risks:** benchmark cold and warm caches separately; results include direct backend
+  serialization plus browser decoding and normalization.
+- **CI follow-up:** production builds in CI and manual deployment read the repository variable
+  `VITE_API_FORMAT`; the shared production build cache key includes the selected format.
+  Test fixtures keep their existing transport; only the production build receives the setting.
+  `VITE_API_FORMAT=msgpack npm run build` passed typechecking, production compilation, bundle
+  budgets, and release artifact checks. Workflow/docs formatting and `git diff --check` passed.
+  API boundary and ADR notes cover CI selection, final bundle budgets, and version compatibility.
+
 ## Agent handoff template
 
 ```md

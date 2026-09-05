@@ -50,7 +50,10 @@ Copy the example environment file to override that default:
 cp .env.example .env
 ```
 
-The supported setting is `VITE_API_BASE_URL`. To exercise only locally developed
+The supported base setting is `VITE_API_BASE_URL`. To compare the backend's v2 transports, set
+`VITE_API_FORMAT=json` or `VITE_API_FORMAT=msgpack`; leaving it unset preserves v1 JSON. See
+[`docs/API_BOUNDARY.md`](docs/API_BOUNDARY.md) for the per-tab developer override and benchmark
+method. To exercise only locally developed
 replay routes while keeping the rest of the site on the live API, use:
 
 ```sh
@@ -108,7 +111,7 @@ accessibility scans, console-error checks, small-screen reflow, reduced motion, 
 equivalent. See [the CJS-015 validation record](docs/CJS-015-VALIDATION.md) for the current matrix and
 bundle measurements.
 
-GitHub Actions installs the locked dependencies, runs `npm run verify`, validates
+GitHub Actions installs the locked dependencies, runs the `npm run verify` checks, validates
 a Cloudflare dry run, and executes the three-browser E2E matrix for every pull
 request and push to `main`. The stable required check is named
 `Build and validate`. A separate, disabled-by-default workflow can publish the
@@ -121,6 +124,14 @@ Configure the deployment workflow with:
 - Repository variable `CJS_PRODUCTION_URL`: the HTTPS custom-domain origin used
   for the post-deploy smoke test.
 - Repository variable `CLOUDFLARE_DEPLOY_ENABLED`: set to `true` only after the secrets and production route are configured.
+- Repository variable `VITE_API_FORMAT`: set to `msgpack` for v2 MessagePack or `json`
+  for v2 JSON; leave unset for legacy v1 JSON. Configure it under **Settings → Secrets
+  and variables → Actions → Variables**, after deploying the v2 backend. CI embeds
+  it in the production build; the deployment workflow publishes that cached bundle.
+  The manual deployment build reads the same variable. Format changes require a new
+  CI build; changing a Cloudflare runtime variable does not change an existing bundle.
+  Use a repository variable, not a production-environment override, so both workflows
+  select the same format. Unit tests and browser mocks retain their default transport.
 
 Custom domains and routes remain managed in the Cloudflare dashboard. `wrangler.jsonc` intentionally omits route keys and disables `workers.dev` and preview URLs so deployments do not replace dashboard-managed routing settings.
 See [the release runbook](docs/RELEASE.md) before changing the deployment gate.

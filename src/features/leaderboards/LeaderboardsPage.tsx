@@ -1,5 +1,5 @@
 import { ArrowDown, ArrowUp, ArrowUpDown, Globe2, RefreshCw, Search, Trophy } from "lucide-react";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import {
   Button,
   CodPlayerName,
@@ -29,6 +29,7 @@ import {
   boardUsesFps,
   canonicalizeLeaderboardSearch,
   createLeaderboardRows,
+  createDifficultySplit,
   createTopPlaceDistribution,
   filterLeaderboardRows,
   leaderboardQuerySchema,
@@ -40,6 +41,7 @@ import {
   type LeaderboardRow,
   type LeaderboardSort,
   type SortOrder,
+  topListKind,
 } from "./leaderboardModel";
 import { useLeaderboardData } from "./useLeaderboardData";
 import "./leaderboards.css";
@@ -71,7 +73,7 @@ const decimalFormatter = new Intl.NumberFormat(undefined, {
   minimumFractionDigits: 2,
 });
 const DEFAULT_LEADERBOARD_VIEW = {
-  board: "speed-skill",
+  board: "jump-skill",
   fps: "125",
   order: "asc",
   query: "",
@@ -425,7 +427,7 @@ function LeaderboardTable({ board, onSort, order, rows, sort, source }: Leaderbo
                 Points
               </th>
             )}
-            <th scope="col">{board === "rank-xp" ? "Progress" : "Tops 1–10"}</th>
+            <th scope="col">{distributionLabel(board)}</th>
           </tr>
         </thead>
         <tbody>
@@ -462,10 +464,12 @@ function LeaderboardTable({ board, onSort, order, rows, sort, source }: Leaderbo
               )}
               <td
                 className="cjs-table__cell cjs-leaderboards__distribution-cell"
-                data-label={board === "rank-xp" ? "Progress" : "Tops 1–10"}
+                data-label={distributionLabel(board)}
               >
                 {board === "rank-xp" ? (
                   <RankProgress row={row} />
+                ) : topListKind(board) === "difficulty" ? (
+                  <DifficultySplit row={row} />
                 ) : (
                   <TopPlaceDistribution row={row} />
                 )}
@@ -573,6 +577,42 @@ function RankProgress({ row }: { row: LeaderboardRow }) {
 function formatRankLevel(row: LeaderboardRow): string {
   const level = row.levelDisplay?.trim() || (row.level === undefined ? "" : String(row.level));
   return level ? `Lv ${level}` : "Level unavailable";
+}
+
+function distributionLabel(board: LeaderboardBoard): string {
+  if (board === "rank-xp") return "Progress";
+  return topListKind(board) === "difficulty" ? "Points by difficulty" : "Tops 1–10";
+}
+
+function DifficultySplit({ row }: { row: LeaderboardRow }) {
+  const split = createDifficultySplit(row.topList);
+
+  if (!split) return <span className="cjs-leaderboards__muted">—</span>;
+
+  const summary = split.bands
+    .map(({ band, points }) => `difficulty ${band}: ${numberFormatter.format(points)}`)
+    .join(", ");
+
+  return (
+    <div
+      className="cjs-leaderboards__difficulty"
+      role="img"
+      aria-label={`Average map difficulty ${split.average.toFixed(1)}. Points by difficulty: ${summary}`}
+    >
+      <span className="cjs-leaderboards__difficulty-average">
+        Avg <strong>{split.average.toFixed(1)}</strong>
+      </span>
+      <span className="cjs-leaderboards__difficulty-bar" aria-hidden="true">
+        {split.bands.map(({ band, points }) => (
+          <span
+            key={band}
+            title={`Difficulty ${band}: ${numberFormatter.format(points)} points`}
+            style={{ flexGrow: points, "--cjs-band": band } as CSSProperties}
+          />
+        ))}
+      </span>
+    </div>
+  );
 }
 
 function TopPlaceDistribution({ row }: { row: LeaderboardRow }) {
