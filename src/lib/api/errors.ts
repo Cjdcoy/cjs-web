@@ -2,7 +2,13 @@ import type { Capability } from "./capabilities";
 import type { Game, Source } from "./domain";
 
 export type ApiErrorKind =
-  "aborted" | "http" | "invalid-argument" | "invalid-json" | "invalid-response" | "network";
+  | "aborted"
+  | "http"
+  | "invalid-argument"
+  | "invalid-json"
+  | "invalid-messagepack"
+  | "invalid-response"
+  | "network";
 
 export interface ApiErrorOptions {
   kind: ApiErrorKind;

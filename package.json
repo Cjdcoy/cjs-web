@@ -30,6 +30,7 @@
     "smoke:production": "node scripts/smoke-production.mjs"
   },
   "dependencies": {
+    "@msgpack/msgpack": "3.1.2",
     "circle-flags": "^2.8.3",
     "lucide-react": "^1.27.0",
     "react": "^19.0.0",
