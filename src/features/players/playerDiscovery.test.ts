@@ -41,12 +41,14 @@ describe("sortPlayers", () => {
       playername: "alpha",
       last_seen: "2026-01-02T00:00:00Z",
       visits: 20,
+      admin: 90,
     },
     {
       player_id: 1,
       playername: "^2Alpha",
       last_seen: "2026-01-03T00:00:00Z",
       visits: 20,
+      admin: 50,
     },
   ];
 
@@ -57,6 +59,20 @@ describe("sortPlayers", () => {
   it("puts missing or invalid metadata last for numeric and date sorts", () => {
     expect(sortPlayers(players, "visits").map((player) => player.player_id)).toEqual([1, 2, 3]);
     expect(sortPlayers(players, "last-seen").map((player) => player.player_id)).toEqual([1, 2, 3]);
+  });
+
+  it("orders admin level from highest to lowest and puts a missing level last", () => {
+    expect(sortPlayers(players, "admin").map((player) => player.player_id)).toEqual([2, 1, 3]);
+  });
+
+  it("orders player level by rank XP and puts an unranked player last", () => {
+    const levelXp = new Map([
+      [3, 500],
+      [1, 100],
+    ]);
+    expect(sortPlayers(players, "level", levelXp).map((player) => player.player_id)).toEqual([
+      3, 1, 2,
+    ]);
   });
 
   it("does not mutate the API response array", () => {

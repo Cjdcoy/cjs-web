@@ -15,7 +15,7 @@ export const playerDiscoveryQuerySchema = defineQuerySchema({
   country: stringQueryParam({ maxLength: 8, trim: true }),
   id: stringQueryParam({ maxLength: 12, trim: true }),
   q: stringQueryParam({ maxLength: 64, trim: true }),
-  sort: enumQueryParam(["last-seen", "name", "visits"] as const, "last-seen"),
+  sort: enumQueryParam(["last-seen", "name", "visits", "admin", "level"] as const, "last-seen"),
 });
 
 export type PlayerDiscoverySort = (typeof playerDiscoveryQuerySchema)["sort"]["defaultValue"];
@@ -74,7 +74,13 @@ export function playerDisplayName(player: Player): string {
   return player.pref_name?.trim() || player.playername;
 }
 
-export function sortPlayers(players: readonly Player[], sort: PlayerDiscoverySort): Player[] {
+const emptyLevelXp: ReadonlyMap<number, number> = new Map();
+
+export function sortPlayers(
+  players: readonly Player[],
+  sort: PlayerDiscoverySort,
+  levelXp: ReadonlyMap<number, number> = emptyLevelXp,
+): Player[] {
   return [...players].sort((left, right) => {
     if (sort === "name") {
       return compareNames(left, right) || left.player_id - right.player_id;
@@ -83,6 +89,23 @@ export function sortPlayers(players: readonly Player[], sort: PlayerDiscoverySor
     if (sort === "visits") {
       return (
         sortableNumber(right.visits) - sortableNumber(left.visits) ||
+        compareNames(left, right) ||
+        left.player_id - right.player_id
+      );
+    }
+
+    if (sort === "admin") {
+      return (
+        sortableNumber(right.admin) - sortableNumber(left.admin) ||
+        compareNames(left, right) ||
+        left.player_id - right.player_id
+      );
+    }
+
+    if (sort === "level") {
+      return (
+        sortableNumber(levelXp.get(right.player_id)) -
+          sortableNumber(levelXp.get(left.player_id)) ||
         compareNames(left, right) ||
         left.player_id - right.player_id
       );

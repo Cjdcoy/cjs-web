@@ -31,15 +31,17 @@ export function PlayersPage({
 } = {}) {
   const { source, setSource } = useSourceContext();
   const [queryState, setQueryState] = useQueryState(playerDiscoveryQuerySchema);
+  const sort = queryState.sort === "level" && source !== "j4l" ? "last-seen" : queryState.sort;
   const { error, players, retry, status } = usePlayerSearch({
     listPlayers,
     query: queryState.q,
     searchPlayers,
-    sort: queryState.sort,
+    sort,
     source,
   });
   const {
     error: levelError,
+    levelXp,
     levels: playerLevels,
     retry: retryLevels,
     status: levelStatus,
@@ -49,8 +51,8 @@ export function PlayersPage({
     [players, queryState.country, queryState.id],
   );
   const sortedPlayers = useMemo(
-    () => sortPlayers(filteredPlayers, queryState.sort),
-    [filteredPlayers, queryState.sort],
+    () => sortPlayers(filteredPlayers, sort, levelXp),
+    [filteredPlayers, levelXp, sort],
   );
   const countryOptions = useMemo(() => playerCountryOptions(players), [players]);
   const selectedCountry = normalizePlayerCountry(queryState.country);
@@ -129,17 +131,16 @@ export function PlayersPage({
           </Select>
           <Select
             label="Sort results"
-            onChange={(event) => {
-              const sort = event.target.value;
-              if (sort === "last-seen" || sort === "name" || sort === "visits") {
-                setQueryState({ sort });
-              }
-            }}
-            value={queryState.sort}
+            onChange={(event) =>
+              setQueryState({ sort: playerDiscoveryQuerySchema.sort.parse(event.target.value) })
+            }
+            value={sort}
           >
             <option value="last-seen">Last seen</option>
             <option value="name">Player name</option>
             <option value="visits">Visit count</option>
+            <option value="admin">Admin level</option>
+            {source === "j4l" && <option value="level">Player level</option>}
           </Select>
         </Panel>
 

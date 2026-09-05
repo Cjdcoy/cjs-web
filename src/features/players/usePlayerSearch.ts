@@ -4,6 +4,7 @@ import {
   PLAYER_SEARCH_DEBOUNCE_MS,
   PLAYER_SEARCH_LIMIT,
   PLAYER_SEARCH_MIN_LENGTH,
+  type PlayerDiscoverySort,
 } from "./playerDiscovery";
 import { cachePlayerDirectory } from "./playerDirectoryCache";
 
@@ -32,7 +33,7 @@ interface UsePlayerSearchOptions {
   listPlayers?: ListPlayers;
   query: string;
   searchPlayers?: SearchPlayers;
-  sort?: "last-seen" | "name" | "visits";
+  sort?: PlayerDiscoverySort;
   source: Source;
 }
 

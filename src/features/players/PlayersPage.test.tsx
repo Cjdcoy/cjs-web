@@ -296,6 +296,32 @@ describe("PlayersPage", () => {
     expect(listPlayerRanks).toHaveBeenCalledTimes(1);
   });
 
+  it("offers the player level sort only for J4L and records the admin sort in the URL", async () => {
+    const user = userEvent.setup();
+    const searchPlayers = vi.fn<typeof api.searchPlayers>().mockResolvedValue([]);
+    const listPlayers = vi
+      .fn<typeof api.players>()
+      .mockResolvedValue([{ player_id: 21, playername: "Sorter", admin: 60, visits: 3 }]);
+
+    const { unmount } = renderPlayersPage(searchPlayers, listPlayers);
+
+    const jhSort = await screen.findByLabelText("Sort results");
+    expect(within(jhSort).getByRole("option", { name: "Admin level" })).toBeInTheDocument();
+    expect(within(jhSort).queryByRole("option", { name: "Player level" })).not.toBeInTheDocument();
+    unmount();
+
+    window.history.replaceState(null, "", "/players?source=j4l");
+    renderPlayersPage(searchPlayers, listPlayers);
+
+    const j4lSort = await screen.findByLabelText("Sort results");
+    expect(within(j4lSort).getByRole("option", { name: "Player level" })).toBeInTheDocument();
+
+    await user.selectOptions(j4lSort, "admin");
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).get("sort")).toBe("admin"),
+    );
+  });
+
   it("reports an empty search without presenting inferred player statuses", async () => {
     const searchPlayers = vi.fn<typeof api.searchPlayers>().mockResolvedValue([]);
     const listPlayers = vi.fn<typeof api.players>().mockResolvedValue([]);
