@@ -5,6 +5,9 @@
   "workers_dev": false,
   "preview_urls": false,
   "keep_vars": true,
+  "observability": {
+    "enabled": true,
+  },
   // stats.jump4life.org is attached to this Worker as a custom domain out of
   // band. Keeping it out of here means CI's token needs Workers Scripts: Edit
   // and nothing else -- no DNS or Workers Routes permission on the zone.
