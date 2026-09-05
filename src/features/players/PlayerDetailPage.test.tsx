@@ -305,6 +305,9 @@ describe("PlayerDetailPage", () => {
     expect(apiClient.playerJumpScores).toHaveBeenCalledWith(
       expect.objectContaining({ fps: "250", playerId: 42, source: "jh" }),
     );
+    expect(apiClient.playerTops).toHaveBeenCalledWith(
+      expect.objectContaining({ fps: "250", limit: 1000, playerId: 42, source: "jh" }),
+    );
     expect(apiClient.playerPerformance).not.toHaveBeenCalled();
     expect(apiClient.playerRoutes).not.toHaveBeenCalled();
     expect(screen.getByRole("link", { name: "mp_jump" })).toHaveAttribute(
@@ -324,6 +327,22 @@ describe("PlayerDetailPage", () => {
     expect(screen.getByRole("radio", { name: "250 FPS" })).toHaveAttribute("aria-checked", "true");
     expect(screen.queryByRole("combobox", { name: "FPS" })).not.toBeInTheDocument();
 
+    const firstMapLink = () =>
+      screen.getAllByRole("link").find((link) => link.getAttribute("href")?.startsWith("/maps/"));
+    expect(firstMapLink()).toHaveTextContent("mp_jump");
+
+    await user.click(screen.getByRole("button", { name: "Sort by date, descending" }));
+    expect(screen.getByRole("columnheader", { name: "Date" })).toHaveAttribute(
+      "aria-sort",
+      "descending",
+    );
+    expect(firstMapLink()).toHaveTextContent("mp_ladder(Hard)");
+    expect(window.location.search).toContain("sort=date");
+    expect(window.location.search).toContain("order=desc");
+
+    await user.click(screen.getByRole("button", { name: "Sort by date, ascending" }));
+    expect(firstMapLink()).toHaveTextContent("mp_jump");
+
     await user.click(screen.getByRole("radio", { name: "125 FPS" }));
     await waitFor(() => {
       expect(screen.getByRole("radio", { name: "125 FPS" })).toHaveAttribute(
@@ -333,10 +352,13 @@ describe("PlayerDetailPage", () => {
       expect(apiClient.playerJumpScores).toHaveBeenLastCalledWith(
         expect.objectContaining({ fps: "125", playerId: 42, source: "jh" }),
       );
+      expect(apiClient.playerTops).toHaveBeenLastCalledWith(
+        expect.objectContaining({ fps: "125", limit: 1000, playerId: 42, source: "jh" }),
+      );
     });
   });
 
-  it("treats a player without jump scores as an empty best-runs view", async () => {
+  it("treats a player without personal bests as an empty best-runs view", async () => {
     window.history.replaceState(null, "", "/players/42?source=jh&view=runs&fps=125");
     const apiClient = createProfileApi({
       playerJumpScores: vi.fn().mockResolvedValue({
@@ -347,22 +369,59 @@ describe("PlayerDetailPage", () => {
         score: 0,
         top_list: {},
       }),
+      playerTops: vi.fn().mockResolvedValue([]),
     });
 
     renderProfile(apiClient);
 
     expect(await screen.findByRole("heading", { name: "No ranked runs yet" })).toBeInTheDocument();
-    expect(
-      screen.getByText(/has not earned jump-skill points at 125 FPS yet/i),
-    ).toBeInTheDocument();
+    expect(screen.getByText(/has no recorded 125 FPS personal bests yet/i)).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Profile unavailable" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Try again" })).not.toBeInTheDocument();
+  });
+
+  it("lists personal bests outside the jump-skill top ten without a skill summary", async () => {
+    window.history.replaceState(null, "", "/players/144163?source=jh&view=runs&fps=250");
+    const apiClient = createProfileApi({
+      playerJumpScores: vi.fn().mockResolvedValue({
+        ...jumpScores,
+        map_scores: [],
+        rank: 0,
+        rating: 0,
+        score: 0,
+        top_list: {},
+      }),
+      playerTops: vi.fn().mockResolvedValue([
+        {
+          cpid: 7_784,
+          fps: "250",
+          mapname: "mp_organic_white_tea_with_vanilla",
+          player_id: 144_163,
+          playername: "x",
+          rank: 68,
+          run_id: 9_600_657,
+          score: 0,
+          time_played: 12_345,
+          totalNr: 117,
+        },
+      ] satisfies TopRun[]),
+    });
+
+    renderProfile(apiClient, "144163");
+
+    expect(await screen.findByRole("heading", { level: 2, name: "Best runs" })).toBeInTheDocument();
+    expect(
+      await screen.findByRole("link", { name: "mp_organic_white_tea_with_vanilla" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("cell", { name: "#68 / 117" })).toBeInTheDocument();
+    expect(screen.queryByText("Jump-skill rank")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "No ranked runs yet" })).not.toBeInTheDocument();
   });
 
   it("keeps the combined run-analytics filters available when the map list fails", async () => {
     window.history.replaceState(null, "", "/players/42?source=jh&view=progress&fps=125");
     const apiClient = createProfileApi({
-      playerJumpScores: vi.fn().mockRejectedValue(new Error("Map list offline")),
+      playerTops: vi.fn().mockRejectedValue(new Error("Map list offline")),
     });
 
     const { container } = renderProfile(apiClient);
@@ -419,7 +478,22 @@ describe("PlayerDetailPage", () => {
     expect(
       within(analyticsFilters).getByRole("searchbox", { name: "Find a ranked map" }),
     ).toBeInTheDocument();
-    expect(within(analyticsFilters).getByRole("combobox", { name: "Map" })).toBeInTheDocument();
+    expect(
+      within(analyticsFilters).getByRole("button", { name: "mp_jump #1", pressed: true }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "mp_jump preview" })).toHaveAttribute(
+      "src",
+      "/maps/cards/mp_jump.avif",
+    );
+
+    const otherMap = within(analyticsFilters).getByRole("button", { name: "mp_ladder(Hard) #6" });
+    await user.hover(otherMap);
+    expect(await screen.findByRole("img", { name: "mp_ladder(Hard) preview" })).toHaveAttribute(
+      "src",
+      "/maps/cards/mp_ladder.avif",
+    );
+    await user.unhover(otherMap);
+    expect(await screen.findByRole("img", { name: "mp_jump preview" })).toBeInTheDocument();
     expect(
       screen.getByRole("heading", { level: 2, name: "Finish-time trend" }),
     ).toBeInTheDocument();
@@ -573,6 +647,7 @@ function createProfileApi(overrides: Partial<PlayerProfileApi> = {}): PlayerProf
     replayWatchAggregate: vi.fn().mockResolvedValue(replayAggregate),
     replayWatchRankings: vi.fn().mockResolvedValue([replayRanking]),
     playerRoutes: vi.fn().mockResolvedValue([route]),
+    playerTops: vi.fn().mockResolvedValue(personalBests),
     players: vi.fn().mockResolvedValue([directoryPlayer]),
     ...overrides,
   };
@@ -622,6 +697,40 @@ const mapRuns: TopRun[] = [
     time_played: 12,
     time_played_string: "0:12.34",
     type: "jump",
+  },
+];
+
+const personalBests: TopRun[] = [
+  {
+    cpid: 321,
+    fps: "250",
+    load_count: 4,
+    mapname: "mp_jump",
+    nadejumps: 2,
+    player_id: 42,
+    playername: "^2Runner^7One",
+    rank: 1,
+    run_id: 9_100,
+    score: 1_536,
+    time_created: "2026-01-02T03:04:05Z",
+    time_played: 12_340,
+    time_played_string: "0:12.34",
+    totalNr: 88,
+  },
+  {
+    cpid: 322,
+    fps: "250",
+    load_count: 1,
+    mapname: "mp_ladder(Hard)",
+    player_id: 42,
+    playername: "^2Runner^7One",
+    rank: 6,
+    run_id: 9_101,
+    score: 720,
+    time_created: "2026-01-03T03:04:05Z",
+    time_played: 30_000,
+    time_played_string: "0:30.00",
+    totalNr: 88,
   },
 ];
 

@@ -11,6 +11,7 @@ import type {
 import {
   createPlayerProfileIdentity,
   createPlayerRouteInventory,
+  defaultBestRunOrder,
   filterPlayerRouteInventory,
   formatDuration,
   formatFpsList,
@@ -19,6 +20,7 @@ import {
   getRunAchievement,
   hasProfileIdentity,
   playerBoardLabel,
+  sortBestRuns,
   summarizePlayerRouteInventory,
 } from "./playerProfileModel";
 
@@ -276,3 +278,31 @@ function topRun(overrides: Partial<TopRun> = {}): TopRun {
     ...overrides,
   };
 }
+
+describe("sortBestRuns", () => {
+  const runs: TopRun[] = [
+    topRun({ cpid: 1, rank: 3, score: 900, time_created: "2026-01-02T00:00:00Z" }),
+    topRun({ cpid: 2, rank: 1, score: 100, time_created: undefined }),
+    topRun({ cpid: 3, rank: 7, score: 500, time_created: "2026-03-04T00:00:00Z" }),
+  ];
+
+  it("orders by rank, points, or date in either direction without mutating the input", () => {
+    const ids = (
+      sort: Parameters<typeof sortBestRuns>[1],
+      order: Parameters<typeof sortBestRuns>[2],
+    ) => sortBestRuns(runs, sort, order).map((run) => run.cpid);
+
+    expect(ids("rank", "asc")).toEqual([2, 1, 3]);
+    expect(ids("rank", "desc")).toEqual([3, 1, 2]);
+    expect(ids("points", "desc")).toEqual([1, 3, 2]);
+    expect(ids("date", "desc")).toEqual([3, 1, 2]);
+    expect(ids("date", "asc")).toEqual([2, 1, 3]);
+    expect(runs.map((run) => run.cpid)).toEqual([1, 2, 3]);
+  });
+
+  it("defaults rank ascending and every other key descending", () => {
+    expect(defaultBestRunOrder("rank")).toBe("asc");
+    expect(defaultBestRunOrder("points")).toBe("desc");
+    expect(defaultBestRunOrder("date")).toBe("desc");
+  });
+});
