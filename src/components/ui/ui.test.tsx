@@ -112,6 +112,27 @@ describe("design-system data and feedback", () => {
     expect(cells[1]).toHaveAttribute("data-align", "end");
   });
 
+  it("turns sortable columns into toggling header buttons", async () => {
+    const user = userEvent.setup();
+    const onSort = vi.fn();
+    render(
+      <DataTable
+        caption="Top runs"
+        columns={[{ id: "player", header: "Player", sortKey: "player", cell: (row) => row.player }]}
+        rows={[{ id: 1, player: "jumper", time: "00:42.381" }]}
+        getRowKey={(row: Row) => row.id}
+        sort={{ key: "player", order: "asc", onSort }}
+      />,
+    );
+
+    expect(screen.getByRole("columnheader", { name: "Player" })).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    await user.click(screen.getByRole("button", { name: "Sort by player, descending" }));
+    expect(onSort).toHaveBeenCalledWith("player");
+  });
+
   it("labels the current page and prevents out-of-range navigation", async () => {
     const user = userEvent.setup();
     const onPageChange = vi.fn();
