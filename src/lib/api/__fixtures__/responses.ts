@@ -71,28 +71,45 @@ export const leaderboardFixture: unknown = [
   },
 ];
 
-export const topRunsFixture: unknown = [
-  {
-    rank: 1,
-    player_id: 501,
-    playername: "^2Runner",
-    mapname: "mp_cjs_training",
-    cpid: 901,
-    time_played: 12_345,
-    run_id: 7001,
-    fps: "125",
-    type: "jump",
-    score: 100,
-    totalNr: 5,
-    time_played_string: "00:12.345",
-    load_count: 0,
-    save_count: 0,
-    nade_throws: 1,
-    nadejumps: 1,
-    ender: null,
-    time_created: "2026-01-02T03:04:05Z",
-  },
-];
+const topRunResponse = {
+  rank: 1,
+  player_id: 501,
+  playername: "^2Runner",
+  mapname: "mp_cjs_training",
+  cpid: 901,
+  time_played: 12_345,
+  run_id: 7001,
+  fps: "125",
+  type: "jump",
+  score: 100,
+  totalNr: 5,
+  time_played_string: "00:12.345",
+  load_count: 0,
+  save_count: 0,
+  nade_throws: 1,
+  nadejumps: 1,
+  ender: null,
+  time_created: "2026-01-02T03:04:05Z",
+};
+
+export const topRunsFixture: unknown = [topRunResponse];
+
+export const recentRunsFixture: unknown = {
+  runs: [
+    topRunResponse,
+    {
+      ...topRunResponse,
+      rank: 0,
+      totalNr: 0,
+      run_id: 7002,
+      player_id: 502,
+      playername: "^3Sprinter",
+      ender: "checkpoint",
+      time_created: "2026-01-02T02:04:05Z",
+    },
+  ],
+  next_cursor: "cursor-2",
+};
 
 export const replayWatchAggregateFixture: unknown = {
   owner_player_id: 501,

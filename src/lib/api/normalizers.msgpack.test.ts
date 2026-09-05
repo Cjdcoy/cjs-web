@@ -8,6 +8,7 @@ import {
   normalizePlayerPerformance,
   normalizePlayers,
   normalizeRankLeaderboard,
+  normalizeRecentRunsPage,
   normalizeReplayWatchRankings,
   normalizeTopRuns,
 } from "./normalizers";
@@ -58,6 +59,11 @@ describe("Go positional MessagePack normalization", () => {
       '[{"source":"j4l","rank":1,"totalNr":42,"player_id":7,"playername":"jumper","mapname":"mp_jump","cpid":9,"ender":null,"nadejumps":2,"time_played_string":"00:12.345","time_played":12345,"load_count":3,"save_count":4,"nade_throws":5,"time_created":"2026-09-05T01:02:03Z","run_id":11,"fps":"125","type":"jump","score":100}]',
     ],
     [
+      normalizeRecentRunsPage,
+      "kpHcABOjajRsASoHpmp1bXBlcqdtcF9qdW1wCcACqTAwOjEyLjM0Nc0wOQMEBbQyMDI2LTA5LTA1VDAxOjAyOjAzWgujMTI1pGp1bXBkqGN1cnNvci0y",
+      '{"runs":[{"source":"j4l","rank":1,"totalNr":42,"player_id":7,"playername":"jumper","mapname":"mp_jump","cpid":9,"ender":null,"nadejumps":2,"time_played_string":"00:12.345","time_played":12345,"load_count":3,"save_count":4,"nade_throws":5,"time_created":"2026-09-05T01:02:03Z","run_id":11,"fps":"125","type":"jump","score":100}],"next_cursor":"cursor-2"}',
+    ],
+    [
       normalizePlayerPerformance,
       "3AAQCss/4AAAAAAAAAEIAstACgAAAAAAAJGWp21wX2p1bXCjMTI1AbQyMDI2LTA5LTA1VDAxOjAyOjAzWgsJlqdtcF9qdW1wozEyNQG0MjAyNi0wOS0wNVQwMTowMjowM1oLCQGmQWN0aXZlw8IBgaMxMjUIozEyNZ8Hpmp1bXBlcs0E0gARoKAAAADCoKCgoA==",
       '{"total_maps_completed":10,"maps_completed_ratio":0.5,"best_rank":1,"top10_count":8,"top1_count":2,"average_rank":3.25,"recent_tops":[{"map_name":"mp_jump","fps":"125","rank":1,"finish_date":"2026-09-05T01:02:03Z","runid":11,"cpid":9}],"oldest_top":{"map_name":"mp_jump","fps":"125","rank":1,"finish_date":"2026-09-05T01:02:03Z","runid":11,"cpid":9},"days_since_last_seen":1,"activity_level":"Active","is_donator":true,"is_banned":false,"admin_level":1,"nb_tops_per_fps":{"125":8},"best_fps":"125","rank":{"player_id":7,"player_name":"jumper","total_xp":1234,"prestige":0,"level":17,"level_display":"","title":"","xp_into_level":0,"xp_for_level":0,"xp_to_next":0,"maxed":false}}',
@@ -71,6 +77,17 @@ describe("Go positional MessagePack normalization", () => {
     expect(normalize(decodeBase64(msgpack), "/api/v2/fixture")).toEqual(
       normalize(JSON.parse(json), "/api/v2/fixture"),
     );
+  });
+
+  it("treats an empty positional cursor as the last page", () => {
+    const page = normalizeRecentRunsPage(
+      decodeBase64(
+        "kpHcABOjajRsASoHpmp1bXBlcqdtcF9qdW1wCcACqTAwOjEyLjM0Nc0wOQMEBbQyMDI2LTA5LTA1VDAxOjAyOjAzWgujMTI1pGp1bXBkoA==",
+      ),
+      "/api/v2/runs/recent",
+    );
+    expect(page.nextCursor).toBeNull();
+    expect(page.runs).toHaveLength(1);
   });
 
   it("rejects truncated positional structs", () => {

@@ -15,6 +15,7 @@ import {
   type PlayerRankInfo,
   type PlayerRouteCompletion,
   type RankLeaderboardEntry,
+  type RecentRunsPage,
   type ReplayWatchAggregate,
   type ReplayWatchRankingEntry,
   type ServerPlayer,
@@ -109,6 +110,16 @@ export function normalizeTopRuns(value: unknown, path: string): TopRun[] {
       time_created: optionalString(object, "time_created", path, 14),
     };
   });
+}
+
+export function normalizeRecentRunsPage(value: unknown, path: string): RecentRunsPage {
+  // Positional MessagePack encodes the page as [runs, next_cursor]; an omitted,
+  // null or empty cursor all mean "no further page".
+  const object = wireStruct(value, path, "$response", 1);
+  return {
+    runs: normalizeTopRuns(field(object, "runs", 0), path),
+    nextCursor: optionalString(object, "next_cursor", path, 1) || null,
+  };
 }
 
 export function normalizePlayerMapRuns(value: unknown, path: string): TopRun[] {

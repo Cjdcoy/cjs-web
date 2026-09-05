@@ -187,6 +187,11 @@ export interface TopRun {
   time_created?: string;
 }
 
+export interface RecentRunsPage {
+  runs: TopRun[];
+  nextCursor: string | null;
+}
+
 export interface SimpleTop {
   cpid: number;
   finish_date: string;

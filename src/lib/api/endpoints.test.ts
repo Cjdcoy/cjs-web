@@ -11,6 +11,7 @@ import {
   playerRoutesFixture,
   playersFixture,
   rankLeaderboardFixture,
+  recentRunsFixture,
   replayWatchAggregateFixture,
   replayWatchRankingsFixture,
   topRunsFixture,
@@ -111,6 +112,36 @@ describe("typed CJS API endpoints", () => {
       "https://example.test/proxy/api/v1/replay/watch-aggregate?source=j4l&owner_playerid=501",
       "https://example.test/proxy/api/v1/replay/watch-rankings?source=j4l&metric=watch_count&mapid=101&limit=5&offset=0",
     ]);
+  });
+
+  it("pages recent runs with the requested filters", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json(recentRunsFixture))
+      .mockResolvedValueOnce(
+        Response.json({ runs: (recentRunsFixture as { runs: unknown[] }).runs }),
+      );
+    const api = createCjsApi(
+      createJsonClient({ baseUrl: "https://example.test", fetch: fetchMock as typeof fetch }),
+    );
+
+    await expect(api.recentRuns({ source: "jh", fps: "125", limit: 50 })).resolves.toMatchObject({
+      nextCursor: "cursor-2",
+      runs: [
+        { rank: 1, totalNr: 5, player_id: 501, ender: null },
+        { rank: 0, totalNr: 0, player_id: 502, ender: "checkpoint" },
+      ],
+    });
+    expect(fetchMock.mock.calls[0]?.[0]).toBe(
+      "https://example.test/api/v1/runs/recent?source=jh&fps=125&limit=50",
+    );
+
+    await expect(api.recentRuns({ source: "j4l", cursor: "cursor / 2" })).resolves.toMatchObject({
+      nextCursor: null,
+    });
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "https://example.test/api/v1/runs/recent?source=j4l&cursor=cursor+%2F+2",
+    );
   });
 
   it("composes owner and map replay filters in one request", async () => {

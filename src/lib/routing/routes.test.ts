@@ -17,6 +17,7 @@ describe("route table", () => {
     expect(routeDefinitions.map(({ path }) => path)).toEqual([
       "/",
       "/leaderboards",
+      "/recent",
       "/maps",
       "/maps/:mapId",
       "/players",
@@ -30,6 +31,7 @@ describe("route table", () => {
   it.each([
     ["/", "servers"],
     ["/leaderboards", "leaderboards"],
+    ["/recent", "recent"],
     ["/maps", "maps"],
     ["/players/42", "player-detail"],
     ["/favorites/", "favorites"],

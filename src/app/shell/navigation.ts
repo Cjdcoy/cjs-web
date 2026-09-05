@@ -1,4 +1,13 @@
-import { BarChart3, Heart, Info, Map, Server, Users, type LucideIcon } from "lucide-react";
+import {
+  Activity,
+  BarChart3,
+  Heart,
+  Info,
+  Map,
+  Server,
+  Users,
+  type LucideIcon,
+} from "lucide-react";
 import { appPaths, type AppRouteId } from "../../lib/routing";
 
 export interface PrimaryNavigationItem {
@@ -10,6 +19,7 @@ export interface PrimaryNavigationItem {
 
 export const primaryNavigation: readonly PrimaryNavigationItem[] = [
   { activeRoutes: ["servers"], href: appPaths.servers, icon: Server, label: "Servers" },
+  { activeRoutes: ["recent"], href: appPaths.recent, icon: Activity, label: "Recent" },
   {
     activeRoutes: ["leaderboards"],
     href: appPaths.leaderboards,

@@ -1,0 +1,98 @@
+.cjs-recent {
+  --cjs-stack-space: var(--cjs-space-6);
+}
+
+.cjs-recent__hero {
+  max-width: var(--cjs-reading-width);
+}
+
+.cjs-recent__hero h1 {
+  margin-block: var(--cjs-space-2) var(--cjs-space-3);
+  font-size: var(--cjs-font-size-2xl);
+  line-height: var(--cjs-line-height-tight);
+}
+
+.cjs-recent__hero p {
+  margin: 0;
+  color: var(--cjs-color-text-muted);
+}
+
+.cjs-recent__eyebrow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--cjs-space-2);
+  color: var(--cjs-color-accent-strong);
+  font-size: var(--cjs-font-size-sm);
+  font-weight: var(--cjs-font-weight-bold);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.cjs-recent__toolbar,
+.cjs-recent__inline-error {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--cjs-space-3);
+}
+
+.cjs-recent__inline-error {
+  padding: var(--cjs-space-3);
+  border: var(--cjs-border-width) solid var(--cjs-color-border);
+  border-radius: var(--cjs-radius-md);
+  color: var(--cjs-color-text-muted);
+}
+
+.cjs-recent__list {
+  display: grid;
+  gap: var(--cjs-space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cjs-recent__row {
+  display: grid;
+  gap: var(--cjs-space-1);
+  padding: var(--cjs-space-3);
+  border: var(--cjs-border-width) solid var(--cjs-color-border);
+  border-radius: var(--cjs-radius-md);
+  background: var(--cjs-color-panel);
+}
+
+.cjs-recent__sentence,
+.cjs-recent__meta {
+  margin: 0;
+}
+
+.cjs-recent__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--cjs-space-2);
+}
+
+.cjs-recent__when {
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-sm);
+}
+
+.cjs-recent__load-more {
+  display: flex;
+  justify-content: center;
+}
+
+@media (min-width: 48rem) {
+  .cjs-recent__row {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: var(--cjs-space-3);
+  }
+
+  .cjs-recent__when {
+    text-align: end;
+    white-space: nowrap;
+  }
+}
