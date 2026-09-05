@@ -10,7 +10,7 @@ export type {
 } from "./controls";
 export { SegmentedControl } from "./SegmentedControl";
 export type { SegmentedControlOption, SegmentedControlProps } from "./SegmentedControl";
-export { Badge, Card, DataTable, Panel } from "./surfaces";
+export { Badge, Card, DataTable, Panel, SortableHeader } from "./surfaces";
 export type {
   BadgeProps,
   BadgeTone,
@@ -18,6 +18,8 @@ export type {
   DataTableColumn,
   DataTableProps,
   PanelProps,
+  SortableHeaderProps,
+  SortOrder,
   SurfacePadding,
   SurfaceVariant,
 } from "./surfaces";

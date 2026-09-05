@@ -30,8 +30,7 @@
 
 .cjs-leaderboards__eyebrow,
 .cjs-leaderboards__filter-actions,
-.cjs-leaderboards__results-header,
-.cjs-leaderboards__sort-button {
+.cjs-leaderboards__results-header {
   display: flex;
   align-items: center;
 }
@@ -198,32 +197,8 @@
   padding-block: var(--cjs-space-4);
 }
 
-.cjs-leaderboards__table th[data-align="end"] .cjs-leaderboards__sort-button {
-  margin-inline-start: auto;
-}
-
 .cjs-leaderboards__table th[data-align="end"] {
   text-align: end;
-}
-
-.cjs-leaderboards__sort-button {
-  gap: var(--cjs-space-1);
-  min-height: var(--cjs-control-height-sm);
-  margin: calc(var(--cjs-space-2) * -1);
-  padding: var(--cjs-space-2);
-  border: 0;
-  border-radius: var(--cjs-radius-sm);
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  letter-spacing: inherit;
-  text-transform: inherit;
-  cursor: pointer;
-}
-
-.cjs-leaderboards__sort-button:hover {
-  background: var(--cjs-color-panel-hover);
-  color: var(--cjs-color-text);
 }
 
 .cjs-leaderboards__rank {
