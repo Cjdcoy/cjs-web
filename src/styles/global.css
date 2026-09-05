@@ -1,8 +1,5 @@
 body {
-  background:
-    radial-gradient(circle at 12% -8%, var(--cjs-color-accent-surface), transparent 32rem),
-    radial-gradient(circle at 88% 6%, var(--cjs-color-panel-hover), transparent 28rem),
-    linear-gradient(180deg, var(--cjs-color-elevated) 0, var(--cjs-color-page) 32rem);
+  background: var(--cjs-color-page);
   color: var(--cjs-color-text);
 }
 
@@ -49,6 +46,7 @@ a:focus-visible {
   margin-block: var(--cjs-space-2) var(--cjs-space-3);
   font-size: var(--cjs-font-size-2xl);
   line-height: var(--cjs-line-height-tight);
+  letter-spacing: -0.02em;
 }
 
 .cjs-page-heading__eyebrow {
@@ -57,8 +55,8 @@ a:focus-visible {
   flex-wrap: wrap;
   gap: var(--cjs-space-2);
   color: var(--cjs-color-accent-strong);
-  font-size: var(--cjs-font-size-sm);
-  font-weight: var(--cjs-font-weight-bold);
+  font-size: var(--cjs-font-size-xs);
+  font-weight: var(--cjs-font-weight-semibold);
   letter-spacing: 0.06em;
   text-transform: uppercase;
 }

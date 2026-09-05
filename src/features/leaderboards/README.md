@@ -7,6 +7,9 @@ with its machine-readable OpenAPI document at
 Contract decisions for CJS-008:
 
 - Skill boards accept `source` and `fps`; map completions accept only `source`.
+- `top_list` is board-specific: jump-skill returns points per map difficulty band
+  (`floor(difficulty)`, 0–9, summing to `score`); speed, defrag, and surf return top-place counts
+  (1–10). The jump board is the default.
 - J4L rank XP uses `/api/v1/leaderboard/rank-xp`, requires `source=j4l`, and accepts an
   optional server-side `limit` but no offset.
 - The API does not expose region, last-seen, sort, or general leaderboard offset controls.

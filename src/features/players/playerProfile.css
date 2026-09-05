@@ -72,9 +72,7 @@
 .cjs-player-profile__activity-highlights dt {
   color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
-  font-weight: var(--cjs-font-weight-bold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-weight: var(--cjs-font-weight-medium);
 }
 
 .cjs-player-profile__hero-stat dd {
@@ -148,11 +146,10 @@
   place-items: center;
   border: var(--cjs-border-width) solid var(--cjs-color-border-strong);
   border-radius: var(--cjs-radius-pill);
-  background: var(--cjs-color-accent-surface-strong);
-  color: var(--cjs-color-accent-strong);
+  background: var(--cjs-color-panel-strong);
+  color: var(--cjs-color-text);
   font-size: var(--cjs-font-size-lg);
   font-weight: var(--cjs-font-weight-bold);
-  box-shadow: var(--cjs-shadow-accent);
 }
 
 .cjs-player-profile__hero h1,
@@ -188,7 +185,8 @@
 }
 
 .cjs-player-profile__favorite[aria-pressed="true"] {
-  box-shadow: var(--cjs-shadow-accent);
+  border-color: var(--cjs-color-accent);
+  color: var(--cjs-color-accent-strong);
 }
 
 .cjs-player-profile__tabs {
@@ -216,14 +214,14 @@
 }
 
 .cjs-player-profile__tab:hover {
-  background: var(--cjs-color-panel);
+  background: var(--cjs-color-panel-hover);
   color: var(--cjs-color-text);
 }
 
 .cjs-player-profile__tab[data-active="true"] {
-  background: var(--cjs-color-accent-surface-strong);
-  color: var(--cjs-color-accent-strong);
-  box-shadow: var(--cjs-shadow-sm);
+  background: var(--cjs-color-panel-strong);
+  color: var(--cjs-color-text);
+  box-shadow: var(--cjs-shadow-card);
 }
 
 .cjs-player-profile__controls {
@@ -410,7 +408,6 @@
   color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
   font-weight: var(--cjs-font-weight-medium);
-  text-transform: uppercase;
 }
 
 .cjs-player-profile__stat-grid dd,
@@ -954,7 +951,6 @@
   color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
   font-weight: var(--cjs-font-weight-medium);
-  text-transform: uppercase;
 }
 
 .cjs-run-progress__summary dd,
@@ -1545,9 +1541,7 @@
 .cjs-replay-analytics__totals dt {
   color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
-  font-weight: var(--cjs-font-weight-bold);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  font-weight: var(--cjs-font-weight-medium);
 }
 
 .cjs-replay-analytics__totals dd {

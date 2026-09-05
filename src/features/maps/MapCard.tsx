@@ -152,7 +152,6 @@ export function MapCard({
           <dt>Completions</dt>
           <dd>
             <strong>{numberFormatter.format(item.completionCount)}</strong>
-            <span>{numberFormatter.format(map.difficulty?.[fps]?.nb_tops ?? 0)} recorded tops</span>
           </dd>
         </div>
         <div>
@@ -162,7 +161,6 @@ export function MapCard({
           </dt>
           <dd>
             <strong>{formatReleaseDate(item.releaseTime)}</strong>
-            <span>{item.releaseTime === null ? "Metadata unavailable" : "Published map date"}</span>
           </dd>
         </div>
       </dl>

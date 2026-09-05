@@ -5,6 +5,7 @@ import { applyRouteMetadata, getRouteMetadata } from "./routeMetadata";
 const routeMatches: readonly RouteMatch[] = [
   { id: "servers", params: {} },
   { id: "leaderboards", params: {} },
+  { id: "recent", params: {} },
   { id: "maps", params: {} },
   { id: "map-detail", params: { mapId: "jm_example" } },
   { id: "players", params: {} },

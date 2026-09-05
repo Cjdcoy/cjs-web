@@ -197,6 +197,47 @@ describe("PlayersPage", () => {
     });
   });
 
+  it("filters loaded players by player ID and country", async () => {
+    const user = userEvent.setup();
+    const searchPlayers = vi.fn<typeof api.searchPlayers>().mockResolvedValue([]);
+    const listPlayers = vi.fn<typeof api.players>().mockResolvedValue([
+      { player_id: 11, playername: "Berliner", country: "DE" },
+      { player_id: 12, playername: "Londoner", country: "UK" },
+      { player_id: 13, playername: "Nomad" },
+    ]);
+    window.history.replaceState(null, "", "/players?id=12");
+
+    const { unmount } = renderPlayersPage(searchPlayers, listPlayers);
+
+    expect(await screen.findByRole("link", { name: /Londoner.*12/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Berliner/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Player ID")).toHaveValue("12");
+    unmount();
+
+    window.history.replaceState(null, "", "/players?country=gb");
+    renderPlayersPage(searchPlayers, listPlayers);
+
+    expect(await screen.findByRole("link", { name: /Londoner.*12/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Berliner/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Nomad/i })).not.toBeInTheDocument();
+    expect(screen.getByLabelText("Country")).toHaveValue("GB");
+
+    await user.selectOptions(screen.getByLabelText("Country"), "DE");
+
+    expect(await screen.findByRole("link", { name: /Berliner.*11/i })).toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Londoner/i })).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).get("country")).toBe("DE"),
+    );
+
+    await user.type(screen.getByLabelText("Player ID"), "999");
+
+    expect(
+      await screen.findByRole("heading", { name: "No players match these filters" }),
+    ).toBeInTheDocument();
+    expect(new URLSearchParams(window.location.search).get("id")).toBe("999");
+  });
+
   it("keeps the directory usable and retries when J4L levels fail", async () => {
     const user = userEvent.setup();
     const listPlayers = vi
@@ -253,6 +294,32 @@ describe("PlayersPage", () => {
     await waitFor(() => expect(rankSignal?.aborted).toBe(true));
     expect(screen.queryByRole("columnheader", { name: "Player level" })).not.toBeInTheDocument();
     expect(listPlayerRanks).toHaveBeenCalledTimes(1);
+  });
+
+  it("offers the player level sort only for J4L and records the admin sort in the URL", async () => {
+    const user = userEvent.setup();
+    const searchPlayers = vi.fn<typeof api.searchPlayers>().mockResolvedValue([]);
+    const listPlayers = vi
+      .fn<typeof api.players>()
+      .mockResolvedValue([{ player_id: 21, playername: "Sorter", admin: 60, visits: 3 }]);
+
+    const { unmount } = renderPlayersPage(searchPlayers, listPlayers);
+
+    const jhSort = await screen.findByLabelText("Sort results");
+    expect(within(jhSort).getByRole("option", { name: "Admin level" })).toBeInTheDocument();
+    expect(within(jhSort).queryByRole("option", { name: "Player level" })).not.toBeInTheDocument();
+    unmount();
+
+    window.history.replaceState(null, "", "/players?source=j4l");
+    renderPlayersPage(searchPlayers, listPlayers);
+
+    const j4lSort = await screen.findByLabelText("Sort results");
+    expect(within(j4lSort).getByRole("option", { name: "Player level" })).toBeInTheDocument();
+
+    await user.selectOptions(j4lSort, "admin");
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).get("sort")).toBe("admin"),
+    );
   });
 
   it("reports an empty search without presenting inferred player statuses", async () => {

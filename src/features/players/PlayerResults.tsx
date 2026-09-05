@@ -32,6 +32,7 @@ const sourceLabels: Readonly<Record<Source, string>> = {
 interface PlayerResultsProps {
   error: string | null;
   favoriteIds: ReadonlySet<number>;
+  filtered?: boolean;
   levelError: string | null;
   levelStatus: PlayerLevelsStatus;
   players: Player[];
@@ -47,6 +48,7 @@ interface PlayerResultsProps {
 export function PlayerResults({
   error,
   favoriteIds,
+  filtered = false,
   levelError,
   levelStatus,
   players,
@@ -222,12 +224,20 @@ export function PlayerResults({
       {status === "success" && players.length === 0 && (
         <EmptyState
           description={
-            hasSearch
-              ? `No ${sourceLabels[source]} player names matched “${query}”. Try a broader spelling.`
-              : `The ${sourceLabels[source]} directory did not return any players.`
+            filtered
+              ? "Clear the player ID or country filter to see more players."
+              : hasSearch
+                ? `No ${sourceLabels[source]} player names matched “${query}”. Try a broader spelling.`
+                : `The ${sourceLabels[source]} directory did not return any players.`
           }
           icon={UsersRound}
-          title={hasSearch ? "No players found" : "No directory players"}
+          title={
+            filtered
+              ? "No players match these filters"
+              : hasSearch
+                ? "No players found"
+                : "No directory players"
+          }
         />
       )}
 

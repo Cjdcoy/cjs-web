@@ -1,6 +1,7 @@
 export const routeDefinitions = [
   { id: "servers", path: "/" },
   { id: "leaderboards", path: "/leaderboards" },
+  { id: "recent", path: "/recent" },
   { id: "maps", path: "/maps" },
   { id: "map-detail", path: "/maps/:mapId" },
   { id: "players", path: "/players" },
@@ -58,6 +59,7 @@ export const appPaths = {
   leaderboards: "/leaderboards",
   maps: "/maps",
   players: "/players",
+  recent: "/recent",
   servers: "/",
 } as const;
 

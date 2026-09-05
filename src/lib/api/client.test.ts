@@ -117,6 +117,79 @@ describe("JSON API client", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("requests v2 MessagePack and decodes a Go-produced payload", async () => {
+    const json = JSON.parse(
+      '{"empty":[],"map_keys":{"1":2},"max_uint64":18446744073709551615,"negative_zero":-0,"nil":null,"timestamp":"2026-09-05T01:02:03Z","unsafe":9007199254740993}',
+    );
+    const bytes = Uint8Array.from(
+      atob(
+        "h6htYXBfa2V5c4GhMQKqbWF4X3VpbnQ2NM///////////61uZWdhdGl2ZV96ZXJvy4AAAAAAAAAAo25pbMCpdGltZXN0YW1wtDIwMjYtMDktMDVUMDE6MDI6MDNapnVuc2FmZc8AIAAAAAAAAaVlbXB0eZA=",
+      ),
+      (character) => character.charCodeAt(0),
+    );
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(
+        new Response(bytes, { headers: { "Content-Type": "application/msgpack" } }),
+      );
+    const client = createJsonClient({
+      baseUrl: "https://example.test",
+      fetch: fetchMock as typeof fetch,
+      format: "msgpack",
+    });
+
+    const decoded = await client.get("/api/v1/test");
+    expect(decoded).toEqual(json);
+    expect(Object.is((decoded as { negative_zero: number }).negative_zero, -0)).toBe(true);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://example.test/api/v2/test",
+      expect.objectContaining({ headers: { Accept: "application/msgpack" } }),
+    );
+  });
+
+  it.each([
+    ["malformed payload", new Uint8Array([0xc1]), "application/msgpack"],
+    ["wrong content type", new Uint8Array([0x80]), "application/msgpackjunk"],
+  ])("rejects MessagePack with a %s without retry or fallback", async (_, body, contentType) => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(new Response(body, { headers: { "Content-Type": contentType } }));
+    const client = createJsonClient({
+      baseUrl: "https://example.test",
+      fetch: fetchMock as typeof fetch,
+      format: "msgpack",
+      maxRetries: 2,
+    });
+
+    await expect(client.get("/api/v1/maps")).rejects.toMatchObject({
+      kind: "invalid-messagepack",
+      path: "/api/v2/maps",
+      attempts: 1,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("preserves cancellation while reading a MessagePack response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      status: 200,
+      headers: new Headers({ "Content-Type": "application/msgpack; charset=binary" }),
+      arrayBuffer: vi.fn().mockRejectedValue(new DOMException("Aborted", "AbortError")),
+    } as unknown as Response);
+    const client = createJsonClient({
+      baseUrl: "https://example.test",
+      fetch: fetchMock as typeof fetch,
+      format: "msgpack",
+    });
+
+    await expect(client.get("/api/v1/maps")).rejects.toMatchObject({
+      kind: "aborted",
+      path: "/api/v2/maps",
+      attempts: 1,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("cancels before issuing a request", async () => {
     const fetchMock = vi.fn();
     const controller = new AbortController();

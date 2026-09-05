@@ -7,6 +7,7 @@ export type PlayerLevelsStatus = "idle" | "loading" | "success" | "error";
 
 export interface PlayerLevelsResult {
   error: string | null;
+  levelXp: ReadonlyMap<number, number>;
   levels: ReadonlyMap<number, string>;
   retry: () => void;
   status: PlayerLevelsStatus;
@@ -14,14 +15,17 @@ export interface PlayerLevelsResult {
 
 interface PlayerLevelsState {
   error: string | null;
+  levelXp: ReadonlyMap<number, number>;
   levels: ReadonlyMap<number, string>;
   source: Source | null;
   status: PlayerLevelsStatus;
 }
 
 const emptyLevels = new Map<number, string>();
+const emptyLevelXp = new Map<number, number>();
 const initialState: PlayerLevelsState = {
   error: null,
+  levelXp: emptyLevelXp,
   levels: emptyLevels,
   source: null,
   status: "idle",
@@ -41,6 +45,7 @@ export function usePlayerLevels({
     if (source !== "j4l") {
       setState({
         error: null,
+        levelXp: emptyLevelXp,
         levels: emptyLevels,
         source,
         status: "idle",
@@ -49,7 +54,13 @@ export function usePlayerLevels({
     }
 
     const controller = new AbortController();
-    setState({ error: null, levels: emptyLevels, source, status: "loading" });
+    setState({
+      error: null,
+      levelXp: emptyLevelXp,
+      levels: emptyLevels,
+      source,
+      status: "loading",
+    });
 
     void listPlayerRanks({ signal: controller.signal, source })
       .then((ranks) => {
@@ -59,12 +70,14 @@ export function usePlayerLevels({
             (rank) => [rank.player_id, rank.level_display.trim() || String(rank.level)] as const,
           ),
         );
-        setState({ error: null, levels, source, status: "success" });
+        const levelXp = new Map(ranks.map((rank) => [rank.player_id, rank.total_xp] as const));
+        setState({ error: null, levelXp, levels, source, status: "success" });
       })
       .catch((reason: unknown) => {
         if (controller.signal.aborted) return;
         setState({
           error: reason instanceof Error ? reason.message : "The player level request failed.",
+          levelXp: emptyLevelXp,
           levels: emptyLevels,
           source,
           status: "error",
@@ -78,11 +91,18 @@ export function usePlayerLevels({
 
   return useMemo(() => {
     if (state.source === source) {
-      return { error: state.error, levels: state.levels, retry, status: state.status };
+      return {
+        error: state.error,
+        levelXp: state.levelXp,
+        levels: state.levels,
+        retry,
+        status: state.status,
+      };
     }
 
     return {
       error: null,
+      levelXp: emptyLevelXp,
       levels: emptyLevels,
       retry,
       status: source === "j4l" ? ("loading" as const) : ("idle" as const),

@@ -26,12 +26,15 @@ export interface JsonClient {
 
 export interface JsonClientConfig {
   baseUrl: string;
+  format?: ApiFormat;
   fetch?: typeof fetch;
   maxRetries?: number;
   retryDelayMs?: number;
   maxRetryDelayMs?: number;
   sleep?: (delayMs: number, signal?: AbortSignal) => Promise<void>;
 }
+
+export type ApiFormat = "legacy" | "json" | "msgpack";
 
 const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 
@@ -54,11 +57,22 @@ export function createJsonClient(config: JsonClientConfig): JsonClient {
   const retryDelayMs = Math.max(0, config.retryDelayMs ?? 250);
   const maxRetryDelayMs = Math.max(retryDelayMs, config.maxRetryDelayMs ?? 2_000);
   const sleep = config.sleep ?? abortableSleep;
+  const format = config.format ?? "legacy";
+  const messagePackDecoder =
+    format === "msgpack"
+      ? import("@msgpack/msgpack").then(
+          ({ decode }) => decode,
+          (cause: unknown) => () => {
+            throw cause;
+          },
+        )
+      : undefined;
 
   return {
     async get(path, options = {}) {
-      const url = buildApiUrl(config.baseUrl, path, options.query);
-      const safePath = safeEndpointPath(path);
+      const requestPath = format === "legacy" ? path : path.replace(/^\/api\/v1(?=\/)/, "/api/v2");
+      const url = buildApiUrl(config.baseUrl, requestPath, options.query);
+      const safePath = safeEndpointPath(requestPath);
       const maxAttempts = maxRetries + 1;
 
       for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -71,7 +85,7 @@ export function createJsonClient(config: JsonClientConfig): JsonClient {
           response = await fetchImpl(url, {
             method: "GET",
             signal: options.signal,
-            headers: { Accept: "application/json" },
+            headers: { Accept: format === "msgpack" ? "application/msgpack" : "application/json" },
           });
         } catch (cause) {
           if (isAbort(cause, options.signal)) {
@@ -128,11 +142,24 @@ export function createJsonClient(config: JsonClientConfig): JsonClient {
         }
 
         try {
+          if (format === "msgpack") {
+            const mediaType = response.headers.get("Content-Type")?.split(";", 1)[0]?.trim();
+            if (mediaType?.toLowerCase() !== "application/msgpack") {
+              throw new TypeError("Unexpected content type");
+            }
+            const decode = await messagePackDecoder;
+            if (!decode) throw new TypeError("MessagePack decoder unavailable");
+            return decode(await response.arrayBuffer());
+          }
           return await response.json();
         } catch (cause) {
+          if (isAbort(cause, options.signal)) {
+            throw abortedError(safePath, attempt, cause);
+          }
+          const kind = format === "msgpack" ? "invalid-messagepack" : "invalid-json";
           throw new ApiError({
-            kind: "invalid-json",
-            message: `API returned invalid JSON for ${safePath}`,
+            kind,
+            message: `API returned invalid ${format === "msgpack" ? "MessagePack" : "JSON"} for ${safePath}`,
             path: safePath,
             status: response.status,
             attempts: attempt,

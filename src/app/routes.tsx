@@ -9,6 +9,7 @@ import {
   MapsPage,
   PlayerDetailPage,
   PlayersPage,
+  RecentPage,
   ServersPage,
 } from "./routeComponents";
 
@@ -23,6 +24,7 @@ export const appRouteTable: Readonly<Record<AppRouteId, RouteRenderer>> = {
   "not-found": () => <NotFoundPage />,
   "player-detail": ({ params }) => <PlayerDetailPage playerId={params.playerId} />,
   players: () => <PlayersPage />,
+  recent: () => <RecentPage />,
   servers: () => <ServersPage />,
 };
 

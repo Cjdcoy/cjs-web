@@ -32,3 +32,7 @@ export const ServersPage = lazy(async () => {
   const feature = await import("../features/servers");
   return { default: feature.ServersPage };
 });
+export const RecentPage = lazy(async () => {
+  const feature = await import("../features/recent");
+  return { default: feature.RecentPage };
+});

@@ -53,7 +53,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: dist
-          key: dist-${{ github.event.workflow_run.head_sha }}
+          key: dist-${{ github.event.workflow_run.head_sha }}-${{ vars.VITE_API_FORMAT || 'legacy' }}
           fail-on-cache-miss: true
 
       # Wrangler needs Node 22+, so do not rely on the runner's preinstalled Node.
@@ -77,6 +77,8 @@ jobs:
 
       - name: Build production site
         if: github.event_name == 'workflow_dispatch'
+        env:
+          VITE_API_FORMAT: ${{ vars.VITE_API_FORMAT }}
         run: npm run build
 
       - name: Resolve pinned Wrangler version
