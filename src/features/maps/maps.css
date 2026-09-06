@@ -87,7 +87,7 @@
 
 .cjs-maps__loading {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
   gap: var(--cjs-space-4);
 }
 
@@ -113,7 +113,7 @@
 
 .cjs-maps__results[data-view="grid"] {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 20rem), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 20rem), 1fr));
   gap: var(--cjs-space-4);
 }
 
@@ -587,6 +587,13 @@
   color: var(--cjs-color-text);
   font-size: var(--cjs-font-size-sm);
   font-weight: var(--cjs-font-weight-bold);
+}
+
+.cjs-map-detail__hint {
+  display: inline-flex;
+  vertical-align: middle;
+  color: var(--cjs-color-text-muted);
+  cursor: help;
 }
 
 .cjs-map-videos {

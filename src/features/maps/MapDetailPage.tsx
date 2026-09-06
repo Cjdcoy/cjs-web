@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   CalendarDays,
+  CircleHelp,
   ExternalLink,
   Film,
   Heart,
@@ -35,6 +36,7 @@ import {
 } from "../../lib/routing";
 import { hasFavorite, toggleMapFavorite, useFavorites } from "../../lib/storage";
 import {
+  describeUnratedDifficulty,
   formatRunDate,
   formatRunTime,
   getMapRouteLabel,
@@ -325,19 +327,34 @@ function MapSummary({
   topCount: number | null;
 }) {
   const difficulty = map.difficulty?.[fps];
+  const unratedReason = describeUnratedDifficulty(map, fps);
 
   return (
     <dl className="cjs-map-detail__summary">
       <div>
         <dt>Completions</dt>
-        <dd>{formatCount(map.individual_finish_count)}</dd>
+        <dd>{map.individual_finish_count ? formatCount(map.individual_finish_count) : "No"}</dd>
       </div>
       <div>
         <dt>{fpsLabel(fps)} difficulty</dt>
         <dd>
-          {difficulty && Number.isFinite(difficulty.difficulty)
-            ? `${difficulty.difficulty.toFixed(1)} / 10`
-            : "Not rated"}
+          {difficulty && Number.isFinite(difficulty.difficulty) && difficulty.difficulty >= 0 ? (
+            `${difficulty.difficulty.toFixed(1)} / 10`
+          ) : (
+            <>
+              Not rated{" "}
+              <span
+                className="cjs-map-detail__hint"
+                role="img"
+                // eslint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- focusable so the title tooltip is reachable by keyboard
+                tabIndex={0}
+                title={unratedReason}
+                aria-label={`Why not rated: ${unratedReason}`}
+              >
+                <CircleHelp size={14} aria-hidden="true" />
+              </span>
+            </>
+          )}
         </dd>
       </div>
       <div>

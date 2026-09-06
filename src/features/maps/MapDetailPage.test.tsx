@@ -401,7 +401,7 @@ describe("MapDetailPage", () => {
       {
         ...alphaCheckpoints[0],
         difficulty: {
-          "125": { difficulty: 2, nb_tops: 0 },
+          "125": { difficulty: -2, nb_tops: 0 },
           "250": { difficulty: 3, nb_tops: 0 },
           "333": { difficulty: 4, nb_tops: 0 },
           "0": { difficulty: 5, nb_tops: 0 },
@@ -422,6 +422,12 @@ describe("MapDetailPage", () => {
         name: "125, no tops available",
       }),
     ).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("125 FPS difficulty").nextElementSibling).toHaveTextContent(
+      "Not rated",
+    );
+    expect(
+      screen.getByRole("img", { name: /Why not rated: No runs have been recorded/ }),
+    ).toBeVisible();
     expect(topsRequest).not.toHaveBeenCalled();
   });
 

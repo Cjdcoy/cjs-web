@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { GameMap, TopRun } from "../../lib/api";
 import {
+  describeUnratedDifficulty,
   formatRunDate,
   formatRunTime,
   getMapRouteLabel,
@@ -53,8 +54,17 @@ describe("map detail model", () => {
         "0": { difficulty: 5, nb_tops: 1 },
       },
     };
+    const uncounted: GameMap = {
+      ...map,
+      difficulty: {
+        "125": { difficulty: -1, nb_tops: 0 },
+        "250": { difficulty: -2, nb_tops: 0 },
+      },
+    };
 
     expect(hasMapTopRuns(map, "125")).toBe(false);
+    expect(hasMapTopRuns(uncounted, "125")).toBe(true);
+    expect(hasMapTopRuns(uncounted, "250")).toBe(false);
     expect(hasMapTopRuns(map, "250")).toBe(true);
     expect(selectMapProfileFps(map, "125")).toBe("250");
     expect(selectMapProfileFps(map, "333")).toBe("333");
@@ -76,6 +86,29 @@ describe("map detail model", () => {
     );
     expect(getSafeMediaUrl("javascript:alert(1)")).toBeNull();
     expect(getSafeMediaUrl("not a URL")).toBeNull();
+  });
+
+  it("explains why a difficulty is unrated", () => {
+    const map = (type: string | null, difficulty: number | null): GameMap => ({
+      mapid: 1,
+      mapname: "m",
+      cp_id: 1,
+      type,
+      difficulty: difficulty === null ? {} : { "125": { difficulty, nb_tops: 0 } },
+    });
+
+    expect(describeUnratedDifficulty(map(null, -2), "125")).toBe(
+      "No runs have been recorded at this FPS yet.",
+    );
+    expect(describeUnratedDifficulty(map("Surf", -1), "125")).toBe(
+      "Difficulty is only rated for jump maps.",
+    );
+    expect(describeUnratedDifficulty(map("jump", -1), "125")).toBe(
+      "The fastest run uses more than 3 nade jumps, so the difficulty formula does not apply.",
+    );
+    expect(describeUnratedDifficulty(map(null, null), "125")).toBe(
+      "No difficulty data is available for this FPS.",
+    );
   });
 
   it("presents safe fallback labels for partial run data", () => {
