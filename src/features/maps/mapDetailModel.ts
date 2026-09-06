@@ -65,8 +65,23 @@ export function selectCheckpoint(record: MapRecord, requestedCheckpointId: numbe
 }
 
 export function hasMapTopRuns(map: GameMap, fps: MapProfileFps): boolean {
-  const topCount = map.difficulty?.[fps]?.nb_tops;
-  return topCount !== undefined && Number.isFinite(topCount) && topCount > 0;
+  const rating = map.difficulty?.[fps];
+  if (!rating) return false;
+  // difficulty -1: the API skipped counting tops (nade-jump or defrag/surf top run), so nb_tops is
+  // meaningless and the only way to know whether runs exist is to fetch them. -2 means truly none.
+  if (rating.difficulty === -1) return true;
+  return Number.isFinite(rating.nb_tops) && rating.nb_tops > 0;
+}
+
+export function describeUnratedDifficulty(map: GameMap, fps: Fps | string): string {
+  const difficulty = map.difficulty?.[fps]?.difficulty;
+  if (difficulty === -2) return "No runs have been recorded at this FPS yet.";
+  if (difficulty === -1) {
+    const type = map.type?.trim().toLowerCase();
+    if (type === "defrag" || type === "surf") return "Difficulty is only rated for jump maps.";
+    return "The fastest run uses more than 3 nade jumps, so the difficulty formula does not apply.";
+  }
+  return "No difficulty data is available for this FPS.";
 }
 
 export function selectMapProfileFps(map: GameMap, requestedFps: MapProfileFps): MapProfileFps {
