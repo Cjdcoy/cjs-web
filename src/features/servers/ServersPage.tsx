@@ -418,7 +418,6 @@ function ServerCard({ server, source }: { server: ServerViewModel; source: Sourc
   const headingId = useId();
   const [copyState, setCopyState] = useState<"idle" | "copied" | "failed">("idle");
   const [imageFailed, setImageFailed] = useState(false);
-  const visiblePlayers = server.players?.slice(0, 5) ?? [];
   const country = getServerCountry(server.domain);
   const imageSources =
     server.mapName === "Map unavailable" ? null : getMapImageSources(server.mapName);
@@ -519,7 +518,7 @@ function ServerCard({ server, source }: { server: ServerViewModel; source: Sourc
         )}
 
         <ServerRoster
-          players={visiblePlayers}
+          players={server.players ?? []}
           rosterKnown={server.players !== null}
           source={source}
           totalPlayers={server.playerCount}

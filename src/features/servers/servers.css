@@ -427,8 +427,13 @@
 .server-card__roster ul {
   display: grid;
   gap: 0;
+  /* Five rows tall; busier servers scroll instead of stretching the card. */
+  max-height: calc(
+    5 * (var(--cjs-font-size-sm) * var(--cjs-line-height-tight) + 2 * var(--cjs-space-1))
+  );
   margin: 0;
   padding: 0;
+  overflow-y: auto;
   list-style: none;
 }
 
