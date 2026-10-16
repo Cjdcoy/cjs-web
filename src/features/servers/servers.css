@@ -424,17 +424,43 @@
   font-weight: var(--cjs-font-weight-medium);
 }
 
+@property --server-card-roster-fade {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
+/* Busier servers scroll instead of stretching the card. Five and a half rows
+   leave the sixth visibly cut off, and a bottom fade that shrinks away as the
+   list reaches its end makes the overflow obvious before anyone scrolls. */
 .server-card__roster ul {
   display: grid;
   gap: 0;
-  /* Five rows tall; busier servers scroll instead of stretching the card. */
   max-height: calc(
-    5 * (var(--cjs-font-size-sm) * var(--cjs-line-height-tight) + 2 * var(--cjs-space-1))
+    5.5 * (var(--cjs-font-size-sm) * var(--cjs-line-height-tight) + 2 * var(--cjs-space-1))
   );
-  margin: 0;
-  padding: 0;
+  /* Inline room so the scroll container doesn't clip link focus rings. */
+  margin: 0 calc(-1 * var(--cjs-space-2));
+  padding: 0 var(--cjs-space-2);
   overflow-y: auto;
   list-style: none;
+  mask-image: linear-gradient(
+    to bottom,
+    #000 calc(100% - var(--server-card-roster-fade)),
+    transparent
+  );
+  animation: server-card-roster-fade linear both;
+  animation-timeline: scroll(self);
+}
+
+@keyframes server-card-roster-fade {
+  from {
+    --server-card-roster-fade: var(--cjs-space-8);
+  }
+
+  to {
+    --server-card-roster-fade: 0px;
+  }
 }
 
 .server-card__roster li {
