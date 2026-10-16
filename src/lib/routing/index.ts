@@ -2,6 +2,8 @@ export {
   markNavigationComplete,
   navigate,
   parseBrowserHref,
+  previousRouteId,
+  recordRouteVisit,
   useBrowserLocation,
   useNavigationPending,
 } from "./browser";

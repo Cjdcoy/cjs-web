@@ -13,7 +13,10 @@ import {
   rankLeaderboardFixture,
   recentRunsFixture,
   replayWatchAggregateFixture,
+  replayViewCountsFixture,
   replayWatchRankingsFixture,
+  replayWebViewAggregateFixture,
+  replayWebViewSummaryFixture,
   topRunsFixture,
   trackerServersFixture,
 } from "./__fixtures__/responses";
@@ -206,6 +209,83 @@ describe("typed CJS API endpoints", () => {
         metric: "watch_count",
       }),
     ).rejects.toMatchObject({ kind: "invalid-response" });
+  });
+
+  it("requests and validates the web replay-view endpoints", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json(replayWebViewSummaryFixture))
+      .mockResolvedValueOnce(Response.json(replayWebViewAggregateFixture))
+      .mockResolvedValueOnce(Response.json(replayWatchRankingsFixture))
+      .mockResolvedValueOnce(Response.json(replayViewCountsFixture));
+    const api = createCjsApi(
+      createJsonClient({ baseUrl: "https://example.test", fetch: fetchMock as typeof fetch }),
+    );
+
+    await expect(api.replayWebViewSummary({ source: "j4l", runId: 7001 })).resolves.toEqual({
+      heat: {
+        bucket_ms: 5_000,
+        view_count: [1, 3, 3, 2],
+        watch_ms: [5_000, 15_000, 16_000, 9_000],
+      },
+    });
+    await expect(
+      api.replayWebViewAggregate({ source: "j4l", ownerPlayerId: 501 }),
+    ).resolves.toMatchObject({ watch_count: 18, unique_viewer_count: 11, avg_completion: 0.42 });
+    await expect(
+      api.replayWebViewRankings({ source: "j4l", mapId: 101, metric: "watch_count", limit: 1 }),
+    ).resolves.toHaveLength(1);
+    const counts = await api.replayViewCounts({ source: "j4l", runIds: [7001, 7002, 7001] });
+    expect([...counts]).toEqual([
+      [7001, { web: 1_234, in_game: 340 }],
+      [7002, { web: 0, in_game: 0 }],
+    ]);
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://example.test/api/v1/replay/web-view-summary?source=j4l&run_id=7001",
+      "https://example.test/api/v1/replay/web-view-aggregate?source=j4l&owner_playerid=501",
+      "https://example.test/api/v1/replay/web-view-rankings?source=j4l&metric=watch_count&mapid=101&limit=1",
+      "https://example.test/api/v1/replay/view-counts?source=j4l&run_ids=7001%2C7002",
+    ]);
+  });
+
+  it("rejects invalid web replay-view arguments and responses", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ heat: { bucket_ms: 5_000, view_count: [1, 2], watch_ms: [1] } }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ ...(replayWebViewAggregateFixture as object), avg_completion: 1.5 }),
+      )
+      .mockResolvedValueOnce(Response.json({ "7001": { web: "many", in_game: 0 } }));
+    const api = createCjsApi(
+      createJsonClient({ baseUrl: "https://example.test", fetch: fetchMock as typeof fetch }),
+    );
+
+    await expect(api.replayViewCounts({ source: "j4l", runIds: [] })).rejects.toMatchObject({
+      kind: "invalid-argument",
+    });
+    await expect(
+      api.replayViewCounts({ source: "j4l", runIds: Array.from({ length: 101 }, (_, i) => i + 1) }),
+    ).rejects.toMatchObject({ kind: "invalid-argument" });
+    await expect(api.replayWebViewSummary({ source: "j4l", runId: 0 })).rejects.toMatchObject({
+      kind: "invalid-argument",
+    });
+    await expect(api.replayWebViewSummary({ source: "jh", runId: 1 })).rejects.toBeInstanceOf(
+      UnsupportedCapabilityError,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await expect(api.replayWebViewSummary({ source: "j4l", runId: 7001 })).rejects.toMatchObject({
+      kind: "invalid-response",
+    });
+    await expect(
+      api.replayWebViewAggregate({ source: "j4l", ownerPlayerId: 501 }),
+    ).rejects.toMatchObject({ kind: "invalid-response" });
+    await expect(api.replayViewCounts({ source: "j4l", runIds: [7001] })).rejects.toMatchObject({
+      kind: "invalid-response",
+    });
   });
 
   it("omits FPS for the howmany leaderboard because the API does not support it", async () => {

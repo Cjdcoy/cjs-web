@@ -21,7 +21,11 @@ import {
   type ReplaySamples,
   type ReplaySkip,
   type ReplayWatchAggregate,
+  type ReplayViewCounts,
   type ReplayWatchRankingEntry,
+  type ReplayWebViewAggregate,
+  type ReplayWebViewHeat,
+  type ReplayWebViewSummary,
   type ServerPlayer,
   type ServerResponse,
   type SimpleTop,
@@ -31,6 +35,8 @@ import { invalidResponse } from "./errors";
 
 type JsonRecord = Record<string, unknown>;
 type WireStruct = JsonRecord | unknown[];
+
+const REPLAY_HEAT_BUCKET_MS = 5_000;
 
 export function normalizeServerResponse(value: unknown, path: string): ServerResponse {
   const object = wireStruct(value, path, "$response", 3);
@@ -320,6 +326,61 @@ export function normalizeReplayWatchRankings(
       updated_at: nullableString(summary, "updated_at", path, 8),
     };
   });
+}
+
+export function normalizeReplayWebViewAggregate(
+  value: unknown,
+  path: string,
+): ReplayWebViewAggregate {
+  const completion = nullableNumber(record(value, path, "$response"), "avg_completion", path);
+  if (completion !== null && (completion < 0 || completion > 1)) {
+    throw invalidResponse(path, "$response.avg_completion");
+  }
+  return { ...normalizeReplayWatchAggregate(value, path), avg_completion: completion };
+}
+
+export function normalizeReplayWebViewSummary(value: unknown, path: string): ReplayWebViewSummary {
+  const heatValue = record(value, path, "$response").heat;
+  if (heatValue === undefined || heatValue === null) {
+    return { heat: { bucket_ms: REPLAY_HEAT_BUCKET_MS, view_count: [], watch_ms: [] } };
+  }
+  const heat = record(heatValue, path, "$response.heat");
+  const bucketMs = requiredNumber(heat, "bucket_ms", path, "$response.heat");
+  if (bucketMs <= 0) throw invalidResponse(path, "$response.heat.bucket_ms");
+  const viewCount = numberArray(heat.view_count, path, "$response.heat.view_count");
+  const watchMs = numberArray(heat.watch_ms, path, "$response.heat.watch_ms", viewCount.length);
+  const negative = [...viewCount, ...watchMs].findIndex((entry) => entry < 0);
+  if (negative >= 0) throw invalidResponse(path, "$response.heat");
+  const normalized: ReplayWebViewHeat = {
+    bucket_ms: bucketMs,
+    view_count: viewCount,
+    watch_ms: watchMs,
+  };
+  return { heat: normalized };
+}
+
+/** `{run_id: {web, in_game}}`; a requested run the API leaves out has no views. */
+export function normalizeReplayViewCounts(
+  value: unknown,
+  runIds: readonly number[],
+  path: string,
+): Map<number, ReplayViewCounts> {
+  const object = record(value, path, "$response");
+  return new Map(
+    runIds.map((runId) => {
+      const entry = object[String(runId)];
+      if (entry === undefined || entry === null) return [runId, { web: 0, in_game: 0 }];
+      const at = `$response.${runId}`;
+      const counts = record(entry, path, at);
+      return [
+        runId,
+        {
+          web: requiredNumber(counts, "web", path, at),
+          in_game: requiredNumber(counts, "in_game", path, at),
+        },
+      ];
+    }),
+  );
 }
 
 export function normalizeReplaySamples(value: unknown, path: string): ReplaySamples {

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { describe, expect, it, vi, type Mocked } from "vitest";
@@ -67,6 +67,86 @@ describe("ReplayAnalyticsPanel", () => {
       source: "j4l",
     });
     expect((await axe.run(container)).violations).toEqual([]);
+  });
+
+  it("switches to web views with In-game | Web when the feature is on", async () => {
+    vi.stubEnv("VITE_REPLAY_VIEW_ANALYTICS", "1");
+    const user = userEvent.setup();
+    const apiClient = {
+      ...createReplayApi(),
+      replayWebViewAggregate: vi.fn().mockResolvedValue({ ...aggregate, avg_completion: 0.42 }),
+      replayWebViewRankings: vi.fn().mockResolvedValue([ranking]),
+    };
+    try {
+      const { container } = render(
+        <ReplayAnalyticsPanel apiClient={apiClient} scope={{ mapId: 101 }} source="j4l" />,
+      );
+      const audience = screen.getByRole("radiogroup", { name: "Replay audience" });
+      expect(screen.getByRole("radio", { name: "In-game" })).toBeChecked();
+      expect(await screen.findByText("Most watched replay")).toBeInTheDocument();
+      expect(apiClient.replayWebViewAggregate).not.toHaveBeenCalled();
+
+      await user.click(within(audience).getByRole("radio", { name: "Web" }));
+      expect(screen.getByRole("heading", { name: "Web replay views" })).toBeInTheDocument();
+      expect(await screen.findByLabelText("Web replay audience summary")).toHaveTextContent(
+        "Web views18Viewer-days11Avg. completion42%",
+      );
+      expect(screen.getByText("Most watched on the web").parentElement).toHaveTextContent(
+        "8 viewer-days",
+      );
+      expect(apiClient.replayWebViewAggregate).toHaveBeenCalledWith({
+        mapId: 101,
+        signal: expect.any(AbortSignal),
+        source: "j4l",
+      });
+      expect(apiClient.replayWebViewRankings).toHaveBeenCalledWith({
+        mapId: 101,
+        limit: 1,
+        metric: "watch_count",
+        offset: 0,
+        signal: expect.any(AbortSignal),
+        source: "j4l",
+      });
+      expect((await axe.run(container)).violations).toEqual([]);
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+
+  it("shows a web empty state and keeps In-game | Web hidden while the feature is off", async () => {
+    const apiClient = createReplayApi();
+    const { unmount } = render(
+      <ReplayAnalyticsPanel apiClient={apiClient} scope={{ ownerPlayerId: 42 }} source="j4l" />,
+    );
+    expect(await screen.findByText("Watched replays")).toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "Replay audience" })).not.toBeInTheDocument();
+    unmount();
+
+    vi.stubEnv("VITE_REPLAY_VIEW_ANALYTICS", "1");
+    try {
+      const empty = {
+        ...aggregate,
+        replay_count: 0,
+        watch_count: 0,
+        unique_viewer_count: 0,
+        avg_completion: null,
+      };
+      render(
+        <ReplayAnalyticsPanel
+          apiClient={{
+            ...apiClient,
+            replayWebViewAggregate: vi.fn().mockResolvedValue(empty),
+            replayWebViewRankings: vi.fn().mockResolvedValue([]),
+          }}
+          scope={{ ownerPlayerId: 42 }}
+          source="j4l"
+        />,
+      );
+      await userEvent.setup().click(screen.getByRole("radio", { name: "Web" }));
+      expect(await screen.findByRole("heading", { name: "No web views yet" })).toBeVisible();
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 
   it("does not request or render replay analytics for JumpersHeaven", () => {

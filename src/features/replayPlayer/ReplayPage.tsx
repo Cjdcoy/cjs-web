@@ -11,6 +11,7 @@ import { getMapModelUrl, hasMapModels } from "../../lib/mapModels";
 import { appPaths, playerDetailPath } from "../../lib/routing";
 import { formatReplayClock } from "./replayPlayback";
 import { ReplayPlayer } from "./ReplayPlayer";
+import { ReplayViewCountBadge } from "./ReplayWebViews";
 import { useReplaySamples, type ReplaySamplesApi } from "./useReplaySamples";
 import "./replayPlayer.css";
 
@@ -99,6 +100,7 @@ function ReplayContent({ apiClient, runId }: { apiClient?: ReplaySamplesApi; run
           </Link>
         </span>
         <Badge>{formatReplayClock(samples.t.at(-1) ?? 0)}</Badge>
+        <ReplayViewCountBadge runId={samples.run_id} />
         <Badge tone={samples.finished ? "success" : "neutral"}>
           {samples.finished ? "Finished run" : "Unfinished run"}
         </Badge>
@@ -110,7 +112,8 @@ function ReplayContent({ apiClient, runId }: { apiClient?: ReplaySamplesApi; run
           description="The archived replay does not contain enough samples to play back."
         />
       ) : (
-        <ReplayPlayer modelUrl={modelUrl} samples={samples} />
+        // A new run is a new view: remount so playback and view analytics start over.
+        <ReplayPlayer key={samples.run_id} modelUrl={modelUrl} samples={samples} />
       )}
     </>
   );

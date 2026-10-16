@@ -6,6 +6,7 @@ import {
   matchRoute,
   navigate,
   parseBrowserHref,
+  recordRouteVisit,
   SourceProvider,
   useBrowserLocation,
 } from "../lib/routing";
@@ -31,6 +32,7 @@ export function AppRouter() {
 
   useEffect(() => {
     applyRouteMetadata(match, routedLocation.pathname);
+    recordRouteVisit(match.id, routedLocation.pathname);
   }, [match, routedLocation.pathname]);
 
   const handleRouteReady = useCallback((pathname: string, label: string) => {

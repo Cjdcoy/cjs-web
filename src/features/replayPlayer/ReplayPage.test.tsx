@@ -7,6 +7,7 @@ import { replaySamplesFixture } from "../../lib/api/__fixtures__/responses";
 import { ApiError } from "../../lib/api";
 import { normalizeReplaySamples } from "../../lib/api/normalizers";
 import type { MapViewerProps } from "../mapViewer";
+import { replayWebViewHandlers } from "../../test/replayWebViewHandlers";
 import { server } from "../../test/server";
 import { ReplayPage } from "./ReplayPage";
 import type { ReplaySamplesApi } from "./useReplaySamples";
@@ -341,6 +342,44 @@ describe("ReplayPage", () => {
 
     const results = await axe.run(container, { rules: { region: { enabled: false } } });
     expect(results.violations).toEqual([]);
+  });
+
+  it("shows view counts and a toggleable watch heat strip when view analytics are on", async () => {
+    vi.stubEnv("VITE_REPLAY_VIEW_ANALYTICS", "1");
+    server.use(...replayWebViewHandlers);
+    const user = userEvent.setup();
+    const { container } = render(
+      <ReplayPage apiClient={apiReturning(Promise.resolve(samples))} runId="7001" />,
+    );
+
+    expect(await screen.findByText("1.2K web views · 340 in-game")).toBeVisible();
+    const hud = screen.getByRole("group", { name: "HUD" });
+    const toggle = await within(hud).findByRole("checkbox", { name: "Watch heat" });
+    await waitFor(() => expect(toggle).toBeChecked());
+    expect(container.querySelector(".cjs-replay-player__heat")).toBeInTheDocument();
+    expect(screen.getByText("Most watched: 0:05–0:15")).toBeInTheDocument();
+
+    await user.click(toggle);
+    expect(container.querySelector(".cjs-replay-player__heat")).not.toBeInTheDocument();
+    expect(JSON.parse(storageValues.get("cjs.replay-hud") ?? "{}")).toMatchObject({
+      heatmap: false,
+    });
+    const results = await axe.run(container, { rules: { region: { enabled: false } } });
+    expect(results.violations).toEqual([]);
+  });
+
+  it("explains a missing watch heat in the HUD", async () => {
+    vi.stubEnv("VITE_REPLAY_VIEW_ANALYTICS", "1");
+    server.use(
+      http.get("*/api/v1/replay/web-view-summary", () => new HttpResponse(null, { status: 503 })),
+      ...replayWebViewHandlers,
+    );
+    render(<ReplayPage apiClient={apiReturning(Promise.resolve(samples))} runId="7001" />);
+
+    const hud = await screen.findByRole("group", { name: "HUD" });
+    expect(within(hud).getByText("(loading)")).toBeInTheDocument();
+    expect(await within(hud).findByText("(could not load)")).toBeInTheDocument();
+    expect(within(hud).getByRole("checkbox", { name: /Watch heat/ })).toBeDisabled();
   });
 
   it("plays to the end and stops", async () => {

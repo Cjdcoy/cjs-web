@@ -5,10 +5,20 @@ import {
   type ReplayWatchAggregate,
   type ReplayWatchRankingEntry,
   type ReplayWatchScope,
+  type ReplayWebViewAggregate,
   type Source,
 } from "../../lib/api";
 
-export type ReplayAnalyticsApi = Pick<CjsApi, "replayWatchAggregate" | "replayWatchRankings">;
+/** In-game watches (`run_replay_watch_*`) or web player views (`run_replay_web_*`, ADR 0005). */
+export type ReplayAudience = "in-game" | "web";
+
+/** Without the web methods, the web side uses the shared API client. */
+export type ReplayAnalyticsApi = Pick<CjsApi, "replayWatchAggregate" | "replayWatchRankings"> &
+  Partial<Pick<CjsApi, "replayWebViewAggregate" | "replayWebViewRankings">>;
+
+/** Web aggregates add the average completion. */
+export type ReplayAudienceAggregate = ReplayWatchAggregate &
+  Partial<Pick<ReplayWebViewAggregate, "avg_completion">>;
 
 export type ReplayResourceStatus = "error" | "loading" | "refreshing" | "success" | "unsupported";
 
@@ -22,17 +32,19 @@ interface ReplayResourceState<Data> extends ReplayResource<Data> {
 }
 
 export interface ReplayAnalyticsResources {
-  aggregate: ReplayResource<ReplayWatchAggregate>;
+  aggregate: ReplayResource<ReplayAudienceAggregate>;
   rankings: ReplayResource<ReplayWatchRankingEntry[]>;
   reload: () => void;
 }
 
 export function useReplayAnalytics({
   apiClient = api,
+  audience = "in-game",
   scope,
   source,
 }: {
   apiClient?: ReplayAnalyticsApi;
+  audience?: ReplayAudience;
   scope: ReplayWatchScope;
   source: Source;
 }): ReplayAnalyticsResources {
@@ -40,8 +52,10 @@ export function useReplayAnalytics({
   const enabled = source === "j4l";
   const ownerPlayerId = scope.ownerPlayerId;
   const mapId = scope.mapId;
-  const rankingLimit = ownerPlayerId === undefined ? 1 : 5;
-  const scopeKey = `owner:${ownerPlayerId ?? "all"}:map:${mapId ?? "all"}`;
+  const web = audience === "web";
+  // The web side shows only its most watched run.
+  const rankingLimit = ownerPlayerId === undefined || web ? 1 : 5;
+  const scopeKey = `${audience}:owner:${ownerPlayerId ?? "all"}:map:${mapId ?? "all"}`;
   const requestScope = useMemo<ReplayWatchScope>(
     () =>
       ownerPlayerId !== undefined
@@ -50,20 +64,28 @@ export function useReplayAnalytics({
     [mapId, ownerPlayerId],
   );
   const loadAggregate = useCallback(
-    (signal: AbortSignal) => apiClient.replayWatchAggregate({ ...requestScope, signal, source }),
-    [apiClient, requestScope, source],
+    (signal: AbortSignal): Promise<ReplayAudienceAggregate> =>
+      web
+        ? (apiClient.replayWebViewAggregate?.({ ...requestScope, signal, source }) ??
+          api.replayWebViewAggregate({ ...requestScope, signal, source }))
+        : apiClient.replayWatchAggregate({ ...requestScope, signal, source }),
+    [apiClient, requestScope, source, web],
   );
   const loadRankings = useCallback(
-    (signal: AbortSignal) =>
-      apiClient.replayWatchRankings({
+    (signal: AbortSignal) => {
+      const options = {
         ...requestScope,
         limit: rankingLimit,
-        metric: "watch_count",
+        metric: "watch_count" as const,
         offset: 0,
         signal,
         source,
-      }),
-    [apiClient, rankingLimit, requestScope, source],
+      };
+      return web
+        ? (apiClient.replayWebViewRankings?.(options) ?? api.replayWebViewRankings(options))
+        : apiClient.replayWatchRankings(options);
+    },
+    [apiClient, rankingLimit, requestScope, source, web],
   );
   const aggregate = useReplayResource(
     `${source}:${scopeKey}:aggregate`,

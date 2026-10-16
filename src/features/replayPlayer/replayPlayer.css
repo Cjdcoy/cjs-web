@@ -466,3 +466,13 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Web watch heat (ADR 0005): one gradient band in the marker lane, under the ticks. */
+.cjs-replay-player__heat {
+  position: absolute;
+  inset: 0 var(--cjs-space-2) auto;
+  height: var(--cjs-space-3);
+  border-radius: var(--cjs-radius-sm);
+  background: var(--cjs-replay-heat, none);
+  pointer-events: none;
+}

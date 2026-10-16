@@ -141,6 +141,22 @@ export const replayWatchRankingsFixture: unknown = [
   },
 ];
 
+/** Web replay views (ADR 0005), shapes from the replay web analytics design. */
+export const replayWebViewSummaryFixture: unknown = {
+  run_id: 7001,
+  watch_count: 3,
+  unique_viewer_count: 2,
+  avg_completion: 0.5,
+  heat: { bucket_ms: 5_000, view_count: [1, 3, 3, 2], watch_ms: [5_000, 15_000, 16_000, 9_000] },
+};
+
+export const replayWebViewAggregateFixture: unknown = {
+  ...(replayWatchAggregateFixture as Record<string, unknown>),
+  avg_completion: 0.42,
+};
+
+export const replayViewCountsFixture: unknown = { "7001": { web: 1_234, in_game: 340 } };
+
 export const playerPerformanceFixture: unknown = {
   total_maps_completed: 18,
   maps_completed_ratio: 0.75,

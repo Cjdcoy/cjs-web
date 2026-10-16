@@ -15,6 +15,8 @@ export interface HudPreferences {
   autoSkip: boolean;
   viewmodel: boolean;
   sound: boolean;
+  /** Web watch heat on the timeline (ADR 0005). */
+  heatmap: boolean;
   /** Sound volume, 0..1. */
   volume: number;
   /** Map render brightness multiplier, 0.5..2.5. */
@@ -38,6 +40,7 @@ export const DEFAULT_HUD_PREFERENCES: Readonly<HudPreferences> = {
   autoSkip: true,
   viewmodel: false,
   sound: true,
+  heatmap: true,
   volume: 0.5,
   brightness: 1.3,
 };

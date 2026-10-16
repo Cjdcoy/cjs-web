@@ -26,11 +26,14 @@ import type {
   RankLeaderboardEntry,
   RecentRunsPage,
   ReplaySamples,
+  ReplayViewCounts,
   ReplayWatchAggregate,
   ReplayWatchFilters,
   ReplayWatchMetric,
   ReplayWatchRankingEntry,
   ReplayWatchScope,
+  ReplayWebViewAggregate,
+  ReplayWebViewSummary,
   ServerResponse,
   Source,
   TopRun,
@@ -50,8 +53,11 @@ import {
   normalizeRankLeaderboard,
   normalizeRecentRunsPage,
   normalizeReplaySamples,
+  normalizeReplayViewCounts,
   normalizeReplayWatchAggregate,
   normalizeReplayWatchRankings,
+  normalizeReplayWebViewAggregate,
+  normalizeReplayWebViewSummary,
   normalizeServerResponse,
   normalizeTopRuns,
 } from "./normalizers";
@@ -75,7 +81,13 @@ const PATHS = {
   replayWatchAggregate: "/api/v1/replay/watch-aggregate",
   replayWatchRankings: "/api/v1/replay/watch-rankings",
   replaySamples: "/api/v1/replay/samples",
+  replayWebViewSummary: "/api/v1/replay/web-view-summary",
+  replayWebViewAggregate: "/api/v1/replay/web-view-aggregate",
+  replayWebViewRankings: "/api/v1/replay/web-view-rankings",
+  replayViewCounts: "/api/v1/replay/view-counts",
 } as const;
+
+const MAX_VIEW_COUNT_RUNS = 100;
 
 export interface RequestContext {
   source: Source;
@@ -129,6 +141,18 @@ export interface CjsApi {
       ReplayWatchFilters & { metric: ReplayWatchMetric; limit?: number; offset?: number },
   ): Promise<ReplayWatchRankingEntry[]>;
   replaySamples(options: RequestContext & { runId: number }): Promise<ReplaySamples>;
+  replayWebViewSummary(options: RequestContext & { runId: number }): Promise<ReplayWebViewSummary>;
+  replayWebViewAggregate(
+    options: RequestContext & ReplayWatchScope,
+  ): Promise<ReplayWebViewAggregate>;
+  replayWebViewRankings(
+    options: RequestContext &
+      ReplayWatchFilters & { metric: ReplayWatchMetric; limit?: number; offset?: number },
+  ): Promise<ReplayWatchRankingEntry[]>;
+  /** Web and in-game view counts for up to 100 runs, keyed by run id. */
+  replayViewCounts(
+    options: RequestContext & { runIds: readonly number[] },
+  ): Promise<Map<number, ReplayViewCounts>>;
 }
 
 /**
@@ -429,6 +453,75 @@ export function createCjsApi(
       }
       return samples;
     },
+
+    async replayWebViewSummary(options) {
+      const game = context(options, PATHS.replayWebViewSummary);
+      assertCapability("replay-analytics", options.source, game);
+      if (!isRunId(options.runId)) throw invalidArgument(PATHS.replayWebViewSummary, "runId");
+      return normalizeReplayWebViewSummary(
+        await get(replayClient, PATHS.replayWebViewSummary, options, {
+          source: options.source,
+          run_id: options.runId,
+        }),
+        PATHS.replayWebViewSummary,
+      );
+    },
+
+    async replayWebViewAggregate(options) {
+      const path = PATHS.replayWebViewAggregate;
+      const game = replayContext(options, path);
+      assertCapability("replay-analytics", options.source, game);
+      const aggregate = normalizeReplayWebViewAggregate(
+        await get(replayClient, path, options, {
+          source: options.source,
+          owner_playerid: options.ownerPlayerId,
+          mapid: options.mapId,
+        }),
+        path,
+      );
+      assertReplayAggregateScope(aggregate, options, path);
+      return aggregate;
+    },
+
+    async replayWebViewRankings(options) {
+      const path = PATHS.replayWebViewRankings;
+      const game = replayFiltersContext(options, path);
+      assertCapability("replay-analytics", options.source, game);
+      if (!isReplayWatchMetric(options.metric)) throw invalidArgument(path, "metric");
+      limit(options.limit, path);
+      offset(options.offset, path);
+      const rankings = normalizeReplayWatchRankings(
+        await get(replayClient, path, options, {
+          source: options.source,
+          metric: options.metric,
+          owner_playerid: options.ownerPlayerId,
+          mapid: options.mapId,
+          limit: options.limit,
+          offset: options.offset,
+        }),
+        path,
+      );
+      assertReplayRankingScope(rankings, options, path);
+      return rankings;
+    },
+
+    async replayViewCounts(options) {
+      const path = PATHS.replayViewCounts;
+      const game = context(options, path);
+      assertCapability("replay-analytics", options.source, game);
+      const runIds = [...new Set(options.runIds)];
+      if (runIds.length === 0 || runIds.length > MAX_VIEW_COUNT_RUNS || !runIds.every(isRunId)) {
+        throw invalidArgument(path, "runIds");
+      }
+      return normalizeReplayViewCounts(
+        await get(replayClient, path, options, {
+          source: options.source,
+          run_ids: runIds.join(","),
+        }),
+        runIds,
+        path,
+      );
+    },
   };
 }
 
@@ -496,6 +589,10 @@ function assertReplayRankingScope(
   if (mismatchedIndex >= 0) {
     throw invalidResponse(path, `$response[${mismatchedIndex}].scope`);
   }
+}
+
+function isRunId(value: number): boolean {
+  return Number.isSafeInteger(value) && value > 0;
 }
 
 function requireFps(value: unknown, path: string): asserts value is Fps {

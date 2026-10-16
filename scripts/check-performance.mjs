@@ -12,7 +12,8 @@ const budgets = {
   initialJavaScriptGzip: 75 * 1024,
   initialCssGzip: 8 * 1024,
   routeIncrementGzip: 36 * 1024,
-  totalJavaScriptGzip: 151 * 1024,
+  // 155 KiB since ADR 0005 (web replay-view analytics); measured at 154.0 KiB.
+  totalJavaScriptGzip: 155 * 1024,
   totalCssGzip: 22 * 1024,
   mapViewerGzip: 170 * 1024,
 };

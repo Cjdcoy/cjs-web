@@ -38,7 +38,10 @@ import {
   type ReplayTimeline,
 } from "./replayPlayback";
 import { ShortcutsDialog } from "./ShortcutsDialog";
-import { PLAYBACK_SPEEDS, useReplayPlayback } from "./useReplayPlayback";
+import { ReplayHeatStrip } from "./ReplayWebViews";
+import { PLAYBACK_SPEEDS, useReplayPlayback, type PlaybackObserver } from "./useReplayPlayback";
+import { useReplayViewAnalytics } from "./useReplayViewAnalytics";
+import { useReplayHeat } from "./useReplayWebViews";
 import { useReplaySound } from "./useReplaySound";
 import { useViewMode, type ViewMode } from "./useViewMode";
 
@@ -61,8 +64,10 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     () => ({ enabled: preferences.autoSkip, skips: samples.skips, markers: samples.markers }),
     [preferences.autoSkip, samples.markers, samples.skips],
   );
-  const playback = useReplayPlayback(start, end, autoSkipOptions);
-  const { executedSkips, getTime, playing, seek, setPlaying, setSpeed, speed, time } = playback;
+  const playbackObserver = useRef<PlaybackObserver | null>(null);
+  const playback = useReplayPlayback(start, end, autoSkipOptions, playbackObserver);
+  const { executedSkips, flushSegment, getTime, playing, seek, setPlaying, setSpeed, speed, time } =
+    playback;
   const sound = useReplaySound({
     enabled: preferences.sound,
     getTime,
@@ -87,6 +92,8 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
         : undefined,
     [holstered, preferences.viewmodel, viewmodelMissing, viewmodelUrl],
   );
+  const heat = useReplayHeat(samples.run_id);
+  const heatReady = heat.data?.view_count.some((count) => count > 0) === true;
   const available = useMemo(
     () => ({
       angleHelper: Boolean(samples.flags && samples.input),
@@ -98,8 +105,9 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
       speed: true,
       viewmodel: viewmodelUrl !== null && !viewmodelMissing,
       sound: sound.status !== "unavailable",
+      heatmap: heatReady,
     }),
-    [samples, sound.status, viewmodelMissing, viewmodelUrl],
+    [heatReady, samples, sound.status, viewmodelMissing, viewmodelUrl],
   );
   const fps = fpsAt(samples, time);
   const skipped = skippedFails(executedSkips, time);
@@ -107,6 +115,21 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
   const playerRef = useRef<HTMLElement>(null);
   const shortcutsRef = useRef<HTMLDialogElement>(null);
   const { controlsHidden, mode, setMode } = useViewMode(playerRef);
+  const totalSkippedFails = useMemo(
+    () => [...executedSkips.values()].reduce((total, fails) => total + fails, 0),
+    [executedSkips],
+  );
+  useReplayViewAnalytics({
+    autoSkip: available.autoSkip && preferences.autoSkip,
+    flushSegment,
+    mode,
+    observer: playbackObserver,
+    playing,
+    runId: samples.run_id,
+    skippedFails: totalSkippedFails,
+    span: end - start,
+    start,
+  });
   const [announcement, setAnnouncement] = useState("");
   const followRef = useRef(follow);
   const span = Math.max(1, end - start);
@@ -396,6 +419,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
             </div>
 
             <div className="cjs-replay-player__timeline">
+              {heat.data && preferences.heatmap && <ReplayHeatStrip heat={heat.data} span={span} />}
               <div className="cjs-replay-player__ticks" aria-hidden="true">
                 {timelineMarkers.map((marker, index) => (
                   <span
@@ -429,6 +453,17 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
 
             <HudToggles
               available={available}
+              heatNote={
+                heat.enabled
+                  ? heat.loading && !heat.data
+                    ? "loading"
+                    : heat.error
+                      ? "could not load"
+                      : heatReady
+                        ? null
+                        : "no web views yet"
+                  : undefined
+              }
               preferences={preferences}
               onChange={changePreference}
               onVolumeChange={(volume) => setPreference("volume", volume)}
@@ -471,6 +506,7 @@ const HUD_TOGGLES: readonly {
 function HudToggles({
   autoSkipStatus,
   available,
+  heatNote,
   onChange,
   onBrightnessChange,
   onVolumeChange,
@@ -478,6 +514,8 @@ function HudToggles({
 }: {
   autoSkipStatus: string | null;
   available: Readonly<Record<HudToggleKey, boolean>>;
+  /** Undefined hides the watch heat toggle (feature off); null means the heat is shown. */
+  heatNote: string | null | undefined;
   onChange: (key: HudToggleKey, value: boolean) => void;
   onVolumeChange: (volume: number) => void;
   onBrightnessChange: (brightness: number) => void;
@@ -499,6 +537,18 @@ function HudToggles({
           {!available[key] && <span className="cjs-replay-player__hud-note">({unavailable})</span>}
         </label>
       ))}
+      {heatNote !== undefined && (
+        <label>
+          <input
+            type="checkbox"
+            checked={available.heatmap && preferences.heatmap}
+            disabled={!available.heatmap}
+            onChange={(event) => onChange("heatmap", event.currentTarget.checked)}
+          />
+          Watch heat
+          {heatNote && <span className="cjs-replay-player__hud-note">({heatNote})</span>}
+        </label>
+      )}
       <label className="cjs-replay-player__slider">
         Volume
         <input

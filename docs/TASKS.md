@@ -2502,6 +2502,35 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
 - **Remaining work/risks:** normal maps and specular are not applied (as in the converter's
   preview). Back faces reuse the front normal.
 
+### CJS-073 — Anonymous web replay-view analytics (frontend)
+
+- **Status:** done (behind `VITE_REPLAY_VIEW_ANALYTICS`; backend endpoints land separately)
+- **Owner/handoff:** Claude / frontend replay analytics worker
+- **Dependencies:** CJS-067, cjs-backend `POST /replay/views` and the web-view read endpoints, the
+  J4L `run_replay_web_*` tables
+- **Primary boundary:** `src/features/replayPlayer` (`replayViewTracker.ts`,
+  `useReplayViewAnalytics.ts`, `replayHeat.ts`, `ReplayWebViews.tsx`, `useReplayWebViews.ts`,
+  playback callbacks), `src/features/replay` (In-game | Web), `src/lib/api` (`replayViews.ts`,
+  web-view endpoints), the router's previous-route record
+- **Outcome:**
+  - The player counts visible-tab playback from the first Play: watched ranges, per-flush played
+    segments, wall time per speed, seeks (a drag counts once), auto-skip and skipped fails,
+    cinema and full screen, entry route, and viewport class. It sends sequence-numbered
+    `text/plain` beacons every 30 s, on hide, on `pagehide`, and on in-app navigation, never
+    under 5 s of playback or with Do Not Track or GPC on (ADR 0005).
+  - The replay page shows web and in-game view counts and a watch heat strip on the timeline
+    with a HUD toggle. The map and player replay panels switch between in-game and web views.
+  - No About-page privacy text for now, by owner decision.
+- **Validation:** `npm run verify` on a case-sensitive copy. Unit tests cover range merging and
+  the 64-pair cap, sequence numbers and unchanged flushes, the 5 s floor, seek merging, DNT and
+  GPC, the hidden-tab pause, the 30 s, `pagehide`, and unmount flushes, and the beacon fallback.
+  Component tests cover the count badge and heat strip states with MSW, the HUD toggle, and the
+  In-game | Web panel. Total JavaScript budget raised narrowly from 151 to 155 KiB (154.0 KiB),
+  per ADR 0005. Read shapes follow the backend's final `api-contract.md`.
+- **Remaining work/risks:** run lists (phase 2) do not show view counts yet. The read shapes for
+  the breakdowns are not consumed; only `heat`, the aggregate, rankings, and view counts are.
+  Turn the flag on only after the backend is deployed with writes enabled.
+
 ## Agent handoff template
 
 ```md

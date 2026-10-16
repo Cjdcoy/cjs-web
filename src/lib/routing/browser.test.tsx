@@ -2,7 +2,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { act } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { markNavigationComplete, navigate, useBrowserLocation } from "./browser";
+import {
+  markNavigationComplete,
+  navigate,
+  previousRouteId,
+  recordRouteVisit,
+  useBrowserLocation,
+} from "./browser";
 
 function RouterHarness() {
   const location = useBrowserLocation();
@@ -54,5 +60,16 @@ describe("browser routing", () => {
     await waitFor(() => {
       expect(screen.getByLabelText("Current location")).toHaveTextContent("/players/42");
     });
+  });
+
+  it("remembers the previous in-app page, not query changes on the same page", () => {
+    recordRouteVisit("map-detail", "/maps/17");
+    recordRouteVisit("map-detail", "/maps/17");
+    recordRouteVisit("replay", "/replays/9");
+    expect(previousRouteId()).toBe("map-detail");
+    recordRouteVisit("replay", "/replays/9");
+    expect(previousRouteId()).toBe("map-detail");
+    recordRouteVisit("recent", "/recent");
+    expect(previousRouteId()).toBe("replay");
   });
 });

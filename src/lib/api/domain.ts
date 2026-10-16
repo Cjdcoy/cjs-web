@@ -49,6 +49,29 @@ export interface ReplayWatchAggregate {
   updated_at: string | null;
 }
 
+/** Web replay views (`run_replay_web_*`); `unique_viewer_count` counts viewer-days. */
+export interface ReplayWebViewAggregate extends ReplayWatchAggregate {
+  /** Mean covered share of the replay per view, 0..1; null before any view. */
+  avg_completion: number | null;
+}
+
+/** Per 5 s bucket of one replay: views that covered it and ms played in it (rewatches included). */
+export interface ReplayWebViewHeat {
+  bucket_ms: number;
+  view_count: number[];
+  watch_ms: number[];
+}
+
+/** The part of `/replay/web-view-summary` the site uses; the breakdowns are ignored for now. */
+export interface ReplayWebViewSummary {
+  heat: ReplayWebViewHeat;
+}
+
+export interface ReplayViewCounts {
+  web: number;
+  in_game: number;
+}
+
 export interface ReplayWatchRankingEntry {
   rank: number;
   run_id: number;
