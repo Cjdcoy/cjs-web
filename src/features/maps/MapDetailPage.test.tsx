@@ -155,7 +155,7 @@ describe("MapDetailPage", () => {
       "href",
       "https://media.example.invalid/maps/mp_alpha",
     );
-    expect(await screen.findByRole("heading", { name: "In-game Replay views" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Replay views" })).toBeVisible();
     await waitFor(() =>
       expect(api.replayWatchAggregate).toHaveBeenCalledWith(
         expect.objectContaining({ mapId: 1, source: "j4l" }),
@@ -171,7 +171,7 @@ describe("MapDetailPage", () => {
     expect(resultsLayout?.firstElementChild).toHaveClass("cjs-map-detail__insights");
     expect(
       within(screen.getByRole("complementary", { name: "Map insights" })).getByRole("heading", {
-        name: "In-game Replay views",
+        name: "Replay views",
       }),
     ).toBeVisible();
     expect(resultsLayout?.lastElementChild).toHaveClass("cjs-map-detail__runs");

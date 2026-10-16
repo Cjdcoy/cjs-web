@@ -84,9 +84,7 @@ export function ReplayAnalyticsPanel({
       <Panel className="cjs-replay-analytics__panel cjs-stack" padding="small">
         <div className="cjs-replay-analytics__header cjs-cluster">
           <div>
-            <h2 id={headingId}>
-              {isPlayer ? "Replay reach" : web ? "Web replay views" : "In-game Replay views"}
-            </h2>
+            <h2 id={headingId}>{isPlayer ? "Replay reach" : "Replay views"}</h2>
           </div>
           {webEnabled && (
             <SegmentedControl

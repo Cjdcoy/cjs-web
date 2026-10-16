@@ -87,7 +87,7 @@ describe("ReplayAnalyticsPanel", () => {
       expect(apiClient.replayWebViewAggregate).not.toHaveBeenCalled();
 
       await user.click(within(audience).getByRole("radio", { name: "Web" }));
-      expect(screen.getByRole("heading", { name: "Web replay views" })).toBeInTheDocument();
+      expect(screen.getByRole("heading", { name: "Replay views" })).toBeInTheDocument();
       expect(await screen.findByLabelText("Web replay audience summary")).toHaveTextContent(
         "Web views18Viewer-days11Avg. completion42%",
       );
@@ -187,7 +187,7 @@ describe("ReplayAnalyticsPanel", () => {
       <ReplayAnalyticsPanel apiClient={createReplayApi()} scope={{ mapId: 101 }} source="j4l" />,
     );
 
-    expect(screen.getByRole("heading", { name: "In-game Replay views" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Replay views" })).toBeVisible();
     const highlight = (await screen.findByText("Most watched replay")).parentElement;
     expect(highlight).toHaveTextContent("8 viewers · 5m watched · Run #7001 · 125 FPS");
   });
