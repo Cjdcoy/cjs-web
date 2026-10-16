@@ -25,6 +25,7 @@ import type {
   PlayerSort,
   RankLeaderboardEntry,
   RecentRunsPage,
+  ReplaySamples,
   ReplayWatchAggregate,
   ReplayWatchFilters,
   ReplayWatchMetric,
@@ -48,6 +49,7 @@ import {
   normalizePlayers,
   normalizeRankLeaderboard,
   normalizeRecentRunsPage,
+  normalizeReplaySamples,
   normalizeReplayWatchAggregate,
   normalizeReplayWatchRankings,
   normalizeServerResponse,
@@ -72,6 +74,7 @@ const PATHS = {
   rankXpLeaderboard: "/api/v1/leaderboard/rank-xp",
   replayWatchAggregate: "/api/v1/replay/watch-aggregate",
   replayWatchRankings: "/api/v1/replay/watch-rankings",
+  replaySamples: "/api/v1/replay/samples",
 } as const;
 
 export interface RequestContext {
@@ -125,9 +128,18 @@ export interface CjsApi {
     options: RequestContext &
       ReplayWatchFilters & { metric: ReplayWatchMetric; limit?: number; offset?: number },
   ): Promise<ReplayWatchRankingEntry[]>;
+  replaySamples(options: RequestContext & { runId: number }): Promise<ReplaySamples>;
 }
 
-export function createCjsApi(client: JsonClient, replayClient: JsonClient = client): CjsApi {
+/**
+ * `replaySamplesClient` must negotiate v2 JSON: the samples payload is large and only v2 is
+ * compressed, while MessagePack would encode it positionally.
+ */
+export function createCjsApi(
+  client: JsonClient,
+  replayClient: JsonClient = client,
+  replaySamplesClient: JsonClient = replayClient,
+): CjsApi {
   return {
     async trackerServers(options) {
       const game = context(options, PATHS.trackerServers);
@@ -397,6 +409,25 @@ export function createCjsApi(client: JsonClient, replayClient: JsonClient = clie
       );
       assertReplayRankingScope(rankings, options, PATHS.replayWatchRankings);
       return rankings;
+    },
+
+    async replaySamples(options) {
+      const game = context(options, PATHS.replaySamples);
+      assertCapability("replay-playback", options.source, game);
+      if (!Number.isSafeInteger(options.runId) || options.runId <= 0) {
+        throw invalidArgument(PATHS.replaySamples, "runId");
+      }
+      const samples = normalizeReplaySamples(
+        await get(replaySamplesClient, PATHS.replaySamples, options, {
+          run_id: options.runId,
+          source: options.source,
+        }),
+        PATHS.replaySamples,
+      );
+      if (samples.run_id !== options.runId) {
+        throw invalidResponse(PATHS.replaySamples, "$response.run_id.scope");
+      }
+      return samples;
     },
   };
 }

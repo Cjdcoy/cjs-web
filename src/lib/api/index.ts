@@ -47,6 +47,7 @@ export function createCjsApiForBases({
   return createCjsApi(
     createJsonClient(clientOptions(apiBase)),
     createJsonClient(clientOptions(replayApiBase)),
+    createJsonClient({ ...clientOptions(replayApiBase), format: "json" }),
   );
 }
 

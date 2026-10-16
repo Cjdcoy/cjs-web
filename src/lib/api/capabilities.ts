@@ -22,11 +22,17 @@ export const CAPABILITIES = [
   "player-rank",
   "player-activity",
   "replay-analytics",
+  "replay-playback",
 ] as const;
 
 export type Capability = (typeof CAPABILITIES)[number];
 
-const J4L_ONLY = new Set<Capability>(["player-rank", "player-activity", "replay-analytics"]);
+const J4L_ONLY = new Set<Capability>([
+  "player-rank",
+  "player-activity",
+  "replay-analytics",
+  "replay-playback",
+]);
 
 export function isSource(value: unknown): value is Source {
   return typeof value === "string" && SOURCES.some((source) => source === value);

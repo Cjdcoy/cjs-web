@@ -20,6 +20,10 @@ export const MapDetailPage = lazy(async () => {
   const feature = await import("../features/maps");
   return { default: feature.MapDetailPage };
 });
+export const MapViewerPage = lazy(async () => {
+  const feature = await import("../features/maps");
+  return { default: feature.MapViewerPage };
+});
 export const PlayersPage = lazy(async () => {
   const feature = await import("../features/players");
   return { default: feature.PlayersPage };
@@ -35,4 +39,8 @@ export const ServersPage = lazy(async () => {
 export const RecentPage = lazy(async () => {
   const feature = await import("../features/recent");
   return { default: feature.RecentPage };
+});
+export const ReplayPage = lazy(async () => {
+  const feature = await import("../features/replayPlayer");
+  return { default: feature.ReplayPage };
 });

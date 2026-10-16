@@ -1,0 +1,180 @@
+.cjs-map-viewer {
+  display: grid;
+  gap: var(--cjs-space-3);
+  min-width: 0;
+}
+
+.cjs-map-viewer__frame {
+  position: relative;
+  min-width: 0;
+}
+
+/* A fixed 16:9 view, as wide as fits under the configurable height cap. */
+.cjs-map-viewer__view {
+  position: relative;
+  overflow: hidden;
+  width: min(100%, calc(var(--cjs-map-viewer-max-height, 70svh) * 16 / 9));
+  aspect-ratio: 16 / 9;
+  margin-inline: auto;
+  border: var(--cjs-border-width) solid var(--cjs-color-border);
+  border-radius: var(--cjs-radius-md);
+  background: var(--cjs-color-elevated);
+}
+
+.cjs-map-viewer__view:focus-visible {
+  outline: 0;
+  box-shadow: var(--cjs-focus-ring);
+}
+
+.cjs-map-viewer__stage,
+.cjs-map-viewer__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* A display-only brightness on the map render; overlays drawn over the canvas are unaffected. */
+.cjs-map-viewer__canvas {
+  filter: brightness(var(--cjs-map-viewer-brightness, 1.3));
+}
+
+.cjs-map-viewer__view:not([tabindex="-1"]) .cjs-map-viewer__canvas {
+  cursor: crosshair;
+}
+
+.cjs-map-viewer__crosshair {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--cjs-space-2);
+  height: var(--cjs-space-2);
+  border: var(--cjs-border-width) solid var(--cjs-color-text);
+  border-radius: var(--cjs-radius-pill);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+}
+
+.cjs-map-viewer__overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--cjs-space-4);
+  background: var(--cjs-color-backdrop);
+}
+
+.cjs-map-viewer__overlay > * {
+  max-width: var(--cjs-reading-width);
+}
+
+.cjs-map-viewer__progress {
+  display: grid;
+  justify-items: center;
+  gap: var(--cjs-space-2);
+  width: min(100%, 20rem);
+  color: var(--cjs-color-text);
+  font-size: var(--cjs-font-size-sm);
+}
+
+.cjs-map-viewer__progress progress {
+  width: 100%;
+  accent-color: var(--cjs-color-accent);
+}
+
+.cjs-map-viewer__progress-detail,
+.cjs-map-viewer__help {
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-xs);
+}
+
+.cjs-map-viewer__help {
+  margin: 0;
+}
+
+.cjs-map-viewer__tools {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/*
+ * Readable layer panel rising from the frame's bottom-right, next to the Layers button; it scrolls
+ * when the view is short and keeps clear of the sticky site header when focus scrolls to it.
+ */
+.cjs-map-viewer__layers {
+  position: absolute;
+  z-index: var(--cjs-layer-raised);
+  right: var(--cjs-space-3);
+  bottom: var(--cjs-space-3);
+  scroll-margin-block-start: calc(var(--cjs-space-16) + var(--cjs-space-4));
+  display: grid;
+  gap: var(--cjs-space-2);
+  width: min(20rem, calc(100% - 2 * var(--cjs-space-3)));
+  max-height: calc(100% - 2 * var(--cjs-space-3));
+  overflow: auto;
+  padding: var(--cjs-space-3) var(--cjs-space-4);
+  border: var(--cjs-border-width) solid var(--cjs-color-border-strong);
+  border-radius: var(--cjs-radius-md);
+  background: var(--cjs-color-panel);
+  box-shadow: var(--cjs-shadow-elevated);
+  font-size: var(--cjs-font-size-md);
+}
+
+.cjs-map-viewer__layers:focus-visible {
+  outline: 0;
+  box-shadow: var(--cjs-focus-ring);
+}
+
+.cjs-map-viewer__layers-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cjs-space-2);
+}
+
+.cjs-map-viewer__layers h2 {
+  margin: 0;
+  font-size: var(--cjs-font-size-md);
+}
+
+.cjs-map-viewer__layers ul {
+  display: grid;
+  gap: var(--cjs-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cjs-map-viewer__layers li[data-child] {
+  padding-inline-start: var(--cjs-space-5);
+}
+
+.cjs-map-viewer__layers label {
+  display: flex;
+  align-items: center;
+  gap: var(--cjs-space-2);
+  min-height: var(--cjs-control-height-sm);
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.cjs-map-viewer__layers input {
+  flex: none;
+  accent-color: var(--cjs-color-accent);
+}
+
+/* Small screens: the panel joins the page flow under the short view instead of covering it. */
+@media (max-width: 47.999rem) {
+  .cjs-map-viewer__layers {
+    position: static;
+    width: auto;
+    max-height: none;
+    margin-block-start: var(--cjs-space-3);
+  }
+}
+
+.cjs-map-viewer__swatch {
+  width: var(--cjs-space-3);
+  height: var(--cjs-space-3);
+  border: var(--cjs-border-width) solid var(--cjs-color-border-strong);
+  border-radius: var(--cjs-radius-sm);
+}

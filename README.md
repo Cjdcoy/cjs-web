@@ -63,6 +63,16 @@ VITE_REPLAY_API_BASE_URL=http://127.0.0.1:8080 npm run dev
 Replay values in that mode come from the local backend's configured database.
 Refresh its Jump4Life snapshot before comparing totals with production.
 
+The 3D map view and Jump4Life replay playback appear only when `VITE_MAP_MODEL_BASE_URL`
+points at a CORS-enabled host serving `<mapname>.glb` models (see
+[ADR 0004](docs/adr/0004-lazy-three-map-viewer.md)). For local work, serve a model directory and
+point both the models and replay samples at local services:
+
+```sh
+npx --yes http-server ./maps --cors -p 8090
+VITE_MAP_MODEL_BASE_URL=http://127.0.0.1:8090 VITE_REPLAY_API_BASE_URL=http://127.0.0.1:8080 npm run dev
+```
+
 Vite reads these variables when the development server or production build
 starts, so restart the process after changing them.
 
@@ -130,6 +140,9 @@ Configure the deployment workflow with:
   it in the production build; the deployment workflow publishes that cached bundle.
   The manual deployment build reads the same variable. Format changes require a new
   CI build; changing a Cloudflare runtime variable does not change an existing bundle.
+- Repository variable `VITE_MAP_MODEL_BASE_URL`: optional HTTPS base for `<mapname>.glb` map
+  models. Leave unset to hide the 3D map view and replay playback. Like the format, it is
+  embedded at build time, so a change requires a new CI build.
   Use a repository variable, not a production-environment override, so both workflows
   select the same format. Unit tests and browser mocks retain their default transport.
 

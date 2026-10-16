@@ -50,6 +50,7 @@ jobs:
       - name: Build production site
         env:
           VITE_API_FORMAT: ${{ vars.VITE_API_FORMAT }}
+          VITE_MAP_MODEL_BASE_URL: ${{ vars.VITE_MAP_MODEL_BASE_URL }}
         run: npm run build
 
       - name: Validate Cloudflare package without deploying

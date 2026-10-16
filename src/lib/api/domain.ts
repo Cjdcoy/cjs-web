@@ -286,3 +286,52 @@ export interface PlayerRouteCompletion {
   fps_list: Fps[];
   total_finishes: number;
 }
+
+export const REPLAY_MARKER_KINDS = ["save", "load", "finish", "checkpoint", "fps"] as const;
+export type ReplayMarkerKind = (typeof REPLAY_MARKER_KINDS)[number];
+
+export interface ReplayMarker {
+  t: number;
+  kind: ReplayMarkerKind;
+  cp_id?: number;
+  /** Configured FPS from this marker on ("fps" markers); absent means unknown. */
+  fps?: number;
+}
+
+/** One failed-attempt window of the in-game auto-skip plan. */
+export interface ReplaySkip {
+  start_t: number;
+  target_t: number;
+  fails: number;
+}
+
+/**
+ * Decoded J4L replay. Per-sample arrays are flat and parallel: sample i is t[i] (ms),
+ * pos[3i..3i+2] (feet origin, CoD units, Z up), ang[3i..3i+2] (pitch, yaw, roll in degrees,
+ * positive pitch looks down), vel[3i..3i+2] (CoD units/s), and stance[i] (recorder stance code).
+ * Newer payloads add flags[i] (bit 4: not on ground), input[i] (recorder input mask), run_fps, and
+ * skips; older payloads omit them.
+ */
+export interface ReplaySamples {
+  run_id: number;
+  mapname: string;
+  player_id: number;
+  playername: string;
+  format_version: number;
+  tick_ms: number;
+  duration_ms: number;
+  finished: boolean;
+  t: number[];
+  pos: number[];
+  ang: number[];
+  vel: number[];
+  stance: number[];
+  markers: ReplayMarker[];
+  flags?: number[];
+  input?: number[];
+  /** Recorder aux state: 1 on ladder, 8 mantle, (aux >> 1) & 3 weapon (3: no active weapon). */
+  aux?: number[];
+  /** Run FPS when no "fps" marker applies; 0 means unknown. */
+  run_fps?: number;
+  skips?: ReplaySkip[];
+}

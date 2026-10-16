@@ -1,6 +1,7 @@
 import {
   FPS_VALUES,
   PLAYER_LEADERBOARDS,
+  REPLAY_MARKER_KINDS,
   type DifficultyData,
   type Fps,
   type GameMap,
@@ -16,6 +17,9 @@ import {
   type PlayerRouteCompletion,
   type RankLeaderboardEntry,
   type RecentRunsPage,
+  type ReplayMarker,
+  type ReplaySamples,
+  type ReplaySkip,
   type ReplayWatchAggregate,
   type ReplayWatchRankingEntry,
   type ServerPlayer,
@@ -318,6 +322,78 @@ export function normalizeReplayWatchRankings(
   });
 }
 
+export function normalizeReplaySamples(value: unknown, path: string): ReplaySamples {
+  const object = record(value, path, "$response");
+  const t = numberArray(object.t, path, "$response.t");
+  const count = t.length;
+  for (let index = 1; index < count; index += 1) {
+    if (t[index] < t[index - 1]) throw invalidResponse(path, `$response.t[${index}]`);
+  }
+  const runFps = optionalNumber(object, "run_fps", path);
+  const skips =
+    object.skips === undefined || object.skips === null
+      ? undefined
+      : array(object.skips, path, "$response.skips").map((entry, index): ReplaySkip => {
+          const at = `$response.skips[${index}]`;
+          const skip = record(entry, path, at);
+          return {
+            start_t: requiredNumber(skip, "start_t", path, at),
+            target_t: requiredNumber(skip, "target_t", path, at),
+            fails: requiredNumber(skip, "fails", path, at),
+          };
+        });
+  const markers: ReplayMarker[] = [];
+  if (object.markers !== undefined && object.markers !== null) {
+    array(object.markers, path, "$response.markers").forEach((entry, index) => {
+      const at = `$response.markers[${index}]`;
+      const marker = record(entry, path, at);
+      // Unknown kinds are newer recorder events; skipping them keeps playback working.
+      if (!REPLAY_MARKER_KINDS.some((kind) => kind === marker.kind)) return;
+      const checkpointId = optionalNumber(marker, "cp_id", path);
+      const fps = optionalNumber(marker, "fps", path);
+      markers.push({
+        t: requiredNumber(marker, "t", path, at),
+        kind: marker.kind as ReplayMarker["kind"],
+        ...(checkpointId === undefined ? {} : { cp_id: checkpointId }),
+        ...(fps === undefined || fps <= 0 ? {} : { fps }),
+      });
+    });
+  }
+
+  return {
+    run_id: requiredNumber(object, "run_id", path, "$response"),
+    mapname: requiredString(object, "mapname", path, "$response"),
+    player_id: requiredNumber(object, "player_id", path, "$response"),
+    playername: requiredString(object, "playername", path, "$response"),
+    format_version: requiredNumber(object, "format_version", path, "$response"),
+    tick_ms: requiredNumber(object, "tick_ms", path, "$response"),
+    duration_ms: requiredNumber(object, "duration_ms", path, "$response"),
+    finished: requiredBoolean(object, "finished", path, "$response"),
+    t,
+    pos: numberArray(object.pos, path, "$response.pos", count * 3),
+    ang: numberArray(object.ang, path, "$response.ang", count * 3),
+    vel: numberArray(object.vel, path, "$response.vel", count * 3),
+    stance: numberArray(object.stance, path, "$response.stance", count),
+    markers: markers.sort((left, right) => left.t - right.t),
+    ...optionalNumberArray(object, "flags", path, count),
+    ...optionalNumberArray(object, "input", path, count),
+    ...optionalNumberArray(object, "aux", path, count),
+    ...(runFps === undefined ? {} : { run_fps: runFps }),
+    ...(skips === undefined ? {} : { skips }),
+  };
+}
+
+function optionalNumberArray(
+  object: JsonRecord,
+  key: "flags" | "input" | "aux",
+  path: string,
+  count: number,
+): Partial<Record<typeof key, number[]>> {
+  const value = object[key];
+  if (value === undefined || value === null) return {};
+  return { [key]: numberArray(value, path, `$response.${key}`, count) };
+}
+
 function normalizeServer(value: unknown, path: string, at: string): GameServer {
   const object = wireStruct(value, path, at, 10);
   const playersValue = field(object, "players", 6);
@@ -477,6 +553,18 @@ function wireStruct(
 function array(value: unknown, path: string, field: string): unknown[] {
   if (!Array.isArray(value)) throw invalidResponse(path, field);
   return value;
+}
+
+function numberArray(value: unknown, path: string, at: string, length?: number): number[] {
+  const values = array(value, path, at);
+  if (length !== undefined && values.length !== length) throw invalidResponse(path, at);
+  for (let index = 0; index < values.length; index += 1) {
+    const entry = values[index];
+    if (typeof entry !== "number" || !Number.isFinite(entry)) {
+      throw invalidResponse(path, `${at}[${index}]`);
+    }
+  }
+  return values as number[];
 }
 
 function field(object: WireStruct, key: string, nativeIndex?: number): unknown {

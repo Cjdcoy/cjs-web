@@ -79,6 +79,7 @@ jobs:
         if: github.event_name == 'workflow_dispatch'
         env:
           VITE_API_FORMAT: ${{ vars.VITE_API_FORMAT }}
+          VITE_MAP_MODEL_BASE_URL: ${{ vars.VITE_MAP_MODEL_BASE_URL }}
         run: npm run build
 
       - name: Resolve pinned Wrangler version

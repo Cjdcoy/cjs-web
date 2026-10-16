@@ -15,6 +15,7 @@ import { formatDate, timeAgo } from "../../lib/format";
 import { mapDetailPath, playerDetailPath, sourceOptions, type SourceId } from "../../lib/routing";
 import { formatRunTime } from "../maps/mapDetailModel";
 import { fpsLabel } from "../players/playerProfileModel";
+import { ReplayLink } from "../../components/ReplayLink";
 import { useRecentRuns, type RecentRunsError } from "./useRecentRuns";
 import "./recent.css";
 
@@ -100,6 +101,11 @@ export function RecentPage() {
                   <Badge>{sourceLabels[source].shortLabel}</Badge>
                   <Badge>{fpsLabel(run.fps)}</Badge>
                   {run.rank > 0 && <Badge tone={rankTone(run.rank)}>{rankLabel(run)}</Badge>}
+                  <ReplayLink
+                    label={`Watch replay of ${run.mapname} in ${formatRunTime(run)}`}
+                    runId={run.run_id}
+                    source={source}
+                  />
                 </p>
                 <time
                   className="cjs-recent__when"

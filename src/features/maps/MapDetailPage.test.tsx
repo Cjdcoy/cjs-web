@@ -448,6 +448,27 @@ describe("MapDetailPage", () => {
     expect(await screen.findByRole("heading", { name: "Map unavailable" })).toBeVisible();
     expect(topsRequest).not.toHaveBeenCalled();
   });
+
+  it("links to the 3D view and to Jump4Life replays only when map models are configured", async () => {
+    vi.stubEnv("VITE_MAP_MODEL_BASE_URL", "https://models.example.test/maps/");
+    vi.spyOn(api, "maps").mockResolvedValue(alphaCheckpoints);
+    vi.spyOn(api, "mapTops").mockResolvedValue([alphaRun]);
+    window.history.replaceState(null, "", "/maps/1?source=j4l&fps=333&cp=102");
+
+    try {
+      renderMapDetail();
+
+      expect(await screen.findByRole("link", { name: "View in 3D" })).toHaveAttribute(
+        "href",
+        "/maps/1/3d?source=j4l",
+      );
+      expect(
+        await screen.findByRole("link", { name: "Watch Alpha Runner's replay, rank 1" }),
+      ).toHaveAttribute("href", "/replays/700");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
 });
 
 const replayAggregate: ReplayWatchAggregate = {

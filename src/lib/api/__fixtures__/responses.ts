@@ -285,3 +285,25 @@ export const j4lPlayersFixture: unknown = [
     },
   },
 ];
+
+export const replaySamplesFixture = {
+  run_id: 7001,
+  mapname: "mp_cjs_training",
+  player_id: 501,
+  playername: "^2Runner",
+  format_version: 11,
+  tick_ms: 50,
+  duration_ms: 100,
+  finished: true,
+  t: [0, 50, 100],
+  pos: [0, 0, 0, 5, 0, 0, 10, 0, 0],
+  ang: [0, 90, 0, 0, 90, 0, 0, 90, 0],
+  vel: [100, 0, 0, 100, 0, 0, 100, 0, 0],
+  stance: [0, 0, 1],
+  markers: [
+    { t: 100, kind: "finish" },
+    { t: 50, kind: "save" },
+    { t: 50, kind: "teleport" },
+    { t: 0, kind: "checkpoint", cp_id: 3 },
+  ],
+};

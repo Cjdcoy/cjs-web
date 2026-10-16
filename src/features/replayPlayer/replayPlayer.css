@@ -1,0 +1,468 @@
+.cjs-replay-page {
+  --cjs-stack-space: var(--cjs-space-4);
+}
+
+.cjs-replay-page__summary,
+.cjs-replay-player__transport,
+.cjs-replay-player__options,
+.cjs-replay-player__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--cjs-space-2) var(--cjs-space-3);
+}
+
+.cjs-replay-player {
+  /* Leave room for the transport controls below the view. */
+  --cjs-map-viewer-max-height: 55svh;
+  --cjs-stack-space: var(--cjs-space-3);
+}
+
+/*
+ * Cinema and full screen fill the screen: browser full screen on the player, or a fixed overlay
+ * where the Fullscreen API is unavailable. Both letterbox the 16:9 view; cinema keeps the controls
+ * below it.
+ */
+.cjs-replay-player[data-view] {
+  position: fixed;
+  z-index: var(--cjs-layer-overlay);
+  inset: 0;
+  display: flex;
+  overflow: auto;
+  padding: var(--cjs-space-4);
+  background: var(--cjs-color-page);
+}
+
+:root:has(.cjs-replay-player[data-view]) {
+  overflow: hidden;
+}
+
+.cjs-replay-player[data-view] .cjs-map-viewer {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.cjs-replay-player[data-view] .cjs-map-viewer__frame {
+  display: grid;
+  flex: 1;
+  min-height: min(12rem, 50svh);
+  place-items: center;
+  container-type: size;
+}
+
+.cjs-replay-player[data-view] .cjs-map-viewer__view {
+  width: min(100cqw, calc(100cqh * 16 / 9));
+}
+
+/* Full screen: the replay on CoD black, with the controls over its bottom edge (useViewMode). */
+.cjs-replay-player[data-view="fullscreen"] {
+  padding: 0;
+  background: var(--cjs-color-cod-0);
+}
+
+.cjs-replay-player[data-view="fullscreen"] .cjs-map-viewer__view {
+  border: 0;
+  border-radius: 0;
+}
+
+/* Still the view's description (aria-describedby reads hidden text), just not drawn. */
+.cjs-replay-player[data-view="fullscreen"] .cjs-map-viewer__help {
+  display: none;
+}
+
+/* The controls cover the bottom of the view, so the layer panel hangs from the top. */
+.cjs-replay-player[data-view="fullscreen"] .cjs-map-viewer__layers {
+  position: absolute;
+  top: var(--cjs-space-3);
+  bottom: auto;
+  width: min(20rem, calc(100% - 2 * var(--cjs-space-3)));
+  max-height: calc(100% - 2 * var(--cjs-space-3));
+  margin: 0;
+}
+
+.cjs-replay-player[data-view="fullscreen"] .cjs-replay-player__controls {
+  position: absolute;
+  inset: auto var(--cjs-space-4) var(--cjs-space-4);
+  max-height: calc(100% - 2 * var(--cjs-space-4));
+  overflow: auto;
+  background: color-mix(in srgb, var(--cjs-color-panel) 92%, transparent);
+  box-shadow: var(--cjs-shadow-elevated);
+  transition: opacity var(--cjs-duration-standard) var(--cjs-ease-standard);
+}
+
+/* Idle: invisible and click-through, but still focusable so keyboard focus brings it back. */
+.cjs-replay-player[data-controls="hidden"] .cjs-replay-player__controls {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.cjs-replay-player[data-controls="hidden"],
+.cjs-replay-player[data-controls="hidden"] * {
+  cursor: none;
+}
+
+.cjs-replay-player__controls {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: var(--cjs-space-3);
+  padding: var(--cjs-space-3) var(--cjs-space-4);
+  border: var(--cjs-border-width) solid var(--cjs-color-border);
+  border-radius: var(--cjs-radius-md);
+  background: var(--cjs-color-panel);
+}
+
+.cjs-replay-player .cjs-button__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cjs-space-2);
+}
+
+.cjs-replay-player__options .cjs-button[aria-pressed="true"] {
+  border-color: var(--cjs-color-border-strong);
+  background: var(--cjs-color-panel-hover);
+  color: var(--cjs-color-text);
+  box-shadow: var(--cjs-shadow-card);
+}
+
+.cjs-replay-player__clock {
+  font-family: var(--cjs-font-mono);
+  font-size: var(--cjs-font-size-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cjs-replay-player__options .cjs-field {
+  grid-auto-flow: column;
+  align-items: center;
+}
+
+.cjs-replay-player__timeline,
+.cjs-replay-player__legend {
+  grid-column: 1 / -1;
+}
+
+.cjs-replay-player__timeline {
+  position: relative;
+  padding-block-start: var(--cjs-space-3);
+}
+
+.cjs-replay-player__ticks {
+  position: absolute;
+  inset: 0 var(--cjs-space-2) auto;
+  height: var(--cjs-space-3);
+  pointer-events: none;
+}
+
+.cjs-replay-player__ticks span,
+.cjs-replay-player__legend span {
+  background: var(--cjs-replay-marker);
+}
+
+.cjs-replay-player__ticks span {
+  position: absolute;
+  bottom: 0;
+  width: 2px;
+  height: 50%;
+  transform: translateX(-50%);
+}
+
+.cjs-replay-player__ticks span[data-kind="checkpoint"],
+.cjs-replay-player__ticks span[data-kind="finish"] {
+  height: 100%;
+}
+
+[data-kind="save"] {
+  --cjs-replay-marker: var(--cjs-color-information);
+}
+
+[data-kind="load"] {
+  --cjs-replay-marker: var(--cjs-color-accent-secondary);
+}
+
+[data-kind="checkpoint"] {
+  --cjs-replay-marker: var(--cjs-color-accent);
+}
+
+[data-kind="finish"] {
+  --cjs-replay-marker: var(--cjs-color-podium-gold);
+}
+
+.cjs-replay-player__seek {
+  width: 100%;
+  min-height: var(--cjs-touch-target);
+  margin: 0;
+  accent-color: var(--cjs-color-accent);
+}
+
+.cjs-replay-player__seek:focus-visible {
+  outline: 0;
+  border-radius: var(--cjs-radius-sm);
+  box-shadow: var(--cjs-focus-ring);
+}
+
+.cjs-replay-player__legend {
+  margin: 0;
+  padding: 0;
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-xs);
+  list-style: none;
+}
+
+.cjs-replay-player__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cjs-space-1);
+}
+
+.cjs-replay-player__legend span {
+  width: var(--cjs-space-2);
+  height: var(--cjs-space-3);
+  border-radius: var(--cjs-radius-sm);
+}
+
+.cjs-replay-shortcuts {
+  width: min(32rem, calc(100% - 2 * var(--cjs-space-4)));
+  max-height: calc(100% - 2 * var(--cjs-space-4));
+  padding: var(--cjs-space-4) var(--cjs-space-5) var(--cjs-space-5);
+  border: var(--cjs-border-width) solid var(--cjs-color-border-strong);
+  border-radius: var(--cjs-radius-lg);
+  background: var(--cjs-color-panel);
+  box-shadow: var(--cjs-shadow-elevated);
+  color: var(--cjs-color-text);
+  font-size: var(--cjs-font-size-md);
+}
+
+.cjs-replay-shortcuts::backdrop {
+  background: var(--cjs-color-backdrop);
+}
+
+.cjs-replay-shortcuts__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cjs-space-3);
+}
+
+.cjs-replay-shortcuts h2,
+.cjs-replay-shortcuts h3 {
+  margin: 0;
+  font-size: var(--cjs-font-size-lg);
+}
+
+.cjs-replay-shortcuts h3 {
+  margin-block: var(--cjs-space-4) var(--cjs-space-2);
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-sm);
+}
+
+.cjs-replay-shortcuts dl {
+  display: grid;
+  gap: var(--cjs-space-2);
+  margin: var(--cjs-space-3) 0 0;
+}
+
+.cjs-replay-shortcuts dl > div {
+  display: grid;
+  grid-template-columns: minmax(8rem, 2fr) 3fr;
+  gap: var(--cjs-space-3);
+}
+
+.cjs-replay-shortcuts dt {
+  font-family: var(--cjs-font-mono);
+  font-weight: var(--cjs-font-weight-semibold);
+}
+
+.cjs-replay-shortcuts dd {
+  margin: 0;
+  color: var(--cjs-color-text-muted);
+}
+
+.cjs-replay-player__hud {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--cjs-space-2) var(--cjs-space-4);
+  min-width: 0;
+  margin: 0;
+  padding: var(--cjs-space-3) 0 0;
+  border: 0;
+  border-block-start: var(--cjs-border-width) solid var(--cjs-color-border);
+  font-size: var(--cjs-font-size-sm);
+}
+
+.cjs-replay-player__hud legend {
+  float: left;
+  margin-inline-end: var(--cjs-space-1);
+  color: var(--cjs-color-text-muted);
+  font-weight: var(--cjs-font-weight-semibold);
+}
+
+.cjs-replay-player__hud label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cjs-space-2);
+  min-height: var(--cjs-control-height-sm);
+  cursor: pointer;
+}
+
+.cjs-replay-player__hud input {
+  accent-color: var(--cjs-color-accent);
+}
+
+.cjs-replay-player__slider input {
+  width: 7rem;
+}
+
+.cjs-replay-player__hud label:has(input:disabled) {
+  color: var(--cjs-color-text-muted);
+  cursor: not-allowed;
+}
+
+.cjs-replay-player__hud-note,
+.cjs-replay-player__auto-skip {
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-xs);
+}
+
+.cjs-replay-player__auto-skip {
+  margin-inline-start: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+/*
+ * CoD-style HUD over the 3D view. Positions and sizes are in the game's 640×480 virtual screen
+ * relative to the centre and stretch with the view like CoD2. HUD colours are the game's own
+ * colour codes, not brand colours.
+ */
+.cjs-replay-hud {
+  /* One angle helper unit: a degree on the mod's 640-wide HUD. */
+  --hud-unit: calc(100cqw / 640);
+
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  container-type: size;
+  pointer-events: none;
+}
+
+.cjs-replay-hud__line,
+.cjs-replay-hud__bar,
+.cjs-replay-hud__speed,
+.cjs-replay-hud__jump-timer {
+  position: absolute;
+  top: calc(50% + var(--hud-y) / 480 * 100%);
+}
+
+.cjs-replay-hud__line,
+.cjs-replay-hud__bar {
+  height: calc(var(--hud-h) / 480 * 100%);
+  background: var(--cjs-color-cod-2);
+}
+
+.cjs-replay-hud__line {
+  left: clamp(0%, calc(50% + var(--hud-x) * var(--hud-unit)), 100%);
+  width: max(1px, calc(100cqw / 640));
+  transform: translate(-50%, -50%);
+}
+
+.cjs-replay-hud__bar {
+  right: calc(100% - clamp(0%, calc(50% + var(--hud-to) * var(--hud-unit)), 100%));
+  left: clamp(0%, calc(50% + var(--hud-from) * var(--hud-unit)), 100%);
+  min-width: 1px;
+  opacity: 0.25;
+  transform: translateY(-50%);
+}
+
+/* Centre line: the current view gains speed (green), sits in the deadzone (white), or loses (red). */
+.cjs-replay-hud__line[data-zone="deadzone"] {
+  background: var(--cjs-color-cod-7);
+}
+
+.cjs-replay-hud__line[data-zone="loss"] {
+  background: var(--cjs-color-cod-1);
+}
+
+.cjs-replay-hud__speed,
+.cjs-replay-hud__jump-timer {
+  left: 50%;
+  /* textscale 0.32 in hud.menu, drawn like the mod's fontscale 1.5 (12 units of the 480-tall screen). */
+  font-size: max(var(--cjs-font-size-sm), calc(1.5 * 12 / 480 * 100cqh));
+  transform: translate(-50%, -50%);
+}
+
+.cjs-replay-hud__speed,
+.cjs-replay-hud__jump-timer,
+.cjs-replay-hud__fps,
+.cjs-replay-hud__position {
+  color: var(--cjs-color-cod-7);
+  font-family: var(--cjs-font-mono);
+  font-weight: var(--cjs-font-weight-bold);
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  text-shadow: 1px 1px 0 var(--cjs-color-cod-0);
+}
+
+.cjs-replay-hud__speed[data-trend="up"],
+.cjs-replay-hud__jump-timer {
+  color: var(--cjs-color-cod-2);
+}
+
+.cjs-replay-hud__speed[data-trend="down"] {
+  color: var(--cjs-color-cod-1);
+}
+
+/* Key display: hud.menu's dim (0.2) and bright (0.9) white keys, labelled like a keyboard. */
+.cjs-replay-hud__key {
+  position: absolute;
+  top: calc(50% + var(--hud-y) / 480 * 100%);
+  left: calc(50% + var(--hud-x) / 640 * 100%);
+  display: grid;
+  width: calc(var(--hud-w) / 640 * 100%);
+  height: calc(20 / 480 * 100%);
+  place-items: center;
+  border-radius: var(--cjs-radius-sm);
+  background: var(--cjs-color-cod-7);
+  color: var(--cjs-color-cod-0);
+  font-family: var(--cjs-font-mono);
+  font-size: calc(9 / 480 * 100cqh);
+  font-weight: var(--cjs-font-weight-bold);
+  line-height: 1;
+  opacity: 0.2;
+  transform: translate(-50%, -50%);
+}
+
+/* "Ctrl" shrinks to fit one standard cell instead of widening the key. */
+.cjs-replay-hud__key[data-key="prone"] {
+  font-size: calc(7 / 480 * 100cqh);
+}
+
+.cjs-replay-hud__key[data-pressed] {
+  opacity: 0.9;
+}
+
+.cjs-replay-hud__fps {
+  position: absolute;
+  top: var(--cjs-space-3);
+  right: var(--cjs-space-3);
+  font-size: var(--cjs-font-size-sm);
+}
+
+/* poshud (_measure.gsc): top left at (8, 28), fontscale 0.75. */
+.cjs-replay-hud__position {
+  position: absolute;
+  top: calc(28 / 480 * 100%);
+  left: calc(8 / 640 * 100%);
+  font-size: max(var(--cjs-font-size-xs), calc(0.75 * 12 / 480 * 100cqh));
+  line-height: var(--cjs-line-height-tight);
+  white-space: pre;
+}
+
+@media (max-width: 47.999rem) {
+  .cjs-replay-player__controls {
+    grid-template-columns: 1fr;
+  }
+}

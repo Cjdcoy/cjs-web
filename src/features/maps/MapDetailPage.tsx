@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  Box,
   CalendarDays,
   CircleHelp,
   ExternalLink,
@@ -25,8 +26,10 @@ import {
 } from "../../components/ui";
 import { type Fps, type TopRun } from "../../lib/api";
 import { getMapImageSources } from "../../lib/mapImages";
+import { hasMapModels } from "../../lib/mapModels";
 import {
   appPaths,
+  mapViewerPath,
   playerDetailPath,
   sourceOptions,
   useBrowserLocation,
@@ -51,6 +54,7 @@ import {
   type MapProfileFps,
 } from "./mapDetailModel";
 import { useMapRecord, useMapTopRuns } from "./useMapDetail";
+import { ReplayLink } from "../../components/ReplayLink";
 import { ReplayAnalyticsPanel } from "../replay";
 import { MapVideos } from "./MapVideos";
 import { getMapVideos } from "./mapVideos";
@@ -183,6 +187,12 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
                 <Heart aria-hidden="true" size={19} fill={isFavorite ? "currentColor" : "none"} />
               </IconButton>
               <MapMediaLink value={selectedMap.video} videoCount={mapVideos.length} />
+              {hasMapModels() && (
+                <Link href={mapViewerPath(selectedMap.mapid, source)} variant="standalone">
+                  <Box aria-hidden="true" size={17} />
+                  View in 3D
+                </Link>
+              )}
             </div>
           </header>
 
@@ -450,6 +460,22 @@ function useRunColumns(source: SourceId): readonly DataTableColumn<TopRun>[] {
         align: "center" as const,
         cell: (run: TopRun) => formatRunDate(run.time_created),
       },
+      ...(source === "j4l" && hasMapModels()
+        ? [
+            {
+              id: "replay",
+              header: "Replay",
+              align: "center" as const,
+              cell: (run: TopRun) => (
+                <ReplayLink
+                  label={`Watch ${getPlainPlayerName(run.playername)}'s replay, rank ${run.rank}`}
+                  runId={run.run_id}
+                  source={source}
+                />
+              ),
+            },
+          ]
+        : []),
     ],
     [source],
   );

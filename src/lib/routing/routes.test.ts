@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   getLegacyRedirect,
   mapDetailPath,
+  mapViewerPath,
   matchRoute,
   playerDetailPath,
+  replayPath,
   routeDefinitions,
   type RouteLocation,
 } from "./routes";
@@ -20,8 +22,10 @@ describe("route table", () => {
       "/recent",
       "/maps",
       "/maps/:mapId",
+      "/maps/:mapId/3d",
       "/players",
       "/players/:playerId",
+      "/replays/:runId",
       "/favorites",
       "/about",
       "*",
@@ -34,6 +38,8 @@ describe("route table", () => {
     ["/recent", "recent"],
     ["/maps", "maps"],
     ["/players/42", "player-detail"],
+    ["/maps/42/3d", "map-viewer"],
+    ["/replays/28591", "replay"],
     ["/favorites/", "favorites"],
     ["/about", "about"],
   ] as const)("matches a direct load of %s", (pathname, routeId) => {
@@ -59,6 +65,8 @@ describe("detail route links", () => {
       "/maps/19?source=jh&lookup=cpid",
     );
     expect(playerDetailPath("12/3", "jh")).toBe("/players/12%2F3?source=jh");
+    expect(mapViewerPath(19, "j4l")).toBe("/maps/19/3d?source=j4l");
+    expect(replayPath(28591)).toBe("/replays/28591");
   });
 });
 

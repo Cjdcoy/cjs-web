@@ -27,8 +27,10 @@ export {
   appPaths,
   getLegacyRedirect,
   mapDetailPath,
+  mapViewerPath,
   matchRoute,
   playerDetailPath,
+  replayPath,
   routeDefinitions,
 } from "./routes";
 export type { AppRouteId, RouteLocation, RouteMatch } from "./routes";
