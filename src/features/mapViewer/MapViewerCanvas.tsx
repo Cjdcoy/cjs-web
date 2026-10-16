@@ -15,6 +15,7 @@ import {
   MeshBasicMaterial,
   MeshLambertMaterial,
   PerspectiveCamera,
+  Quaternion,
   Raycaster,
   Scene,
   SphereGeometry,
@@ -43,6 +44,7 @@ import {
   loadSurfaceLighting,
   type SurfaceMaterials,
 } from "./legacySurface";
+import { instanceMeshes } from "./instancing";
 import "./displayGamma";
 import "./mapViewer.css";
 
@@ -167,6 +169,8 @@ export default function MapViewerCanvas({
   const onCollisionRef = useRef(onCollision);
   const startRef = useRef({ initialPose, path });
   const objectsRef = useRef(new Map<number, Object3D>());
+  // Forces a redraw for scene changes the render loop cannot see (layers, load, resize).
+  const needsRenderRef = useRef(true);
   const [load, setLoad] = useState<LoadState>({
     status: "loading",
     phase: "download",
@@ -191,6 +195,7 @@ export default function MapViewerCanvas({
 
   useEffect(() => {
     brightnessRef.current = brightness;
+    needsRenderRef.current = true;
   }, [brightness]);
 
   useEffect(() => {
@@ -200,7 +205,8 @@ export default function MapViewerCanvas({
 
     let renderer: WebGLRenderer;
     try {
-      renderer = new WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
+      // Default power preference keeps dual-GPU laptops on the integrated GPU; dense screens skip MSAA.
+      renderer = new WebGLRenderer({ antialias: window.devicePixelRatio < 2 });
     } catch {
       setLoad({
         status: "error",
@@ -215,7 +221,7 @@ export default function MapViewerCanvas({
     const styles = getComputedStyle(host);
     const accent = new Color(styles.getPropertyValue("--cjs-color-accent").trim() || "white");
     const canvas = renderer.domElement;
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     canvas.className = "cjs-map-viewer__canvas";
     canvas.setAttribute("aria-hidden", "true");
     stage.append(canvas);
@@ -301,6 +307,7 @@ export default function MapViewerCanvas({
       camera.updateProjectionMatrix();
       weaponCamera.aspect = width / height;
       weaponCamera.updateProjectionMatrix();
+      needsRenderRef.current = true;
     };
     const observer = new ResizeObserver(resize);
     observer.observe(host);
@@ -330,6 +337,8 @@ export default function MapViewerCanvas({
       // Pointer lock can be refused (no user activation, embedded frames); keyboard flying still works.
       void Promise.resolve(canvas.requestPointerLock()).catch(() => undefined);
     };
+    // A restored context starts blank.
+    const onContextRestored = () => (needsRenderRef.current = true);
     const onLock = () => setLocked(true);
     const onUnlock = () => {
       keys.clear();
@@ -340,6 +349,7 @@ export default function MapViewerCanvas({
     window.addEventListener("blur", clearKeys);
     window.addEventListener("wheel", onWheel, { passive: true });
     canvas.addEventListener("click", onCanvasClick);
+    canvas.addEventListener("webglcontextrestored", onContextRestored);
     controls.addEventListener("lock", onLock);
     controls.addEventListener("unlock", onUnlock);
 
@@ -349,6 +359,13 @@ export default function MapViewerCanvas({
     const move = new Vector3();
     const look = new Euler(0, 0, 0, "YXZ");
     let last = performance.now();
+    // What the last drawn picture depended on; an unchanged view is not redrawn.
+    const drawnPosition = new Vector3();
+    const drawnQuaternion = new Quaternion();
+    const drawnMarker = new Vector3();
+    let drawnRunner = false;
+    let drawnWeapon = false;
+    needsRenderRef.current = true;
 
     const fly = (seconds: number) => {
       const fast = keys.has("ShiftLeft") || keys.has("ShiftRight") ? 4 : 1;
@@ -395,15 +412,31 @@ export default function MapViewerCanvas({
         marker.updateMatrixWorld(true);
       }
       if (isFree) fly(seconds);
+      const weaponOptions = frame && !isFree ? viewmodelRef.current : undefined;
+      if (weaponOptions?.visible && weaponState === "idle") void loadWeapon(weaponOptions.url);
+      // The weapon is fixed in camera space, so whether it is drawn is all of its state.
+      const drawWeapon = Boolean(weaponOptions?.visible) && weaponState === "ready";
+      if (
+        !needsRenderRef.current &&
+        drawnPosition.equals(camera.position) &&
+        drawnQuaternion.equals(camera.quaternion) &&
+        drawnMarker.equals(marker.position) &&
+        drawnRunner === runner.visible &&
+        drawnWeapon === drawWeapon
+      ) {
+        return;
+      }
+      needsRenderRef.current = false;
+      drawnPosition.copy(camera.position);
+      drawnQuaternion.copy(camera.quaternion);
+      drawnMarker.copy(marker.position);
+      drawnRunner = runner.visible;
+      drawnWeapon = drawWeapon;
       renderer.clear();
       renderer.render(scene, camera);
-      const weaponOptions = viewmodelRef.current;
-      if (weaponOptions?.visible && !isFree && frame) {
-        if (weaponState === "idle") void loadWeapon(weaponOptions.url);
-        if (weaponState === "ready") {
-          renderer.clearDepth();
-          renderer.render(weaponScene, weaponCamera);
-        }
+      if (drawWeapon) {
+        renderer.clearDepth();
+        renderer.render(weaponScene, weaponCamera);
       }
     });
 
@@ -447,11 +480,14 @@ export default function MapViewerCanvas({
             mesh.material = mapSurfaces.material(object as Mesh);
           });
         }
+        const layerItems = listLayers(root, objects, materials);
+        instanceMeshes(root, new Set(objects.values()), (mesh) => mapSurfaces.probeIndex(mesh));
         scene.add(root);
         scene.updateMatrixWorld(true);
         frameCamera(camera, root);
         if (startPose) applyPose(camera, startPose);
-        setLayers(listLayers(root, objects, materials));
+        needsRenderRef.current = true;
+        setLayers(layerItems);
         onCollisionRef.current?.(createCollisionProbe(root));
         setLoad({ status: "ready" });
       } catch (error) {
@@ -480,6 +516,7 @@ export default function MapViewerCanvas({
       window.removeEventListener("blur", clearKeys);
       window.removeEventListener("wheel", onWheel);
       canvas.removeEventListener("click", onCanvasClick);
+      canvas.removeEventListener("webglcontextrestored", onContextRestored);
       controls.removeEventListener("lock", onLock);
       controls.removeEventListener("unlock", onUnlock);
       if (controls.isLocked) controls.unlock();
@@ -505,6 +542,7 @@ export default function MapViewerCanvas({
     const object = objectsRef.current.get(id);
     if (!object) return;
     object.visible = visible;
+    needsRenderRef.current = true;
     setLayers((items) => items.map((item) => (item.id === id ? { ...item, visible } : item)));
   };
 
@@ -863,6 +901,8 @@ function createMaterialCache(): MaterialCache {
 function disposeObject(root: Object3D): void {
   const materials = new Set<Material>();
   root.traverse((object) => {
+    // Frees per-object GPU state, such as an InstancedMesh's instance buffers.
+    object.dispose();
     const { geometry, material } = object as Partial<Mesh>;
     geometry?.dispose();
     if (Array.isArray(material)) material.forEach((entry) => materials.add(entry));

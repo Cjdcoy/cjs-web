@@ -1,11 +1,14 @@
 import {
   CustomBlending,
+  DataTexture,
   DoubleSide,
+  FloatType,
   Matrix3,
   MeshBasicMaterial,
   MeshLambertMaterial,
   NoColorSpace,
   OneFactor,
+  RGBAFormat,
   SrcColorFactor,
   Vector2,
   Vector3,
@@ -40,6 +43,15 @@ export interface SurfaceLighting {
   sunDirection: Vector3;
   /** The extension's data textures by glTF texture index, without colour conversion. */
   textures: Map<number, Texture>;
+  probes: ProbePalette;
+}
+
+/** Every distinct placement probe, read per instance by probe and ambient materials. */
+export interface ProbePalette {
+  /** PALETTE_ENTRY float texels per probe: the 8 colours, then the linear ambient and the sun. */
+  texture: DataTexture;
+  /** Each probe's entry, by probeKey. */
+  entries: Map<string, number>;
 }
 
 /** A model placement's lighting sample: 8 RGB colours (0–255, interleaved) and sun visibility (0–255). */
@@ -50,7 +62,7 @@ export interface LightProbe {
 
 export type SurfaceLight =
   | { kind: "lightmap"; lightmap: Texture; sunVisibility: Texture; scale: number }
-  | { kind: "probe" | "ambient"; probe: LightProbe }
+  | { kind: "probe" | "ambient" }
   /** Colour as is. */
   | { kind: "none" }
   /** No game lighting: Lambert under the three.js scene lights. */
@@ -59,12 +71,19 @@ export type SurfaceLight =
 export interface SurfaceMaterials {
   /** The material that draws a render mesh the way the game lights it. */
   material(mesh: Mesh): Material;
+  /** The mesh's probe palette entry, for its instance (0 without a probe). */
+  probeIndex(mesh: Mesh): number;
   dispose(): void;
 }
 
 type Vec3 = [number, number, number];
 
 const SURFACE_EXTENSION = "MAPCONV_legacy_surface";
+/** The per-instance attribute holding the probe palette entry. */
+export const PROBE_ATTRIBUTE = "litProbeEntry";
+const PALETTE_ENTRY = 9;
+// WebGL2's guaranteed texture size; entries wrap across rows.
+const PALETTE_WIDTH = 2048;
 const ALPHA_CUTOFFS = { gt0: 0.5 / 255, ge128: 128 / 255, lt128: 128 / 255 } as const;
 
 /** A CoD direction (Z up) in scene space (glTF Y up): (x, y, z) → (x, z, −y). */
@@ -112,6 +131,31 @@ export function ambientLight(
     for (let corner = 0; corner < 8; corner += 1) sum += colors[corner * 3 + channel];
     return sum / 8 / 255 + (sunVisibility / 255) * sunColor[channel];
   }) as Vec3;
+}
+
+/**
+ * The palette of every distinct probe under `root`: the 8 colours and the sun visibility as the
+ * shader reads them, and the ambient light already linear, as it multiplies colour.
+ */
+export function createProbePalette(root: Object3D, sunColor: readonly number[]): ProbePalette {
+  const entries = new Map<string, number>();
+  const values: number[] = [];
+  root.traverse((object) => {
+    const probe = probeOf(object);
+    if (!probe || entries.has(probeKey(probe))) return;
+    entries.set(probeKey(probe), entries.size);
+    for (let corner = 0; corner < 8; corner += 1) {
+      values.push(...probe.colors.slice(corner * 3, corner * 3 + 3).map((value) => value / 255), 0);
+    }
+    const ambient = ambientLight(probe, sunColor).map((value) => Math.max(value, 0) ** 2.2);
+    values.push(...ambient, probe.sunVisibility / 255);
+  });
+  const height = Math.max(1, Math.ceil(values.length / 4 / PALETTE_WIDTH));
+  const data = new Float32Array(PALETTE_WIDTH * height * 4);
+  data.set(values);
+  const texture = new DataTexture(data, PALETTE_WIDTH, height, RGBAFormat, FloatType);
+  texture.needsUpdate = true;
+  return { texture, entries };
 }
 
 export function parseLegacySurface(value: unknown): LegacySurface | null {
@@ -169,13 +213,15 @@ export async function loadSurfaceLighting(gltf: GLTF): Promise<SurfaceLighting> 
       }
     }),
   );
+  // Without a sun, lit surfaces get the lightmap or probe alone.
+  const sun = isNumbers(sunColor, 3) ? sunColor : [0, 0, 0];
   return {
-    // Without a sun, lit surfaces get the lightmap or probe alone.
-    sunColor: new Vector3(...(isNumbers(sunColor, 3) ? sunColor : [0, 0, 0])),
+    sunColor: new Vector3(...sun),
     sunDirection: new Vector3(
       ...codToSceneDirection(isNumbers(sunDirection, 3) ? sunDirection : [0, 0, 1]),
     ),
     textures,
+    probes: createProbePalette(gltf.scene, sun),
   };
 }
 
@@ -187,7 +233,7 @@ export function surfaceLight(mesh: Mesh, lighting: SurfaceLighting): SurfaceLigh
   if (!surface) {
     if ((source as Partial<MeshBasicMaterial>).isMeshBasicMaterial) return { kind: "none" };
     // A flat fallback colour for a missing game material: lit like a model, or by the scene lights.
-    return probe ? { kind: "probe", probe } : { kind: "scene" };
+    return probe ? { kind: "probe" } : { kind: "scene" };
   }
   const lightmap = surface.lightmap && lighting.textures.get(surface.lightmap.texture);
   const sunVisibility = surface.lightmap && lighting.textures.get(surface.lightmap.sun);
@@ -201,19 +247,22 @@ export function surfaceLight(mesh: Mesh, lighting: SurfaceLighting): SurfaceLigh
     return { kind: "lightmap", lightmap, sunVisibility, scale: surface.lightmap.scale };
   }
   if (surface.lighting !== "unlit" && probe) {
-    return { kind: surface.lighting === "ambient" ? "ambient" : "probe", probe };
+    return { kind: surface.lighting === "ambient" ? "ambient" : "probe" };
   }
   return { kind: "none" };
 }
 
-/** Render materials for one glTF, shared between meshes that light the same way. */
+/**
+ * Render materials for one glTF, shared between meshes that light the same way. Probes are not
+ * part of the key: each instance reads its own from the palette.
+ */
 export function createSurfaceMaterials(lighting: SurfaceLighting): SurfaceMaterials {
   const cache = new Map<string, Material>();
   return {
     material(mesh) {
       const source = mesh.material as Material;
       const light = surfaceLight(mesh, lighting);
-      const key = `${source.uuid}|${light.kind}|${"probe" in light ? `${light.probe.colors.join()}:${light.probe.sunVisibility}` : ""}`;
+      const key = `${source.uuid}|${light.kind}`;
       let material = cache.get(key);
       if (!material) {
         material = createMaterial(source, light, lighting);
@@ -221,9 +270,14 @@ export function createSurfaceMaterials(lighting: SurfaceLighting): SurfaceMateri
       }
       return material;
     },
+    probeIndex(mesh) {
+      const probe = probeOf(mesh);
+      return (probe && lighting.probes.entries.get(probeKey(probe))) ?? 0;
+    },
     dispose() {
       cache.forEach((material) => material.dispose());
       lighting.textures.forEach((texture) => texture.dispose());
+      lighting.probes.texture.dispose();
     },
   };
 }
@@ -232,12 +286,27 @@ export function createSurfaceMaterials(lighting: SurfaceLighting): SurfaceMateri
 // colour by pow(light, 2.2) matches the game's colour × light.
 const APPLY_LIGHT = "diffuseColor.rgb *= pow(max(light, 0.0), vec3(2.2));\n";
 const SUN = "litSunColor * max(dot(litSunDirection, n), 0.0)";
-const NORMAL_VERTEX = "vLitNormal = normalize(mat3(modelMatrix) * normal);\n";
+// MeshBasicMaterial skips defaultnormal_vertex, so instances are rotated here. Placements scale
+// uniformly, so mat3 is enough once renormalized.
+const NORMAL_VERTEX = `vec3 litNormal = normal;
+#ifdef USE_INSTANCING
+litNormal = mat3(instanceMatrix) * litNormal;
+#endif
+vLitNormal = normalize(mat3(modelMatrix) * litNormal);
+`;
 const PROBE_GLSL = `vec3 p = n * litProbeBasis;
 p = p / max(abs(p.x), max(abs(p.y), abs(p.z))) * 0.5 + 0.5;
 vec3 light = mix(mix(mix(litProbe[0], litProbe[1], p.x), mix(litProbe[2], litProbe[3], p.x), p.y),
   mix(mix(litProbe[4], litProbe[5], p.x), mix(litProbe[6], litProbe[7], p.x), p.y), p.z)
   + litProbeSun * ${SUN};
+`;
+const PALETTE_VERTEX_HEAD = `attribute float ${PROBE_ATTRIBUTE};\nflat varying int vLitProbeEntry;\n`;
+const PALETTE_FRAGMENT_HEAD = `uniform sampler2D litProbes;
+flat varying int vLitProbeEntry;
+vec4 litProbeTexel(int k) {
+  int i = vLitProbeEntry * ${PALETTE_ENTRY} + k;
+  return texelFetch(litProbes, ivec2(i % ${PALETTE_WIDTH}, i / ${PALETTE_WIDTH}), 0);
+}
 `;
 
 /**
@@ -307,32 +376,23 @@ function createMaterial(
       "uniform vec3 litSunColor, litSunDirection;\nuniform sampler2D litLightmap, litSunVisibility;\nuniform float litLightmapScale;\nvarying vec3 vLitNormal;\nvarying vec2 vLitUv;\n";
     patch.afterColor += `{\nvec3 n = normalize(vLitNormal);\nvec3 light = texture2D(litLightmap, vLitUv).rgb * litLightmapScale + texture2D(litSunVisibility, vLitUv).r * ${SUN};\n${APPLY_LIGHT}}\n`;
   }
+  if (light.kind === "probe" || light.kind === "ambient") {
+    // The placement's probe comes from the palette, by the instance's entry.
+    uniforms.litProbes = { value: lighting.probes.texture };
+    patch.vertexHead += PALETTE_VERTEX_HEAD;
+    patch.vertex += `vLitProbeEntry = int(${PROBE_ATTRIBUTE});\n`;
+    patch.fragmentHead += PALETTE_FRAGMENT_HEAD;
+  }
   if (light.kind === "probe") {
-    const { colors, sunVisibility } = light.probe;
-    uniforms.litProbe = {
-      value: Array.from({ length: 8 }, (_, corner) =>
-        new Vector3(
-          colors[corner * 3],
-          colors[corner * 3 + 1],
-          colors[corner * 3 + 2],
-        ).divideScalar(255),
-      ),
-    };
-    uniforms.litProbeSun = { value: sunVisibility / 255 };
     uniforms.litProbeBasis = { value: PROBE_BASIS_MATRIX };
     patch.vertexHead += "varying vec3 vLitNormal;\n";
     patch.vertex += NORMAL_VERTEX;
     patch.fragmentHead +=
-      "uniform vec3 litSunColor, litSunDirection;\nuniform vec3 litProbe[8];\nuniform float litProbeSun;\nuniform mat3 litProbeBasis;\nvarying vec3 vLitNormal;\n";
-    patch.afterColor += `{\nvec3 n = normalize(vLitNormal);\n${PROBE_GLSL}${APPLY_LIGHT}}\n`;
+      "uniform vec3 litSunColor, litSunDirection;\nuniform mat3 litProbeBasis;\nvarying vec3 vLitNormal;\n";
+    patch.afterColor += `{\nvec3 n = normalize(vLitNormal);\nvec3 litProbe[8];\nfor (int k = 0; k < 8; k++) litProbe[k] = litProbeTexel(k).rgb;\nfloat litProbeSun = litProbeTexel(8).a;\n${PROBE_GLSL}${APPLY_LIGHT}}\n`;
   }
   if (light.kind === "ambient") {
-    const ambient = ambientLight(light.probe, lighting.sunColor.toArray());
-    uniforms.litAmbient = {
-      value: new Vector3(...ambient.map((value) => Math.max(value, 0) ** 2.2)),
-    };
-    patch.fragmentHead += "uniform vec3 litAmbient;\n";
-    patch.afterColor += "diffuseColor.rgb *= litAmbient;\n";
+    patch.afterColor += "diffuseColor.rgb *= litProbeTexel(8).rgb;\n";
   }
 
   if (surface?.blend === "add") {
@@ -380,6 +440,10 @@ function createMaterial(
 function surfaceOf(material: Material): LegacySurface | null {
   const extensions: unknown = material.userData.gltfExtensions;
   return isRecord(extensions) ? parseLegacySurface(extensions[SURFACE_EXTENSION]) : null;
+}
+
+function probeKey({ colors, sunVisibility }: LightProbe): string {
+  return `${colors.join()}:${sunVisibility}`;
 }
 
 /** The lightProbe and sunVisibility extras of the nearest model placement node. */

@@ -16,6 +16,7 @@ import { describe, expect, it } from "vitest";
 import {
   ambientLight,
   codToSceneDirection,
+  createProbePalette,
   createSurfaceMaterials,
   parseLegacySurface,
   probeLight,
@@ -126,6 +127,12 @@ describe("parseLegacySurface", () => {
 describe("surface lighting", () => {
   const lightmap = new Texture();
   const sunVisibility = new Texture();
+  const placement = (lightProbe: number[], sunVisibility: number) => {
+    const group = new Group();
+    group.userData = { lightProbe, sunVisibility };
+    return group;
+  };
+  const DARK = PROBE.map((value) => value / 2);
   const lighting: SurfaceLighting = {
     sunColor: new Vector3(0.5, 0.5, 0.5),
     sunDirection: new Vector3(0, 1, 0),
@@ -133,6 +140,11 @@ describe("surface lighting", () => {
       [2, lightmap],
       [3, sunVisibility],
     ]),
+    // A repeated probe gets one entry.
+    probes: createProbePalette(
+      new Group().add(placement(PROBE, 128), placement(DARK, 0), placement(PROBE, 128)),
+      [0.5, 0.5, 0.5],
+    ),
   };
 
   const surfaceMaterial = (surface: object) => {
@@ -140,16 +152,25 @@ describe("surface lighting", () => {
     material.userData.gltfExtensions = { MAPCONV_legacy_surface: surface };
     return material;
   };
-  const mesh = (material: Material, options: { uv1?: boolean; probe?: boolean } = {}) => {
+  const mesh = (
+    material: Material,
+    options: { uv1?: boolean; probe?: boolean; dark?: boolean } = {},
+  ) => {
     const geometry = new BufferGeometry();
     if (options.uv1) geometry.setAttribute("uv1", new Float32BufferAttribute([0, 0], 2));
     const result = new Mesh(geometry, material);
-    if (options.probe) {
-      const placement = new Group();
-      placement.userData = { lightProbe: PROBE, sunVisibility: 128 };
-      placement.add(result);
-    }
+    if (options.probe) placement(PROBE, 128).add(result);
+    if (options.dark) placement(DARK, 0).add(result);
     return result;
+  };
+  const compile = (material: Material) => {
+    const shader = {
+      uniforms: {},
+      vertexShader: ShaderLib.basic.vertexShader,
+      fragmentShader: ShaderLib.basic.fragmentShader,
+    } as unknown as Parameters<Material["onBeforeCompile"]>[0];
+    material.onBeforeCompile(shader, undefined as never);
+    return shader;
   };
   const lit = { lighting: "lit", lightmap: { index: 2 }, lightmapSun: { index: 3 } };
 
@@ -160,14 +181,12 @@ describe("surface lighting", () => {
       sunVisibility,
       scale: 1,
     });
-    const probe = { colors: PROBE, sunVisibility: 128 };
     expect(surfaceLight(mesh(surfaceMaterial(lit), { probe: true }), lighting)).toEqual({
       kind: "probe",
-      probe,
     });
     expect(
       surfaceLight(mesh(surfaceMaterial({ lighting: "ambient" }), { probe: true }), lighting),
-    ).toEqual({ kind: "ambient", probe });
+    ).toEqual({ kind: "ambient" });
     expect(surfaceLight(mesh(surfaceMaterial(lit)), lighting)).toEqual({ kind: "none" });
     expect(
       surfaceLight(mesh(surfaceMaterial({ lighting: "unlit" }), { probe: true }), lighting),
@@ -194,12 +213,7 @@ describe("surface lighting", () => {
     expect(first.blending).toBe(CustomBlending);
     expect(surfaces.material(mesh(new MeshStandardMaterial()))).toBeInstanceOf(MeshLambertMaterial);
 
-    const shader = {
-      uniforms: {},
-      vertexShader: ShaderLib.basic.vertexShader,
-      fragmentShader: ShaderLib.basic.fragmentShader,
-    } as unknown as Parameters<Material["onBeforeCompile"]>[0];
-    first.onBeforeCompile(shader, undefined as never);
+    const shader = compile(first);
     expect(shader.vertexShader).toContain("vLitUv = uv1;");
     expect(shader.fragmentShader).toContain("texture2D(litLightmap, vLitUv)");
     expect(shader.uniforms.litLightmap.value).toBe(lightmap);
@@ -210,15 +224,42 @@ describe("surface lighting", () => {
     const material = surfaces.material(
       mesh(surfaceMaterial({ lighting: "lit", alphaTest: "lt128" }), { probe: true }),
     );
-    const shader = {
-      uniforms: {},
-      vertexShader: ShaderLib.basic.vertexShader,
-      fragmentShader: ShaderLib.basic.fragmentShader,
-    } as unknown as Parameters<Material["onBeforeCompile"]>[0];
-    material.onBeforeCompile(shader, undefined as never);
+    const shader = compile(material);
     expect(shader.fragmentShader).toContain("if (diffuseColor.a >= alphaTest) discard;");
     expect(shader.fragmentShader).not.toContain("#include <alphatest_fragment>");
     expect(shader.fragmentShader).toContain("vec3 p = n * litProbeBasis;");
-    expect(shader.uniforms.litProbe.value).toHaveLength(8);
+    expect(shader.vertexShader).toContain("mat3(instanceMatrix)");
+    expect(shader.uniforms.litProbes.value).toBe(lighting.probes.texture);
+  });
+
+  it("shares probe and ambient materials across probes, which instances read from the palette", () => {
+    const surfaces = createSurfaceMaterials(lighting);
+    const source = surfaceMaterial(lit);
+    const bright = mesh(source, { probe: true });
+    const dark = mesh(source, { dark: true });
+    expect(surfaces.material(dark)).toBe(surfaces.material(bright));
+    expect(surfaces.probeIndex(bright)).toBe(0);
+    expect(surfaces.probeIndex(dark)).toBe(1);
+    expect(surfaces.probeIndex(mesh(source))).toBe(0);
+    const ambient = surfaces.material(
+      mesh(surfaceMaterial({ lighting: "ambient" }), { dark: true }),
+    );
+    expect(compile(ambient).fragmentShader).toContain("diffuseColor.rgb *= litProbeTexel(8).rgb;");
+  });
+
+  it("packs each palette entry as the 8 colours, the linear ambient and the sun", () => {
+    const { texture, entries } = lighting.probes;
+    expect([...entries.values()]).toEqual([0, 1]);
+    const texel = (entry: number, k: number) =>
+      Array.from(texture.image.data as Float32Array).slice(
+        (entry * 9 + k) * 4,
+        (entry * 9 + k) * 4 + 4,
+      );
+    expect(texel(0, 7).slice(0, 3)).toEqual(Array.from(new Float32Array(corner(7))));
+    const ambient = ambientLight({ colors: DARK, sunVisibility: 0 }, [0.5, 0.5, 0.5]);
+    expect(texel(1, 8)).toEqual(
+      Array.from(new Float32Array([...ambient.map((value) => value ** 2.2), 0])),
+    );
+    expect(texel(0, 8)[3]).toBeCloseTo(128 / 255, 6);
   });
 });
