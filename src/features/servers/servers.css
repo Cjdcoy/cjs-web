@@ -554,7 +554,7 @@
  * row. The visual and body wrappers drop out of layout, so the header, map,
  * address and roster sit directly in the card: wrapping on narrow screens, and
  * on wide ones a fixed grid that lines the columns up from row to row. The map
- * art only appears as a floating preview on hover.
+ * art only appears on hover, in room the row opens below its main line.
  */
 .servers-grid[data-view="list"] {
   gap: var(--cjs-space-1);
@@ -564,14 +564,37 @@
   min-height: var(--cjs-space-10);
 }
 
+/* How far the row has opened for its map preview. Registered so it animates,
+   and inherited so the image can track the row as it grows. */
+@property --server-card-preview {
+  syntax: "<length>";
+  inherits: true;
+  initial-value: 0px;
+}
+
+/*
+ * The preview opens in the bottom padding, so neither layout mode needs an
+ * extra row. Opening waits a beat, so sweeping the pointer across the list
+ * opens nothing. Closing waits a little longer, so moving straight down to the
+ * next row, even via the gap between rows, opens it just before this one
+ * closes: it grows as fast as it is pulled up and stays under the pointer.
+ */
 .servers-grid[data-view="list"] .server-card {
+  --server-card-preview-delay: 400ms;
+  --server-card-preview-open: calc(var(--cjs-space-2) + 18rem * 9 / 16);
+
   position: relative;
   display: flex;
   overflow: visible;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--cjs-space-1) var(--cjs-space-3);
-  padding: var(--cjs-space-1) var(--cjs-space-3);
+  padding: var(--cjs-space-1) var(--cjs-space-3)
+    calc(var(--cjs-space-1) + var(--server-card-preview));
+  transition:
+    border-color var(--cjs-duration-fast) var(--cjs-ease-standard),
+    --server-card-preview var(--cjs-duration-standard) var(--cjs-ease-standard)
+      var(--server-card-preview-delay);
 }
 
 .servers-grid[data-view="list"] .server-card__header,
@@ -592,22 +615,36 @@
   content: none;
 }
 
+/* The image hangs a gap below the main line and is clipped to the room opened
+   so far. It stays display: none, and so unloaded, until the row opens. */
 .servers-grid[data-view="list"] .server-card__visual-image {
-  top: calc(100% + var(--cjs-space-1));
+  top: calc(100% - var(--cjs-space-1) - var(--server-card-preview) + var(--cjs-space-2));
   left: var(--cjs-space-3);
-  z-index: 3;
   display: none;
   width: 18rem;
   height: auto;
   aspect-ratio: 16 / 9;
   border: var(--cjs-border-width) solid var(--cjs-color-border-strong);
   border-radius: var(--cjs-radius-md);
-  box-shadow: var(--cjs-shadow-elevated);
+  clip-path: inset(
+    0 0 calc(var(--server-card-preview-open) - var(--server-card-preview)) round
+      var(--cjs-radius-md)
+  );
   pointer-events: none;
+  transition: display var(--cjs-duration-standard) var(--server-card-preview-delay) allow-discrete;
 }
 
+/* Keyboard focus opens the row too; a mouse click doesn't pin it open. */
 @media (hover: hover) {
-  .servers-grid[data-view="list"] .server-card:hover .server-card__visual-image {
+  .servers-grid[data-view="list"]
+    .server-card:is(:hover, :has(:focus-visible)):has(.server-card__visual-image) {
+    --server-card-preview: var(--server-card-preview-open);
+    --server-card-preview-delay: 300ms;
+  }
+
+  .servers-grid[data-view="list"]
+    .server-card:is(:hover, :has(:focus-visible))
+    .server-card__visual-image {
     display: block;
   }
 }
