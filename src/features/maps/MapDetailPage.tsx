@@ -57,7 +57,7 @@ import { useMapRecord, useMapTopRuns } from "./useMapDetail";
 import { ReplayLink } from "../../components/ReplayLink";
 import { ReplayAnalyticsPanel } from "../replay";
 import { MapVideos } from "./MapVideos";
-import { getMapVideos } from "./mapVideos";
+import { getMapVideos } from "./mapVideoModel";
 import "./maps.css";
 
 const numberFormatter = new Intl.NumberFormat();

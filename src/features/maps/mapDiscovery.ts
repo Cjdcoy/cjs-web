@@ -7,7 +7,7 @@ import {
   stringQueryParam,
 } from "../../lib/routing";
 import { getSafeMediaUrl } from "./mapDetailModel";
-import { hasMapVideos } from "./mapVideos";
+import { hasMapVideos } from "./mapVideoModel";
 
 export const MAP_MEDIA_FILTERS = ["all", "with-media", "without-media"] as const;
 export const MAP_SORTS = ["completions", "released", "difficulty", "name"] as const;
