@@ -128,7 +128,11 @@ describe("MapDetailPage", () => {
         signal: expect.any(AbortSignal),
       }),
     );
-    expect(screen.getByRole("combobox", { name: "Route" })).toHaveValue("102");
+    expect(
+      within(screen.getByRole("radiogroup", { name: "Route" })).getByRole("radio", {
+        name: "Route 2: bonus",
+      }),
+    ).toHaveAttribute("aria-checked", "true");
     expect(
       within(screen.getByRole("radiogroup", { name: "Top runs FPS" })).getByRole("radio", {
         name: "333",
@@ -243,7 +247,7 @@ describe("MapDetailPage", () => {
         name: "333",
       }),
     ).toHaveAttribute("aria-checked", "true");
-    expect(screen.queryByRole("combobox", { name: "Route" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "Route" })).not.toBeInTheDocument();
     expect(screen.queryByText(/^Route 1/)).not.toBeInTheDocument();
   });
 
@@ -327,7 +331,7 @@ describe("MapDetailPage", () => {
     await screen.findByRole("table", { name: /at all FPS/ });
     expect(playtimeRequest).toHaveBeenCalledTimes(4);
 
-    await user.selectOptions(screen.getByRole("combobox", { name: "Route" }), "101");
+    await user.click(screen.getByRole("radio", { name: "Route 1: main" }));
     expect(
       await screen.findByRole("heading", { name: "Most played at all FPS (on Route 1: main)" }),
     ).toBeVisible();
@@ -361,9 +365,13 @@ describe("MapDetailPage", () => {
 
     renderMapDetail();
     await screen.findByRole("heading", { name: "mp_alpha", level: 1 });
-    expect(screen.getByRole("option", { name: "Route 1: main" })).toBeVisible();
-    expect(screen.getByRole("option", { name: "Route 2: bonus" })).toBeVisible();
-    await user.selectOptions(screen.getByRole("combobox", { name: "Route" }), "102");
+    const routes = screen.getByRole("radiogroup", { name: "Route" });
+    expect(within(routes).getByRole("radio", { name: "Route 1: main" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(within(routes).getByRole("radio", { name: "Route 2: bonus" })).toBeVisible();
+    await user.click(within(routes).getByRole("radio", { name: "Route 2: bonus" }));
 
     await waitFor(() => {
       expect(window.location.search).toContain("cp=102");

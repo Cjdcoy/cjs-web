@@ -537,15 +537,28 @@
   gap: var(--cjs-space-4);
 }
 
-.cjs-map-detail__controls[data-has-routes="true"] {
-  grid-template-columns: repeat(3, minmax(11rem, 1fr));
-}
-
 .cjs-map-detail__controls fieldset {
   min-width: 0;
   margin: 0;
   padding: 0;
   border: 0;
+}
+
+/* Route labels are long and some maps have many, so the route control takes a full row and wraps. */
+.cjs-map-detail__route-field {
+  grid-column: 1 / -1;
+}
+
+/* Stays a wrapping flex row on small screens, where segmented controls otherwise become equal
+   grid columns, so whole labels move to the next line instead of breaking inside a column. */
+.cjs-map-detail__routes.cjs-segmented-control {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+.cjs-map-detail__routes .cjs-segmented-control__option {
+  flex: 1 1 auto;
+  white-space: normal;
 }
 
 .cjs-map-detail__controls legend {
@@ -1023,10 +1036,6 @@
   .cjs-map-detail__loading,
   .cjs-map-detail__hero,
   .cjs-map-detail__controls {
-    grid-template-columns: 1fr;
-  }
-
-  .cjs-map-detail__controls[data-has-routes="true"] {
     grid-template-columns: 1fr;
   }
 

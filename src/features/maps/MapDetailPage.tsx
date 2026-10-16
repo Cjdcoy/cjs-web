@@ -20,7 +20,6 @@ import {
   Link,
   Panel,
   SegmentedControl,
-  Select,
   SkeletonGroup,
   VisuallyHidden,
   type DataTableColumn,
@@ -236,25 +235,6 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
                 }))}
               />
             </fieldset>
-            {mapRequest.data.checkpoints.length > 1 && (
-              <Select
-                label="Route"
-                value={String(selectedMap.cp_id)}
-                onChange={(event) => {
-                  const checkpointId = Number(event.currentTarget.value);
-                  setSelection({
-                    cp: checkpointId === mapRequest.data?.defaultCheckpointId ? 0 : checkpointId,
-                  });
-                }}
-                helperText={`${mapRequest.data.checkpoints.length} routes available`}
-              >
-                {mapRequest.data.checkpoints.map((route, index) => (
-                  <option value={route.cp_id} key={route.cp_id}>
-                    {getMapRouteLabel(route, index)}
-                  </option>
-                ))}
-              </Select>
-            )}
             <fieldset>
               <legend>FPS</legend>
               {showMostPlayed ? (
@@ -285,6 +265,26 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
                 />
               )}
             </fieldset>
+            {mapRequest.data.checkpoints.length > 1 && (
+              <fieldset className="cjs-map-detail__route-field">
+                <legend>Route</legend>
+                <SegmentedControl<string>
+                  ariaLabel="Route"
+                  className="cjs-map-detail__routes"
+                  value={String(selectedMap.cp_id)}
+                  onChange={(value) => {
+                    const checkpointId = Number(value);
+                    setSelection({
+                      cp: checkpointId === mapRequest.data?.defaultCheckpointId ? 0 : checkpointId,
+                    });
+                  }}
+                  options={mapRequest.data.checkpoints.map((route, index) => ({
+                    label: getMapRouteLabel(route, index),
+                    value: String(route.cp_id),
+                  }))}
+                />
+              </fieldset>
+            )}
           </Panel>
 
           <div
