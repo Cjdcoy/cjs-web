@@ -156,10 +156,10 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
   const { unlock: unlockSound } = sound;
   const togglePlaying = useCallback(() => {
     // Play is the user gesture that lets the browser start audio.
-    if (!playing) unlockSound();
+    if (!playing && preferences.sound) unlockSound();
     setPlaying(!playing);
     setAnnouncement(playing ? "Paused" : "Playing");
-  }, [playing, setPlaying, unlockSound]);
+  }, [playing, preferences.sound, setPlaying, unlockSound]);
 
   const changePreference = useCallback(
     (key: HudToggleKey, value: boolean) => {

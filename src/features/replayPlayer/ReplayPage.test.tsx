@@ -239,6 +239,44 @@ describe("ReplayPage", () => {
     });
   });
 
+  it("starts audio when sound is turned on during playback", async () => {
+    server.use(
+      http.get("*/sounds/sounds.json", () =>
+        HttpResponse.json({ surfaceTypes: ["none"], rules: { footsteps: {} } }),
+      ),
+    );
+    const contexts: unknown[] = [];
+    vi.stubGlobal(
+      "AudioContext",
+      class {
+        destination = {};
+        constructor() {
+          contexts.push(this);
+        }
+        createGain() {
+          return { gain: { value: 0 }, connect: vi.fn() };
+        }
+        resume() {
+          return Promise.resolve();
+        }
+        close() {
+          return Promise.resolve();
+        }
+      },
+    );
+    const user = userEvent.setup();
+    render(<ReplayPage apiClient={apiReturning(Promise.resolve(hudSamples))} runId="7001" />);
+
+    const hud = await screen.findByRole("group", { name: "HUD" });
+    const sound = within(hud).getByRole("checkbox", { name: "Sound" });
+    await user.click(sound);
+    await user.click(screen.getByRole("button", { name: "Play" }));
+    expect(contexts).toHaveLength(0);
+
+    await user.click(sound);
+    expect(contexts).toHaveLength(1);
+  });
+
   it("sets the map brightness from a remembered percentage slider", async () => {
     render(<ReplayPage apiClient={apiReturning(Promise.resolve(hudSamples))} runId="7001" />);
 

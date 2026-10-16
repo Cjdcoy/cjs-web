@@ -79,9 +79,12 @@ export function useReplaySound({
 
   useEffect(() => () => void output?.context.close().catch(() => undefined), [output]);
 
-  /** Starts (or resumes) audio from a user gesture such as the Play click. */
+  /**
+   * Starts (or resumes) audio from a user gesture such as the Play click. Not gated on `enabled`:
+   * the sound toggle calls it in the same gesture, before its new value has rendered.
+   */
   const unlock = useCallback(() => {
-    if (!enabled || typeof AudioContext === "undefined") return;
+    if (typeof AudioContext === "undefined") return;
     if (output) {
       void output.context.resume().catch(() => undefined);
       return;
@@ -91,7 +94,7 @@ export function useReplaySound({
     master.gain.value = volume;
     master.connect(context.destination);
     setOutput({ context, master });
-  }, [enabled, output, volume]);
+  }, [output, volume]);
 
   const loadBuffer = useCallback(
     (file: string) => {
