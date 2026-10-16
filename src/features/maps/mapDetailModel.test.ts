@@ -122,7 +122,7 @@ describe("map detail model", () => {
   });
 
   it("uses route names when supplied and safe numbered labels otherwise", () => {
-    expect(getMapRouteLabel({ ...checkpoints[0], ender: "hard" }, 1)).toBe("Route 2: hard");
+    expect(getMapRouteLabel({ ...checkpoints[0], ender: "hard" }, 1)).toBe("hard");
     expect(getMapRouteLabel(checkpoints[0], 0)).toBe("Route 1");
   });
 

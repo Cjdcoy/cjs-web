@@ -143,9 +143,10 @@ export function selectMapProfileFps(map: GameMap, requestedFps: MapProfileFps): 
   return MAP_PROFILE_FPS_VALUES.find((fps) => hasMapTopRuns(map, fps)) ?? "125";
 }
 
+/** The route's name, or "Route N" when it has none. */
 export function getMapRouteLabel(map: GameMap, index: number): string {
   const routeName = map.ender === null || map.ender === undefined ? "" : String(map.ender).trim();
-  return routeName ? `Route ${index + 1}: ${routeName}` : `Route ${index + 1}`;
+  return routeName || `Route ${index + 1}`;
 }
 
 export function getSafeMediaUrl(value: string | null | undefined): string | null {

@@ -530,11 +530,12 @@
   text-align: end;
 }
 
+/* Source, FPS and route share one row and wrap only when the next control does not fit. */
 .cjs-map-detail__controls {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(12rem, 1fr));
-  align-items: start;
-  gap: var(--cjs-space-4);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--cjs-space-4) var(--cjs-space-8);
 }
 
 .cjs-map-detail__controls fieldset {
@@ -544,13 +545,8 @@
   border: 0;
 }
 
-/* Route labels are long and some maps have many, so the route control takes a full row and wraps. */
-.cjs-map-detail__route-field {
-  grid-column: 1 / -1;
-}
-
-/* Stays a wrapping flex row on small screens, where segmented controls otherwise become equal
-   grid columns, so whole labels move to the next line instead of breaking inside a column. */
+/* Wraps whole route names onto a new line when the row is too narrow, also on small screens where
+   segmented controls otherwise become equal grid columns that break names mid-label. */
 .cjs-map-detail__routes.cjs-segmented-control {
   display: inline-flex;
   flex-wrap: wrap;
@@ -1034,9 +1030,12 @@
   }
 
   .cjs-map-detail__loading,
-  .cjs-map-detail__hero,
-  .cjs-map-detail__controls {
+  .cjs-map-detail__hero {
     grid-template-columns: 1fr;
+  }
+
+  .cjs-map-detail__controls > * {
+    flex-basis: 100%;
   }
 
   .cjs-map-videos__dialog {

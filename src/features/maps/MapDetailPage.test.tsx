@@ -130,9 +130,10 @@ describe("MapDetailPage", () => {
     );
     expect(
       within(screen.getByRole("radiogroup", { name: "Route" })).getByRole("radio", {
-        name: "Route 2: bonus",
+        name: "bonus",
       }),
     ).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("Route: bonus")).toBeVisible();
     expect(
       within(screen.getByRole("radiogroup", { name: "Top runs FPS" })).getByRole("radio", {
         name: "333",
@@ -279,7 +280,7 @@ describe("MapDetailPage", () => {
     await user.click(screen.getByRole("radio", { name: "Most played" }));
 
     expect(
-      await screen.findByRole("heading", { name: "Most played at all FPS (on Route 2: bonus)" }),
+      await screen.findByRole("heading", { name: "Most played at all FPS (on route bonus)" }),
     ).toBeVisible();
     expect(window.location.search).toContain("view=played");
     expect(playtimeRequest.mock.calls.map(([options]) => options.fps)).toEqual([
@@ -331,9 +332,9 @@ describe("MapDetailPage", () => {
     await screen.findByRole("table", { name: /at all FPS/ });
     expect(playtimeRequest).toHaveBeenCalledTimes(4);
 
-    await user.click(screen.getByRole("radio", { name: "Route 1: main" }));
+    await user.click(screen.getByRole("radio", { name: "main" }));
     expect(
-      await screen.findByRole("heading", { name: "Most played at all FPS (on Route 1: main)" }),
+      await screen.findByRole("heading", { name: "Most played at all FPS (on route main)" }),
     ).toBeVisible();
     expect(playtimeRequest).toHaveBeenCalledTimes(8);
     expect(playtimeRequest).toHaveBeenLastCalledWith(expect.objectContaining({ ender: "main" }));
@@ -366,12 +367,12 @@ describe("MapDetailPage", () => {
     renderMapDetail();
     await screen.findByRole("heading", { name: "mp_alpha", level: 1 });
     const routes = screen.getByRole("radiogroup", { name: "Route" });
-    expect(within(routes).getByRole("radio", { name: "Route 1: main" })).toHaveAttribute(
+    expect(within(routes).getByRole("radio", { name: "main" })).toHaveAttribute(
       "aria-checked",
       "true",
     );
-    expect(within(routes).getByRole("radio", { name: "Route 2: bonus" })).toBeVisible();
-    await user.click(within(routes).getByRole("radio", { name: "Route 2: bonus" }));
+    expect(within(routes).getByRole("radio", { name: "bonus" })).toBeVisible();
+    await user.click(within(routes).getByRole("radio", { name: "bonus" }));
 
     await waitFor(() => {
       expect(window.location.search).toContain("cp=102");
@@ -380,6 +381,28 @@ describe("MapDetailPage", () => {
       );
     });
     expect(api.maps).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to a route dropdown when a map has more than six routes", async () => {
+    const routes = Array.from({ length: 7 }, (_, index) => ({
+      ...alphaCheckpoints[0],
+      cp_id: 101 + index,
+      ender: index === 6 ? null : `route-${index + 1}`,
+    }));
+    vi.spyOn(api, "maps").mockResolvedValue(routes);
+    const topsRequest = vi.spyOn(api, "mapTops").mockResolvedValue([alphaRun]);
+    const user = userEvent.setup();
+
+    renderMapDetail();
+    const routeSelect = await screen.findByRole("combobox", { name: "Route" });
+    expect(screen.queryByRole("radiogroup", { name: "Route" })).not.toBeInTheDocument();
+    expect(within(routeSelect).getByRole("option", { name: "Route 7" })).toBeInTheDocument();
+    await user.selectOptions(routeSelect, "103");
+
+    await waitFor(() =>
+      expect(topsRequest).toHaveBeenLastCalledWith(expect.objectContaining({ checkpointId: 103 })),
+    );
+    expect(screen.getByText("Route: route-3")).toBeVisible();
   });
 
   it("cancels an obsolete route request and never presents it as the new map", async () => {

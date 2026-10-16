@@ -20,6 +20,7 @@ import {
   Link,
   Panel,
   SegmentedControl,
+  Select,
   SkeletonGroup,
   VisuallyHidden,
   type DataTableColumn,
@@ -67,6 +68,9 @@ import { getMapVideos } from "./mapVideoModel";
 import "./maps.css";
 
 const numberFormatter = new Intl.NumberFormat();
+// More routes than this switch the route picker from buttons to a dropdown. The largest live map
+// has 5 routes, so every current map gets buttons.
+const MAX_ROUTE_BUTTONS = 6;
 
 export function MapDetailPage({ mapId }: { mapId: string }) {
   const location = useBrowserLocation();
@@ -111,6 +115,13 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
       setSelection({ fps: selectedFps });
     }
   }, [selectedFps, selectedMap, selection.fps, setSelection]);
+
+  const selectRoute = (value: string) => {
+    const checkpointId = Number(value);
+    setSelection({
+      cp: checkpointId === mapRequest.data?.defaultCheckpointId ? 0 : checkpointId,
+    });
+  };
 
   const isFavorite = Boolean(
     selectedMap && hasFavorite(favoriteDocument, "map", source, selectedMap.mapid),
@@ -265,25 +276,34 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
                 />
               )}
             </fieldset>
-            {mapRequest.data.checkpoints.length > 1 && (
-              <fieldset className="cjs-map-detail__route-field">
-                <legend>Route</legend>
-                <SegmentedControl<string>
-                  ariaLabel="Route"
-                  className="cjs-map-detail__routes"
-                  value={String(selectedMap.cp_id)}
-                  onChange={(value) => {
-                    const checkpointId = Number(value);
-                    setSelection({
-                      cp: checkpointId === mapRequest.data?.defaultCheckpointId ? 0 : checkpointId,
-                    });
-                  }}
-                  options={mapRequest.data.checkpoints.map((route, index) => ({
-                    label: getMapRouteLabel(route, index),
-                    value: String(route.cp_id),
-                  }))}
-                />
-              </fieldset>
+            {mapRequest.data.checkpoints.length > MAX_ROUTE_BUTTONS ? (
+              <Select
+                label="Route"
+                value={String(selectedMap.cp_id)}
+                onChange={(event) => selectRoute(event.currentTarget.value)}
+              >
+                {mapRequest.data.checkpoints.map((route, index) => (
+                  <option value={route.cp_id} key={route.cp_id}>
+                    {getMapRouteLabel(route, index)}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              mapRequest.data.checkpoints.length > 1 && (
+                <fieldset>
+                  <legend>Route</legend>
+                  <SegmentedControl<string>
+                    ariaLabel="Route"
+                    className="cjs-map-detail__routes"
+                    value={String(selectedMap.cp_id)}
+                    onChange={selectRoute}
+                    options={mapRequest.data.checkpoints.map((route, index) => ({
+                      label: getMapRouteLabel(route, index),
+                      value: String(route.cp_id),
+                    }))}
+                  />
+                </fieldset>
+              )
             )}
           </Panel>
 
@@ -346,7 +366,7 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
                     mapRequest.data.checkpoints.length < 2
                       ? null
                       : playtimeEnder
-                        ? `on ${selectedRouteLabel(mapRequest.data.checkpoints, selectedMap.cp_id)}`
+                        ? `on route ${selectedRouteLabel(mapRequest.data.checkpoints, selectedMap.cp_id)}`
                         : "all routes"
                   }
                   source={source}
@@ -362,7 +382,7 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
                     <div>
                       {mapRequest.data.checkpoints.length > 1 && (
                         <p className="cjs-map-detail__eyebrow">
-                          {selectedRouteLabel(mapRequest.data.checkpoints, selectedMap.cp_id)}
+                          {routeEyebrow(mapRequest.data.checkpoints, selectedMap.cp_id)}
                         </p>
                       )}
                       <h2 id="map-top-runs-heading">Top runs at {fpsLabel(selectedFps)}</h2>
@@ -727,6 +747,15 @@ function selectedRouteLabel(
   const routeIndex = routes.findIndex((route) => route.cp_id === checkpointId);
   const route = routes[routeIndex];
   return route ? getMapRouteLabel(route, routeIndex) : "Route";
+}
+
+/** "Route: Extreme" for a named route, so a bare name like "250" is not read as an FPS. */
+function routeEyebrow(
+  routes: readonly NonNullable<ReturnType<typeof selectCheckpoint>>[],
+  checkpointId: number,
+): string {
+  const label = selectedRouteLabel(routes, checkpointId);
+  return /^Route \d+$/.test(label) ? label : `Route: ${label}`;
 }
 
 function mapsPath(source: SourceId): string {
