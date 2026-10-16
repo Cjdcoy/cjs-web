@@ -301,12 +301,44 @@ describe("ServersPage", () => {
     });
 
     const boss = (await screen.findByRole("link", { name: "Boss" })).closest("li");
-    expect(boss).toHaveTextContent("Admin level 5");
+    const badge = boss?.querySelector(".server-card__admin");
+    // Only the visually hidden prefix adds words; sighted users see just the number.
+    expect(badge).toHaveTextContent(/^Admin level 5$/);
+    expect(badge?.querySelector(".cjs-visually-hidden")).toHaveTextContent("Admin level");
+    expect(badge).toHaveAttribute("title", "Admin level 5");
     expect(screen.getByText("Guest").closest("li")).not.toHaveTextContent(/Admin/);
     expect(screen.getByRole("link", { name: "Regular" }).closest("li")).not.toHaveTextContent(
       /Admin/,
     );
     expect(container.querySelectorAll(".server-card__admin")).toHaveLength(1);
+  });
+
+  it("tiers admin levels so 90 and above stand apart from 60-89 and the rest", async () => {
+    const levels = [20, 59, 60, 89, 90, 101];
+    const { container } = renderPage({
+      loadServers: loadJ4l({
+        servers: [
+          {
+            domain: "tiers.example.invalid",
+            map: "mp_tiers",
+            players: levels.map((admin, index) => ({
+              playername: `Admin${admin}`,
+              playerid: 700 + index,
+              ping: 30,
+              admin,
+            })),
+            player_count: levels.length,
+            online: true,
+          },
+        ],
+      }),
+    });
+
+    await screen.findByRole("link", { name: "Admin20" });
+    const tiers = [...container.querySelectorAll(".server-card__admin")].map((badge) =>
+      badge.getAttribute("data-tier"),
+    );
+    expect(tiers).toEqual(["low", "low", "mid", "mid", "top", "top"]);
   });
 
   it("shows JumpersHeaven COD4 servers through a URL-backed game control", async () => {

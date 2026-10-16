@@ -1,5 +1,5 @@
 import { Check, CircleAlert, Clipboard, Grid2X2, List, RefreshCw, Users } from "lucide-react";
-import { useId, useMemo, useState } from "react";
+import { useId, useMemo, useState, type CSSProperties } from "react";
 import {
   Badge,
   Button,
@@ -498,6 +498,11 @@ function getServerCountry(domain: string) {
   return { code: country.code, name: country.name };
 }
 
+/** 90+ are the real power levels; 60-89 carry some power; below that is everyone else. */
+function adminTier(level: number) {
+  return level >= 90 ? "top" : level >= 60 ? "mid" : "low";
+}
+
 function ServerRoster({
   players,
   rosterKnown,
@@ -526,8 +531,14 @@ function ServerRoster({
               </Link>
             )}
             {player.id !== null && player.admin > 0 && (
-              <Badge className="server-card__admin">
-                Admin<VisuallyHidden> level</VisuallyHidden> {player.admin}
+              <Badge
+                className="server-card__admin"
+                data-tier={adminTier(player.admin)}
+                style={{ "--admin-level": player.admin } as CSSProperties}
+                title={`Admin level ${player.admin}`}
+              >
+                <VisuallyHidden>Admin level </VisuallyHidden>
+                {player.admin}
               </Badge>
             )}
             {player.ping !== null && <small>{player.ping} ms</small>}

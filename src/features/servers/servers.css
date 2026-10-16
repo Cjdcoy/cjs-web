@@ -481,10 +481,59 @@
   font-size: var(--cjs-font-size-xs);
 }
 
-/* The auto margin pulls the admin level over beside the ping. */
+/*
+ * The auto margin pulls the admin level over beside the ping. The level ramps
+ * from grey (below 60) through bronze (60-89) to a solid gold pill (90+), on
+ * fixed podium colours so it reads the same in every theme. Only the top tier
+ * is filled; the content-box minimum keeps 9, 60 and 101 the same width.
+ */
 .server-card__roster li .server-card__admin {
+  --admin-t: calc(var(--admin-level) / 59);
+
   flex: none;
+  justify-content: center;
+  box-sizing: content-box;
+  min-width: 3ch;
   margin-inline-start: auto;
+  border-color: color-mix(in srgb, currentcolor 35%, transparent);
+  background: transparent;
+  color: color-mix(
+    in oklch,
+    var(--cjs-color-text) calc(var(--admin-t) * 45%),
+    var(--cjs-color-text-subtle)
+  );
+  font-variant-numeric: tabular-nums;
+}
+
+.server-card__roster li .server-card__admin[data-tier="mid"] {
+  --admin-t: calc((var(--admin-level) - 60) / 29);
+
+  border-color: color-mix(in srgb, currentcolor 70%, transparent);
+  color: color-mix(
+    in oklch,
+    var(--cjs-color-podium-gold) calc(var(--admin-t) * 55%),
+    var(--cjs-color-podium-bronze)
+  );
+  font-weight: var(--cjs-font-weight-semibold);
+}
+
+.server-card__roster li .server-card__admin[data-tier="top"] {
+  --admin-t: calc((var(--admin-level) - 90) / 11);
+
+  border-color: var(--cjs-color-podium-gold);
+  background: color-mix(
+    in oklch,
+    var(--cjs-color-podium-gold) calc(70% + var(--admin-t) * 30%),
+    var(--cjs-color-podium-bronze)
+  );
+  box-shadow: 0 0 calc(var(--admin-t) * var(--cjs-space-3))
+    color-mix(in srgb, var(--cjs-color-podium-gold) 60%, transparent);
+  color: var(--cjs-color-page);
+  font-weight: var(--cjs-font-weight-bold);
+  /* Only 101, the highest level, gets a ring: the width is zero below it. */
+  outline: calc(max(0, var(--admin-level) - 100) * 2 * var(--cjs-border-width)) solid
+    var(--cjs-color-podium-gold);
+  outline-offset: calc(2 * var(--cjs-border-width));
 }
 
 /* Fixed-width digits keep pings aligned down the column. */
