@@ -1,7 +1,9 @@
 import {
   BufferGeometry,
   CustomBlending,
+  DoubleSide,
   Float32BufferAttribute,
+  FrontSide,
   Group,
   Mesh,
   MeshBasicMaterial,
@@ -217,6 +219,20 @@ describe("surface lighting", () => {
     expect(shader.vertexShader).toContain("vLitUv = uv1;");
     expect(shader.fragmentShader).toContain("texture2D(litLightmap, vLitUv)");
     expect(shader.uniforms.litLightmap.value).toBe(lightmap);
+  });
+
+  it("culls back faces of opaque surfaces only", () => {
+    const surfaces = createSurfaceMaterials(lighting);
+    const side = (source: Material) => surfaces.material(mesh(source, { uv1: true })).side;
+    expect(side(surfaceMaterial(lit))).toBe(FrontSide);
+    expect(side(surfaceMaterial({ ...lit, alphaTest: "ge128" }))).toBe(DoubleSide);
+    expect(side(surfaceMaterial({ ...lit, blend: "multiply" }))).toBe(DoubleSide);
+    const blended = surfaceMaterial(lit);
+    blended.transparent = true;
+    expect(side(blended)).toBe(DoubleSide);
+    const doubleSided = surfaceMaterial(lit);
+    doubleSided.side = DoubleSide;
+    expect(side(doubleSided)).toBe(DoubleSide);
   });
 
   it("inverts the alpha test for lt128 and probes per pixel", () => {

@@ -3,6 +3,7 @@ import {
   DataTexture,
   DoubleSide,
   FloatType,
+  FrontSide,
   Matrix3,
   MeshBasicMaterial,
   MeshLambertMaterial,
@@ -331,7 +332,13 @@ function createMaterial(
     transparent: source.transparent,
     opacity: source.opacity,
     alphaTest,
-    side: DoubleSide,
+    // The game culls back faces of opaque surfaces, and zero-thickness brushes (doors, trim) are
+    // back-to-back coplanar pairs that z-fight when both draw. mapconv doesn't export cull mode
+    // yet, so keep both sides only where the game typically draws cull-none.
+    side:
+      source.side === DoubleSide || source.transparent || alphaTest > 0 || surface?.blend
+        ? DoubleSide
+        : FrontSide,
     depthWrite: source.depthWrite,
     // Blended and alpha-tested surfaces are mostly decals on coplanar surfaces.
     polygonOffset: source.transparent || alphaTest > 0,
