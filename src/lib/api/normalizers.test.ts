@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   j4lPlayersFixture,
   leaderboardFixture,
+  mapPlayersPlaytimeFixture,
   mapsFixture,
   playerActivityFixture,
   playerJumpScoresFixture,
@@ -19,6 +20,7 @@ import {
 } from "./__fixtures__/responses";
 import {
   normalizeLeaderboard,
+  normalizeMapPlayersPlaytime,
   normalizeMaps,
   normalizePlayerActivity,
   normalizePlayerJumpScores,
@@ -161,6 +163,16 @@ describe("API response normalizers", () => {
     });
   });
 
+  it("normalizes map players playtime with numeric ids and a null empty result", () => {
+    expect(normalizeMapPlayersPlaytime(mapPlayersPlaytimeFixture, path)).toEqual([
+      { player_id: 501, player_name: "^2Runner", time_played: 7_440 },
+    ]);
+    expect(normalizeMapPlayersPlaytime([[" 101", "502", "Tuple", 60, ""]], path)).toEqual([
+      { player_id: 502, player_name: "Tuple", time_played: 60 },
+    ]);
+    expect(normalizeMapPlayersPlaytime(null, path)).toEqual([]);
+  });
+
   it("normalizes a successful null player position response as no placement", () => {
     expect(normalizePlayerPositions(null, path)).toEqual([]);
   });
@@ -266,6 +278,11 @@ describe("API response normalizers", () => {
     ["position", () => normalizePlayerPositions([{ rank: 1 }], path)],
     ["jump scores", () => normalizePlayerJumpScores({ player_id: 1 }, path)],
     ["routes", () => normalizePlayerRoutes([{ map_id: 1 }], path)],
+    [
+      "map playtime",
+      () =>
+        normalizeMapPlayersPlaytime([{ player_id: "abc", player_name: "x", time_played: 1 }], path),
+    ],
     ["rank", () => normalizePlayerRank({ player_id: 1 }, path)],
     ["activity", () => normalizePlayerActivity({ player_id: 1 }, path)],
     ["replay aggregate", () => normalizeReplayWatchAggregate({ replay_count: "many" }, path)],

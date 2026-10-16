@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   leaderboardFixture,
+  mapPlayersPlaytimeFixture,
   mapsFixture,
   playerActivityFixture,
   playerJumpScoresFixture,
@@ -51,6 +52,9 @@ describe("typed CJS API endpoints", () => {
     await expect(
       api.mapTops({ source: "jh", checkpointId: "route / 1", fps: "125", limit: 2 }),
     ).resolves.toHaveLength(1);
+    await expect(
+      api.mapPlayersPlaytime({ source: "j4l", mapId: 101, fps: "0", ender: "hard", limit: 50 }),
+    ).resolves.toEqual([{ player_id: 501, player_name: "^2Runner", time_played: 7_440 }]);
     await expect(api.players({ source: "jh", sort: "last-seen" })).resolves.toHaveLength(1);
     await expect(
       api.searchPlayers({ source: "jh", name: "^1 Runner / ?", limit: 2 }),
@@ -102,6 +106,7 @@ describe("typed CJS API endpoints", () => {
       "https://example.test/proxy/api/v1/leaderboard/rank-xp?source=j4l&limit=2",
       "https://example.test/proxy/api/v1/map/all?source=jh",
       "https://example.test/proxy/api/v1/map/tops?source=jh&fps=125&cpid=route+%2F+1&limit=2",
+      "https://example.test/proxy/api/v1/map/players-playtime?source=j4l&mapid=101&fps=0&ender=hard&limit=50",
       "https://example.test/proxy/api/v1/player/all?source=jh&sort=last-seen",
       "https://example.test/proxy/api/v1/player/id-from-name?source=jh&name=%5E1+Runner+%2F+%3F&limit=2",
       "https://example.test/proxy/api/v1/player/performance-stats?source=jh&playerid=501",
@@ -363,6 +368,7 @@ function responseFor(pathname: string): unknown {
   if (pathname.includes("/leaderboard/")) return leaderboardFixture;
   if (pathname.endsWith("/map/all")) return mapsFixture;
   if (pathname.endsWith("/map/tops")) return topRunsFixture;
+  if (pathname.endsWith("/map/players-playtime")) return mapPlayersPlaytimeFixture;
   if (pathname.endsWith("/player/all") || pathname.endsWith("/player/id-from-name")) {
     return playersFixture;
   }

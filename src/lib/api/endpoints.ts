@@ -14,6 +14,7 @@ import type {
   GameMap,
   LeaderboardEntry,
   LeaderboardKind,
+  MapPlayerPlaytime,
   Player,
   PlayerActivitySummary,
   PlayerLeaderboard,
@@ -41,6 +42,7 @@ import type {
 import { invalidArgument, invalidResponse } from "./errors";
 import {
   normalizeLeaderboard,
+  normalizeMapPlayersPlaytime,
   normalizeMaps,
   normalizePlayerActivity,
   normalizePlayerJumpScores,
@@ -66,6 +68,7 @@ const PATHS = {
   trackerServers: "/api/v1/tracker/servers",
   maps: "/api/v1/map/all",
   mapTops: "/api/v1/map/tops",
+  mapPlayersPlaytime: "/api/v1/map/players-playtime",
   recentRuns: "/api/v1/runs/recent",
   players: "/api/v1/player/all",
   playerSearch: "/api/v1/player/id-from-name",
@@ -106,6 +109,10 @@ export interface CjsApi {
   mapTops(
     options: RequestContext & { checkpointId: number | string; fps: Fps; limit?: number },
   ): Promise<TopRun[]>;
+  /** `ender` limits playtime to one route's checkpoints; omit it for every route. */
+  mapPlayersPlaytime(
+    options: RequestContext & { mapId: number; fps: Fps; ender?: string; limit?: number },
+  ): Promise<MapPlayerPlaytime[]>;
   recentRuns(
     options: RequestContext & { fps?: Fps; limit?: number; cursor?: string },
   ): Promise<RecentRunsPage>;
@@ -234,6 +241,26 @@ export function createCjsApi(
           limit: options.limit,
         }),
         PATHS.mapTops,
+      );
+    },
+
+    async mapPlayersPlaytime(options) {
+      const game = context(options, PATHS.mapPlayersPlaytime);
+      assertCapability("maps", options.source, game);
+      requireFps(options.fps, PATHS.mapPlayersPlaytime);
+      limit(options.limit, PATHS.mapPlayersPlaytime);
+      if (!Number.isSafeInteger(options.mapId) || options.mapId <= 0) {
+        throw invalidArgument(PATHS.mapPlayersPlaytime, "mapId");
+      }
+      return normalizeMapPlayersPlaytime(
+        await get(client, PATHS.mapPlayersPlaytime, options, {
+          source: options.source,
+          mapid: options.mapId,
+          fps: options.fps,
+          ender: options.ender,
+          limit: options.limit,
+        }),
+        PATHS.mapPlayersPlaytime,
       );
     },
 

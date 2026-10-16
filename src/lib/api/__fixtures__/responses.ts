@@ -94,6 +94,11 @@ const topRunResponse = {
 
 export const topRunsFixture: unknown = [topRunResponse];
 
+/** Live `/map/players-playtime` shape: string ids, playtime in seconds. */
+export const mapPlayersPlaytimeFixture: unknown = [
+  { map_id: "101", player_id: "501", player_name: "^2Runner", time_played: 7_440, ender: "" },
+];
+
 export const recentRunsFixture: unknown = {
   runs: [
     topRunResponse,

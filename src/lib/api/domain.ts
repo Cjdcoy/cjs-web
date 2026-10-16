@@ -132,6 +132,14 @@ export interface GameMap {
   video?: string | null;
 }
 
+/** One player's playtime on a map at one FPS, from `/map/players-playtime`. */
+export interface MapPlayerPlaytime {
+  player_id: number;
+  player_name: string;
+  /** Seconds, summed over the player's runs, each counted up to its latest checkpoint. */
+  time_played: number;
+}
+
 export interface PlayerActivitySummary {
   player_id: number;
   run_attempt_ms: number;

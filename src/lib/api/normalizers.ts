@@ -7,6 +7,7 @@ import {
   type GameMap,
   type GameServer,
   type LeaderboardEntry,
+  type MapPlayerPlaytime,
   type Player,
   type PlayerActivitySummary,
   type PlayerLeaderboard,
@@ -59,6 +60,24 @@ export function normalizeMaps(value: unknown, path: string): GameMap[] {
   return array(value, path, "$response").map((map, index) =>
     normalizeMap(map, path, `$response[${index}]`),
   );
+}
+
+export function normalizeMapPlayersPlaytime(value: unknown, path: string): MapPlayerPlaytime[] {
+  // The API encodes an empty result as null, and player ids as decimal strings.
+  if (value === null) return [];
+  return array(value, path, "$response").map((entry, index) => {
+    const at = `$response[${index}]`;
+    const object = wireStruct(entry, path, at, 4);
+    const playerId = Number(requiredString(object, "player_id", path, at, 1));
+    if (!Number.isSafeInteger(playerId) || playerId <= 0) {
+      throw invalidResponse(path, `${at}.player_id`);
+    }
+    return {
+      player_id: playerId,
+      player_name: requiredString(object, "player_name", path, at, 2),
+      time_played: requiredNumber(object, "time_played", path, at, 3),
+    };
+  });
 }
 
 export function normalizePlayers(value: unknown, path: string): Player[] {

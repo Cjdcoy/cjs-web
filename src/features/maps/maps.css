@@ -929,6 +929,25 @@
   font-size: var(--cjs-font-size-sm);
 }
 
+.cjs-map-detail__view-switch {
+  margin-block-end: var(--cjs-space-4);
+}
+
+.cjs-map-detail__view-switch .cjs-segmented-control__option {
+  gap: var(--cjs-space-2);
+}
+
+.cjs-map-detail__heading-scope {
+  color: var(--cjs-color-text-muted);
+  font-weight: var(--cjs-font-weight-medium);
+}
+
+.cjs-map-detail__note {
+  margin: var(--cjs-space-1) 0 0;
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-sm);
+}
+
 @keyframes cjs-maps-spin {
   to {
     transform: rotate(1turn);

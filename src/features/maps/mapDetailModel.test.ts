@@ -8,6 +8,9 @@ import {
   getPlainPlayerName,
   getSafeMediaUrl,
   hasMapTopRuns,
+  formatPlaytime,
+  getPlaytimeRouteEnder,
+  mergePlaytime,
   parseMapRouteId,
   resolveMapRecord,
   selectCheckpoint,
@@ -22,6 +25,53 @@ const checkpoints: GameMap[] = [
 ];
 
 describe("map detail model", () => {
+  it.each([
+    [0, "0s"],
+    [59, "59s"],
+    [59.9, "59s"],
+    [60, "0h 01m"],
+    [3_599, "0h 59m"],
+    [3_600, "1h 00m"],
+    [86_400, "24h 00m"],
+    [90_061, "25h 01m"],
+    [-1, "Not available"],
+  ])("formats %s seconds of playtime as %s", (seconds, expected) => {
+    expect(formatPlaytime(seconds)).toBe(expected);
+  });
+
+  it("filters playtime by route only for named routes on multi-route maps", () => {
+    const hard = { mapid: 1, mapname: "m", cp_id: 1, ender: " hard " };
+    const unnamed = { mapid: 1, mapname: "m", cp_id: 2, ender: null };
+    const multi = { mapId: 1, defaultCheckpointId: 1, checkpoints: [hard, unnamed] };
+    const single = { mapId: 1, defaultCheckpointId: 1, checkpoints: [hard] };
+
+    expect(getPlaytimeRouteEnder(multi, hard)).toBe("hard");
+    expect(getPlaytimeRouteEnder(multi, unnamed)).toBeNull();
+    expect(getPlaytimeRouteEnder(single, hard)).toBeNull();
+  });
+
+  it("merges per-FPS playtime by player, summing seconds and keeping the FPS list", () => {
+    expect(
+      mergePlaytime([
+        [
+          "125",
+          [
+            { player_id: 1, player_name: "One", time_played: 100 },
+            { player_id: 2, player_name: "Two", time_played: 90 },
+          ],
+        ],
+        ["250", []],
+        ["0", [{ player_id: 2, player_name: "Two (mix)", time_played: 30 }]],
+        ["333", [{ player_id: 3, player_name: "Three", time_played: 100 }]],
+      ]),
+    ).toEqual([
+      { player_id: 2, player_name: "Two", time_played: 120, fps: ["125", "0"] },
+      { player_id: 1, player_name: "One", time_played: 100, fps: ["125"] },
+      { player_id: 3, player_name: "Three", time_played: 100, fps: ["333"] },
+    ]);
+    expect(mergePlaytime([])).toEqual([]);
+  });
+
   it("resolves map and checkpoint lookup links into a stable ordered record", () => {
     const byMap = resolveMapRecord(checkpoints, 1, "mapid");
     const byCheckpoint = resolveMapRecord(checkpoints, 101, "cpid");

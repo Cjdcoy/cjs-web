@@ -247,6 +247,113 @@ describe("MapDetailPage", () => {
     expect(screen.queryByText(/^Route 1/)).not.toBeInTheDocument();
   });
 
+  it("loads Most played lazily per route, sums every FPS for All and caches each FPS", async () => {
+    vi.spyOn(api, "maps").mockResolvedValue(alphaCheckpoints);
+    vi.spyOn(api, "mapTops").mockResolvedValue([
+      alphaRun,
+      topRun({ player_id: 7, playername: "Slower Alpha", rank: 4 }),
+    ]);
+    const playtimeRequest = vi.spyOn(api, "mapPlayersPlaytime").mockImplementation(({ fps }) =>
+      Promise.resolve(
+        fps === "125"
+          ? [
+              { player_id: 7, player_name: "^1Alpha ^2Runner", time_played: 3_600 },
+              { player_id: 8, player_name: "Beta Runner", time_played: 4_000 },
+            ]
+          : fps === "333"
+            ? [{ player_id: 7, player_name: "^1Alpha ^2Runner", time_played: 1_500 }]
+            : [],
+      ),
+    );
+    const user = userEvent.setup();
+    window.history.replaceState(null, "", "/maps/1?source=j4l&cp=102");
+
+    renderMapDetail();
+    await screen.findByRole("heading", { name: "Top runs at 125 FPS" });
+    expect(playtimeRequest).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("radio", { name: "Most played" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Most played at all FPS (on Route 2: bonus)" }),
+    ).toBeVisible();
+    expect(window.location.search).toContain("view=played");
+    expect(playtimeRequest.mock.calls.map(([options]) => options.fps)).toEqual([
+      "125",
+      "250",
+      "333",
+      "0",
+    ]);
+    expect(playtimeRequest).toHaveBeenCalledWith({
+      source: "j4l",
+      mapId: 1,
+      fps: "125",
+      ender: "bonus",
+      limit: 100,
+    });
+    const allTable = await screen.findByRole("table", {
+      name: /by playtime on mp_alpha at all FPS/,
+    });
+    const allRows = within(allTable).getAllByRole("row").slice(1);
+    expect(allRows[0]).toHaveAccessibleName("Rank 1, Alpha Runner");
+    expect(within(allRows[0]).getByText("1h 25m")).toBeVisible();
+    expect(within(allRows[0]).getByText("125, 333")).toBeVisible();
+    expect(allRows[1]).toHaveAccessibleName("Rank 2, Beta Runner");
+    expect(within(allRows[1]).getByText("1h 06m")).toBeVisible();
+    expect(within(allRows[0]).getByRole("link", { name: "Alpha Runner" })).toHaveAttribute(
+      "href",
+      "/players/7?source=j4l",
+    );
+
+    await user.click(
+      within(screen.getByRole("radiogroup", { name: "Most played FPS" })).getByRole("radio", {
+        name: "333",
+      }),
+    );
+    const fpsTable = await screen.findByRole("table", { name: /at 333 FPS/ });
+    expect(
+      within(fpsTable).getByRole("columnheader", { name: "Best time on route" }),
+    ).toBeVisible();
+    expect(within(fpsTable).getByText("20.951 (#1)")).toBeVisible();
+    expect(api.mapTops).toHaveBeenLastCalledWith(
+      expect.objectContaining({ checkpointId: 102, fps: "333" }),
+    );
+
+    await user.click(
+      within(screen.getByRole("radiogroup", { name: "Most played FPS" })).getByRole("radio", {
+        name: "All FPS combined",
+      }),
+    );
+    await screen.findByRole("table", { name: /at all FPS/ });
+    expect(playtimeRequest).toHaveBeenCalledTimes(4);
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Route" }), "101");
+    expect(
+      await screen.findByRole("heading", { name: "Most played at all FPS (on Route 1: main)" }),
+    ).toBeVisible();
+    expect(playtimeRequest).toHaveBeenCalledTimes(8);
+    expect(playtimeRequest).toHaveBeenLastCalledWith(expect.objectContaining({ ender: "main" }));
+  });
+
+  it("shows an empty Most played state for JumpersHeaven maps without playtime", async () => {
+    vi.spyOn(api, "maps").mockResolvedValue([betaMap]);
+    vi.spyOn(api, "mapTops").mockResolvedValue([betaRun]);
+    vi.spyOn(api, "mapPlayersPlaytime").mockResolvedValue([]);
+    window.history.replaceState(null, "", "/maps/2?view=played&pfps=125");
+
+    renderMapDetail("2");
+
+    expect(
+      await screen.findByRole("heading", { name: "No playtime recorded at 125 FPS on mp_beta" }),
+    ).toBeVisible();
+    expect(api.mapPlayersPlaytime).toHaveBeenCalledWith({
+      source: "jh",
+      mapId: 2,
+      fps: "125",
+      limit: 100,
+    });
+  });
+
   it("shows route selection only for multi-route maps and requests the selected route", async () => {
     vi.spyOn(api, "maps").mockResolvedValue(alphaCheckpoints);
     const topsRequest = vi.spyOn(api, "mapTops").mockResolvedValue([alphaRun]);
