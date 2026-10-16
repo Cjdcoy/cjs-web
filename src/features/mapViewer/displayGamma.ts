@@ -12,9 +12,14 @@ import { ShaderChunk } from "three";
 const GAMMA =
   "if (toneMappingExposure != 1.0) gl_FragColor.rgb = pow(max(gl_FragColor.rgb, 0.0), vec3(1.0 / toneMappingExposure));";
 
-// A hot-reloaded module must not patch the shared chunks twice.
-if (!ShaderChunk.colorspace_fragment.includes(GAMMA)) {
-  ShaderChunk.colorspace_pars_fragment +=
-    "\n#ifndef TONE_MAPPING\nuniform float toneMappingExposure;\n#endif\n";
-  ShaderChunk.colorspace_fragment += `\n${GAMMA}\n`;
-}
+// HMR re-runs this module, so always rebuild from the pristine chunks, kept once on ShaderChunk.
+const holder = ShaderChunk as typeof ShaderChunk & {
+  __cjsGammaBase?: { pars: string; frag: string };
+};
+const base = (holder.__cjsGammaBase ??= {
+  pars: ShaderChunk.colorspace_pars_fragment,
+  frag: ShaderChunk.colorspace_fragment,
+});
+// three declares the uniform in tonemapping_pars_fragment only when TONE_MAPPING is defined.
+ShaderChunk.colorspace_pars_fragment = `${base.pars}\n#ifndef TONE_MAPPING\nuniform float toneMappingExposure;\n#endif\n`;
+ShaderChunk.colorspace_fragment = `${base.frag}\n${GAMMA}\n`;
