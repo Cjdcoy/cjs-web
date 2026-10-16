@@ -51,8 +51,8 @@ describe("server dashboard normalizer", () => {
           game_type: 42,
           players: [
             null,
-            { playername: "^2Runner", playerid: 7, ping: 38 },
-            { playername: "Ghost", playerid: 0, ping: 12 },
+            { playername: "^2Runner", playerid: 7, ping: 38, admin: 5 },
+            { playername: "Ghost", playerid: 0, ping: 12, admin: -1 },
           ],
           player_count: "two",
           online: "yes",
@@ -72,8 +72,8 @@ describe("server dashboard normalizer", () => {
       online: false,
       playerCount: 2,
       players: [
-        { id: 7, name: "^2Runner", ping: 38 },
-        { id: null, name: "Ghost", ping: 12 },
+        { admin: 5, id: 7, name: "^2Runner", ping: 38 },
+        { admin: 0, id: null, name: "Ghost", ping: 12 },
       ],
       port: null,
     });

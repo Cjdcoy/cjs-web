@@ -1,13 +1,4 @@
-import {
-  Check,
-  ChevronDown,
-  CircleAlert,
-  Clipboard,
-  Grid2X2,
-  List,
-  RefreshCw,
-  Server,
-} from "lucide-react";
+import { Check, CircleAlert, Clipboard, Grid2X2, List, RefreshCw, Users } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import {
   Badge,
@@ -20,6 +11,7 @@ import {
   IconButton,
   Link,
   SegmentedControl,
+  VisuallyHidden,
 } from "../../components/ui";
 import { getMapImageSources } from "../../lib/mapImages";
 import {
@@ -39,7 +31,7 @@ import {
   type ServerPlayerViewModel,
   type ServerViewModel,
 } from "./serverModel";
-import { useLiveServers, type ServerLoader } from "./useLiveServers";
+import { useLiveServers, type LiveServersState, type ServerLoader } from "./useLiveServers";
 import "./servers.css";
 
 type ServerView = "grid" | "list";
@@ -106,6 +98,10 @@ export function ServersPage({ loadServers, pollIntervalMs, staleAfterMs }: Serve
   ] as const;
   const visibleSourceGroups: ReadonlyArray<(typeof sourceGroups)[number]> =
     filters.game === "cod4" ? sourceGroups.filter(({ source }) => source === "jh") : sourceGroups;
+  // A source still on its first request holds skeleton cards in the shared grid.
+  const loadingSourceCount = visibleSourceGroups.filter(
+    ({ state }) => !state.data && state.initialLoading,
+  ).length;
   const states = sourceGroups.map(({ state }) => state);
   const dashboards = states.flatMap(({ data }) => (data ? [data] : []));
   const hasData = dashboards.length > 0;
@@ -133,17 +129,7 @@ export function ServersPage({ loadServers, pollIntervalMs, staleAfterMs }: Serve
 
   return (
     <div className="servers-page">
-      <header className="servers-page__header cjs-page-heading">
-        <div className="servers-page__eyebrow cjs-page-heading__eyebrow">
-          <Server aria-hidden="true" size={18} />
-          <span>Live activity</span>
-        </div>
-        <h1>Live servers</h1>
-        <p className="cjs-page-heading__description">
-          See current JumpersHeaven and Jump4Life servers, maps, player counts, and connection
-          details.
-        </p>
-      </header>
+      <h1 className="cjs-visually-hidden">Live servers</h1>
 
       <section className="servers-toolbar" aria-label="Server display controls">
         <div className="servers-toolbar__toggles">
@@ -238,7 +224,31 @@ export function ServersPage({ loadServers, pollIntervalMs, staleAfterMs }: Serve
             </div>
           )}
 
-          {reportingServers === 0 ? (
+          {visibleSourceGroups.map(({ source, state }) => (
+            <ServerSourceNotice key={source} source={source} state={state} />
+          ))}
+
+          {matchingServers + loadingSourceCount > 0 ? (
+            <div
+              className="servers-grid"
+              data-view={filters.view}
+              aria-label={`${matchingServers} matching live ${matchingServers === 1 ? "server" : "servers"}`}
+            >
+              {visibleSourceGroups.map(({ source, servers }) =>
+                servers.map((server) => (
+                  <ServerCard server={server} source={source} key={`${source}:${server.id}`} />
+                )),
+              )}
+              {Array.from({ length: loadingSourceCount * 2 }, (_, index) => (
+                <div
+                  className="servers-card-skeleton cjs-skeleton"
+                  data-variant="card"
+                  aria-hidden="true"
+                  key={`skeleton:${index}`}
+                />
+              ))}
+            </div>
+          ) : reportingServers === 0 ? (
             <EmptyState
               className="servers-page__state"
               title="No servers are reporting"
@@ -249,7 +259,7 @@ export function ServersPage({ loadServers, pollIntervalMs, staleAfterMs }: Serve
                 </Button>
               }
             />
-          ) : matchingServers === 0 ? (
+          ) : (
             <EmptyState
               className="servers-page__state"
               title={
@@ -274,18 +284,6 @@ export function ServersPage({ loadServers, pollIntervalMs, staleAfterMs }: Serve
                 )
               }
             />
-          ) : (
-            <div className="server-source-groups">
-              {visibleSourceGroups.map((group) => (
-                <ServerSourceGroup
-                  key={group.source}
-                  source={group.source}
-                  state={group.state}
-                  servers={group.servers}
-                  view={filters.view}
-                />
-              ))}
-            </div>
           )}
         </>
       )}
@@ -293,80 +291,27 @@ export function ServersPage({ loadServers, pollIntervalMs, staleAfterMs }: Serve
   );
 }
 
-function ServerSourceGroup({
-  source,
-  state,
-  servers,
-  view,
-}: {
-  source: SourceId;
-  state: ReturnType<typeof useLiveServers>;
-  servers: readonly ServerViewModel[];
-  view: ServerView;
-}) {
-  const [expanded, setExpanded] = useState(true);
-  const contentId = `servers-${source}-content`;
+/** A failed source warns in place; the other source's servers stay usable. */
+function ServerSourceNotice({ source, state }: { source: SourceId; state: LiveServersState }) {
+  if (!state.error || (!state.data && state.initialLoading)) return null;
 
   return (
-    <section className="server-source-group" aria-labelledby={`servers-${source}`}>
-      <header className="server-source-group__header">
-        <h2 id={`servers-${source}`}>
-          <button
-            type="button"
-            className="server-source-group__toggle"
-            aria-controls={contentId}
-            aria-expanded={expanded}
-            onClick={() => setExpanded((current) => !current)}
-          >
-            <span className="server-source-group__marker" data-source={source} aria-hidden="true" />
-            <span>{sourceNames[source]}</span>
-            <ChevronDown size={18} strokeWidth={2} aria-hidden="true" />
-          </button>
-        </h2>
-        {state.data && (
-          <span>
-            {servers.length} {servers.length === 1 ? "server" : "servers"}
-          </span>
-        )}
-      </header>
-
-      <div id={contentId} className="server-source-group__content" hidden={!expanded}>
-        {!state.data && state.initialLoading && <ServerSkeleton count={2} />}
-
-        {!state.data && !state.initialLoading && state.error && (
-          <ErrorState
-            title={`${sourceNames[source]} is unavailable`}
-            description={state.error}
-            retryLabel={`Retry ${sourceNames[source]}`}
-            onRetry={state.refresh}
-          />
-        )}
-
-        {state.data && state.error && (
-          <div className="servers-page__notice" data-tone="warning" role="alert">
-            <div>
-              <strong>{sourceNames[source]} refresh failed.</strong>
-              <span>{state.error} Showing the last successful update.</span>
-            </div>
-            <Button variant="ghost" size="small" onClick={state.refresh}>
-              Try again
-            </Button>
-          </div>
-        )}
-
-        {state.data && servers.length > 0 && (
-          <div
-            className="servers-grid"
-            data-view={view}
-            aria-label={`${sourceNames[source]}: ${servers.length} matching live servers`}
-          >
-            {servers.map((server) => (
-              <ServerCard server={server} source={source} key={server.id} />
-            ))}
-          </div>
-        )}
-      </div>
-    </section>
+    <div className="servers-page__notice" data-tone="warning" role="alert">
+      {state.data ? (
+        <div>
+          <strong>{sourceNames[source]} refresh failed.</strong>
+          <span>{state.error} Showing the last successful update.</span>
+        </div>
+      ) : (
+        <div>
+          <strong>{sourceNames[source]} is unavailable.</strong>
+          <span>{state.error}</span>
+        </div>
+      )}
+      <Button variant="ghost" size="small" onClick={state.refresh}>
+        {state.data ? "Try again" : `Retry ${sourceNames[source]}`}
+      </Button>
+    </div>
   );
 }
 
@@ -471,7 +416,7 @@ function ServerCard({ server, source }: { server: ServerViewModel; source: Sourc
             label={country.name}
             size="large"
           />
-          <h3 id={headingId}>{server.domain}</h3>
+          <h2 id={headingId}>{server.domain}</h2>
           <span
             className="server-card__status"
             data-state={server.online ? "online" : "offline"}
@@ -488,6 +433,15 @@ function ServerCard({ server, source }: { server: ServerViewModel; source: Sourc
             </a>
           ) : (
             <strong>{server.mapName}</strong>
+          )}
+          {server.playerCount > 0 && (
+            <span className="server-card__count">
+              <Users size={15} aria-hidden="true" />
+              {server.playerCount}
+              <VisuallyHidden>
+                {server.playerCount === 1 ? " player online" : " players online"}
+              </VisuallyHidden>
+            </span>
           )}
         </div>
       </div>
@@ -561,10 +515,7 @@ function ServerRoster({
 
   return (
     <div className="server-card__roster">
-      <h3>
-        Players <Badge>{totalPlayers}</Badge>
-      </h3>
-      <ul>
+      <ul aria-label="Players">
         {players.map((player, index) => (
           <li key={`${player.id ?? player.name}:${index}`}>
             {player.id === null ? (
@@ -573,6 +524,11 @@ function ServerRoster({
               <Link href={playerDetailPath(player.id, source)} variant="player">
                 <CodPlayerName value={player.name} />
               </Link>
+            )}
+            {player.id !== null && player.admin > 0 && (
+              <Badge className="server-card__admin">
+                Admin<VisuallyHidden> level</VisuallyHidden> {player.admin}
+              </Badge>
             )}
             {player.ping !== null && <small>{player.ping} ms</small>}
           </li>

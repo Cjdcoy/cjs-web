@@ -5,6 +5,8 @@ interface UnknownRecord {
 }
 
 export interface ServerPlayerViewModel {
+  /** Server admin level; 0 for regular players. */
+  readonly admin: number;
   readonly id: number | null;
   readonly name: string;
   readonly ping: number | null;
@@ -127,6 +129,7 @@ function normalizePlayers(value: unknown): readonly ServerPlayerViewModel[] | nu
     const name = displayText(player.playername);
     return [
       {
+        admin: nonNegativeInteger(player.admin) ?? 0,
         // The API sends 0 when it could not resolve the player to a profile.
         id: nonNegativeInteger(player.playerid) || null,
         name: name || "Unknown player",

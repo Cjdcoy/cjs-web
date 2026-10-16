@@ -61,18 +61,6 @@
   accent-color: var(--cjs-color-accent);
 }
 
-.server-source-group__marker {
-  width: var(--cjs-space-2);
-  height: var(--cjs-space-2);
-  flex: 0 0 auto;
-  border-radius: var(--cjs-radius-pill);
-  background: var(--cjs-color-accent);
-}
-
-.server-source-group__marker[data-source="jh"] {
-  background: var(--cjs-color-accent-secondary);
-}
-
 .servers-view-switch.cjs-segmented-control {
   gap: 0;
   padding: 0;
@@ -131,79 +119,24 @@
   min-height: calc(var(--cjs-space-16) * 4);
 }
 
-.server-source-groups,
-.server-source-group {
-  display: grid;
-  gap: var(--cjs-space-3);
-}
-
-.server-source-groups {
-  gap: var(--cjs-space-6);
-}
-
-.server-source-group__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--cjs-space-4);
-  padding-bottom: var(--cjs-space-1);
-  border-bottom: var(--cjs-border-width) solid var(--cjs-color-border);
-}
-
-.server-source-group__header h2 {
-  font-size: var(--cjs-font-size-lg);
-  line-height: var(--cjs-line-height-tight);
-}
-
-.server-source-group__toggle {
-  display: inline-flex;
-  min-height: var(--cjs-control-height-sm);
-  align-items: center;
-  gap: var(--cjs-space-2);
-  padding: 0 var(--cjs-space-1);
-  border: 0;
-  border-radius: var(--cjs-radius-sm);
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
-  font: inherit;
-}
-
-.server-source-group__toggle:hover {
-  color: var(--cjs-color-accent-strong);
-}
-
-.server-source-group__toggle:focus-visible {
-  outline: none;
-  box-shadow: var(--cjs-focus-ring);
-}
-
-.server-source-group__toggle svg {
-  color: var(--cjs-color-text-subtle);
-}
-
-.server-source-group__toggle[aria-expanded="false"] svg {
-  transform: rotate(-90deg);
-}
-
-.server-source-group__header > span {
-  color: var(--cjs-color-text-subtle);
-  font-size: var(--cjs-font-size-sm);
-}
-
-.server-source-group__content {
-  display: grid;
-  gap: var(--cjs-space-4);
-}
-
-.server-source-group__content[hidden] {
-  display: none;
-}
-
 .servers-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 17rem), 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: var(--cjs-space-4);
+}
+
+/* Same breakpoints as the site shell: two columns from tablet width, three
+   once the primary navigation is inline. */
+@media (min-width: 48rem) {
+  .servers-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 68rem) {
+  .servers-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
 
 .servers-grid[data-view="list"] {
@@ -218,7 +151,7 @@
 .server-card {
   display: grid;
   min-width: 0;
-  grid-template-rows: minmax(0, 1fr) auto;
+  grid-template-rows: auto 1fr;
   overflow: hidden;
   transition: border-color var(--cjs-duration-fast) var(--cjs-ease-standard);
 }
@@ -227,10 +160,12 @@
   border-color: var(--cjs-color-border-strong);
 }
 
+/* A fixed ratio keeps the art the same size across a row; a long roster
+   in a neighbouring card stretches only the body. */
 .server-card__visual {
   position: relative;
   display: grid;
-  min-height: calc(var(--cjs-space-16) * 2.25);
+  aspect-ratio: 16 / 9;
   align-content: space-between;
   gap: var(--cjs-space-4);
   isolation: isolate;
@@ -285,7 +220,7 @@
   filter: drop-shadow(0 1px 3px var(--cjs-color-page));
 }
 
-.server-card__header h3 {
+.server-card__header h2 {
   overflow: hidden;
   color: var(--cjs-color-text);
   font-size: var(--cjs-font-size-sm);
@@ -331,9 +266,26 @@
 }
 
 .server-card__map {
-  display: grid;
-  width: fit-content;
-  max-width: 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--cjs-space-1) var(--cjs-space-3);
+}
+
+.server-card__count {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: var(--cjs-space-1);
+  color: var(--cjs-color-text);
+  font-size: var(--cjs-font-size-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: var(--cjs-font-weight-semibold);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.8);
+}
+
+.server-card__count svg {
+  filter: drop-shadow(0 1px 3px rgb(0 0 0 / 0.8));
 }
 
 .server-card__map a,
@@ -416,15 +368,6 @@
   display: grid;
   align-content: start;
   gap: var(--cjs-space-1);
-}
-
-.server-card__roster h3 {
-  display: flex;
-  align-items: center;
-  gap: var(--cjs-space-2);
-  color: var(--cjs-color-text-muted);
-  font-size: var(--cjs-font-size-xs);
-  font-weight: var(--cjs-font-weight-medium);
 }
 
 @property --server-card-roster-fade {
@@ -538,6 +481,12 @@
   font-size: var(--cjs-font-size-xs);
 }
 
+/* The auto margin pulls the admin level over beside the ping. */
+.server-card__roster li .server-card__admin {
+  flex: none;
+  margin-inline-start: auto;
+}
+
 /* Fixed-width digits keep pings aligned down the column. */
 .server-card__roster li small {
   flex: none;
@@ -549,6 +498,12 @@
 .server-card__roster-empty,
 .server-card__unavailable {
   margin-block: auto;
+}
+
+/* List rows are full width, where a 16:9 thumbnail would tower over the row. */
+.servers-grid[data-view="list"] .server-card__visual {
+  min-height: calc(var(--cjs-space-16) * 2.25);
+  aspect-ratio: auto;
 }
 
 @media (min-width: 68rem) {
@@ -574,7 +529,7 @@
     gap: var(--cjs-space-2);
   }
 
-  .servers-grid[data-view="list"] .server-card__header h3 {
+  .servers-grid[data-view="list"] .server-card__header h2 {
     font-size: var(--cjs-font-size-xs);
   }
 
@@ -633,9 +588,5 @@
   .servers-page__notice {
     align-items: stretch;
     flex-direction: column;
-  }
-
-  .server-card__visual {
-    min-height: calc(var(--cjs-space-16) * 2.4);
   }
 }
