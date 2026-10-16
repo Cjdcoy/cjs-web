@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import { useId, useMemo, useState } from "react";
 import {
+  Badge,
   Button,
   Card,
   CodPlayerName,
@@ -560,7 +561,9 @@ function ServerRoster({
 
   return (
     <div className="server-card__roster">
-      <h3>Players</h3>
+      <h3>
+        Players <Badge>{totalPlayers}</Badge>
+      </h3>
       <ul>
         {players.map((player, index) => (
           <li key={`${player.id ?? player.name}:${index}`}>

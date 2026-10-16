@@ -419,6 +419,9 @@
 }
 
 .server-card__roster h3 {
+  display: flex;
+  align-items: center;
+  gap: var(--cjs-space-2);
   color: var(--cjs-color-text-muted);
   font-size: var(--cjs-font-size-xs);
   font-weight: var(--cjs-font-weight-medium);
@@ -430,27 +433,63 @@
   initial-value: 0px;
 }
 
-/* Busier servers scroll instead of stretching the card. Five and a half rows
-   leave the sixth visibly cut off, and a bottom fade that shrinks away as the
-   list reaches its end makes the overflow obvious before anyone scrolls. */
+/* Busier servers scroll instead of stretching the card. Eight and a half rows
+   fit a typical server outright and leave the ninth visibly cut off, and a
+   bottom fade that shrinks away as the list reaches its end makes the overflow
+   obvious before anyone scrolls. */
 .server-card__roster ul {
   display: grid;
   gap: 0;
   max-height: calc(
-    5.5 * (var(--cjs-font-size-sm) * var(--cjs-line-height-tight) + 2 * var(--cjs-space-1))
+    var(--server-card-roster-rows, 8.5) *
+      (
+        var(--cjs-font-size-md) * var(--cjs-line-height-normal) + 2 * var(--cjs-space-1) +
+          var(--cjs-border-width)
+      )
   );
   /* Inline room so the scroll container doesn't clip link focus rings. */
   margin: 0 calc(-1 * var(--cjs-space-2));
   padding: 0 var(--cjs-space-2);
   overflow-y: auto;
+  overscroll-behavior-y: contain;
   list-style: none;
-  mask-image: linear-gradient(
-    to bottom,
-    #000 calc(100% - var(--server-card-roster-fade)),
-    transparent
-  );
+  /* The solid strip on the right keeps the fade off the scrollbar, so the
+     thumb never dims when it reaches the bottom. */
+  mask-image:
+    linear-gradient(#000, #000),
+    linear-gradient(to bottom, #000 calc(100% - var(--server-card-roster-fade)), transparent);
+  mask-position:
+    right,
+    0 0;
+  mask-repeat: no-repeat;
+  mask-size:
+    var(--cjs-space-2) 100%,
+    100% 100%;
   animation: server-card-roster-fade linear both;
   animation-timeline: scroll(self);
+}
+
+/* macOS overlay scrollbars hide until scrolling, so draw a thin persistent
+   one. Chromium ignores these pseudo-elements once scrollbar-width or
+   scrollbar-color is set, which is why those stay behind the Firefox query. */
+.server-card__roster ul::-webkit-scrollbar {
+  width: 6px;
+}
+
+.server-card__roster ul::-webkit-scrollbar-thumb {
+  border-radius: var(--cjs-radius-pill);
+  background: var(--cjs-color-border-strong);
+}
+
+.server-card__roster ul::-webkit-scrollbar-thumb:hover {
+  background: var(--cjs-color-text-subtle);
+}
+
+@supports not selector(::-webkit-scrollbar) {
+  .server-card__roster ul {
+    scrollbar-color: var(--cjs-color-border-strong) transparent;
+    scrollbar-width: thin;
+  }
 }
 
 @keyframes server-card-roster-fade {
@@ -470,8 +509,14 @@
   justify-content: space-between;
   gap: var(--cjs-space-2);
   padding: var(--cjs-space-1) 0;
-  font-size: var(--cjs-font-size-sm);
-  line-height: var(--cjs-line-height-tight);
+  color: var(--cjs-color-text);
+  font-size: var(--cjs-font-size-md);
+  line-height: var(--cjs-line-height-normal);
+}
+
+/* A hairline between rows keeps the eye on one line from name to ping. */
+.server-card__roster li + li {
+  border-top: var(--cjs-border-width) solid var(--cjs-color-border);
 }
 
 .server-card__roster li .cjs-link,
@@ -493,9 +538,12 @@
   font-size: var(--cjs-font-size-xs);
 }
 
+/* Fixed-width digits keep pings aligned down the column. */
 .server-card__roster li small {
-  color: var(--cjs-color-text-subtle);
-  font-size: var(--cjs-font-size-xs);
+  flex: none;
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-sm);
+  font-variant-numeric: tabular-nums;
 }
 
 .server-card__roster-empty,
@@ -555,6 +603,11 @@
 
   .servers-grid[data-view="list"] .server-card__roster {
     flex: 0 0 14rem;
+  }
+
+  /* The roster is the tallest thing in a list row, so it gets fewer rows. */
+  .servers-grid[data-view="list"] .server-card__roster ul {
+    --server-card-roster-rows: 4.5;
   }
 
   .servers-grid[data-view="list"] .server-card__roster-empty,

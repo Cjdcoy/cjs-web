@@ -89,7 +89,7 @@ describe("ServersPage", () => {
     expect(screen.queryByText("Server address")).not.toBeInTheDocument();
     expect(screen.queryByText("Current map")).not.toBeInTheDocument();
     expect(screen.queryByText("Connected players")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Players" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Players 1" })).toBeVisible();
     expect(screen.getByRole("img", { name: "Server online" })).toHaveAttribute(
       "data-tooltip",
       "Online",
