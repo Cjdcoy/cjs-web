@@ -73,6 +73,10 @@ const INPUT_FORWARD = 32;
 const INPUT_BACK = 64;
 const INPUT_SIDE = 128 | 256;
 const MOVE_KEYS = INPUT_FORWARD | INPUT_BACK | INPUT_SIDE;
+const INPUT_ADS = 1024;
+const INPUT_LEAN = 2048 | 4096;
+const MOVE_THRESHOLD = 10; // player_moveThreshhold
+const WALK_SCALE = 0.4; // PM_Footsteps scale while walking (rev :2279-2282, cl:138422-138423)
 
 export function startCursor(time: number): SoundCursor {
   return { time, cycle: 0, lastJumpTime: -Infinity };
@@ -121,24 +125,34 @@ export function soundEvents(
     const previousCycle = cycle;
     if ((flags[index] & IN_AIR) === 0) {
       const speed = Math.hypot(vx, vy);
-      if (speed < 1) cycle = 0;
-      else if (speed >= 10) {
-        cycle = advance(
-          cycle,
-          (speed / footstepScale(context, index)) * footstepK(context, index),
-          msec,
-        );
+      // Below the move threshold PM_Footsteps holds the cycle (resetting it below 1) and returns
+      // before PM_FootstepEvent (rev :2124-2129, cl:138614).
+      if (speed < MOVE_THRESHOLD) {
+        if (speed < 1) cycle = 0;
+        continue;
       }
-      // PM_Footsteps advances the cycle even without move keys, then returns before the step
-      // event, so sliding with no forward or side key held is silent. Older replays without input
-      // are treated as holding a key.
-      const moving = samples.input ? (samples.input[index] & MOVE_KEYS) !== 0 : true;
+      cycle = advance(
+        cycle,
+        (speed / footstepScale(context, index)) * footstepK(context, index),
+        msec,
+      );
+      // PM_Footsteps advances the cycle even without move keys or while aiming, then returns before
+      // the step event (no keys) or PM_ShouldMakeFootsteps fails (ADS, rev :281-289, cl:138571-138575).
+      // Older replays without input are treated as holding a key.
+      const input = samples.input?.[index] ?? 0;
+      const moving = samples.input ? (input & MOVE_KEYS) !== 0 : true;
       const surface =
-        moving && crossed(previousCycle, cycle) && timeline.stance[index] === 0
+        moving &&
+        (input & INPUT_ADS) === 0 &&
+        crossed(previousCycle, cycle) &&
+        timeline.stance[index] === 0
           ? context.surfaceAt(index)
           : null;
-      if (surface)
-        events.push({ t: time, kind: "step", tables: [`footstep.${surface}`, "gearRattleRun"] });
+      // Leaning plays EV_FOOTSTEP_WALK (PM_FootstepForSurface, rev :1513-1518, cl:137277-137280).
+      const tables = walking(input)
+        ? [`footstepWalk.${surface}`, "gearRattleWalk"]
+        : [`footstep.${surface}`, "gearRattleRun"];
+      if (surface) events.push({ t: time, kind: "step", tables });
     } else if ((samples.aux?.[index] ?? 0) & ON_LADDER) {
       if (time - lastJumpTime < rules.skipLadderAfterJumpMs) continue;
       cycle = advance(cycle, (vz / LADDER_SPEED) * LADDER_K, msec);
@@ -245,15 +259,27 @@ function footstepScale(context: SoundContext, index: number): number {
             ? "strafe"
             : "forward";
   const stance = STANCES[timeline.stance[index]] ?? "stand";
-  return rules.gSpeed * (rules.dirScale[direction] ?? 1) * (rules.stanceScale[stance] ?? 1);
+  const walk = walking(input) ? WALK_SCALE : 1;
+  return rules.gSpeed * (rules.dirScale[direction] ?? 1) * (rules.stanceScale[stance] ?? 1) * walk;
 }
 
 function footstepK(context: SoundContext, index: number): number {
   const { rules, timeline } = context;
   const stance = STANCES[timeline.stance[index]] ?? "stand";
-  const backpedal = ((timeline.samples.input?.[index] ?? 0) & INPUT_BACK) !== 0;
-  const key = stance === "stand" && backpedal ? "standBackwards" : stance;
+  const input = timeline.samples.input?.[index] ?? 0;
+  const backpedal = stance === "stand" && (input & INPUT_BACK) !== 0;
+  // sounds.json k: stand, standBackwards, standWalking, standWalkingBackwards, crouchWalking, ...
+  const key = `${stance}${walking(input) ? "Walking" : ""}${backpedal ? "Backwards" : ""}`;
   return rules.k[key] ?? rules.k.stand ?? 0.335;
+}
+
+/**
+ * PM_Footsteps' iswalking: PMF_ADS_WALK or leanf != 0 (rev :2086, cl:138379).
+ * ponytail: the held key stands in for the flags; leanf eases back to 0 for up to 280 ms after
+ * release, and ADS needs a raised weapon that can aim.
+ */
+function walking(input: number): boolean {
+  return (input & (INPUT_ADS | INPUT_LEAN)) !== 0;
 }
 
 const STANCES = ["stand", "crouch", "prone"] as const;

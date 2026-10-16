@@ -19,13 +19,23 @@ const rules: FootstepRules = {
   assumedMsec: 8,
   gSpeed: 190,
   dirScale: { forward: 1, back: 0.7, strafe: 0.85, forwardDiagonal: 0.925, backDiagonal: 0.78625 },
-  k: { stand: 0.335, standBackwards: 0.36, crouch: 0.34, prone: 0.25 },
+  k: {
+    stand: 0.335,
+    standBackwards: 0.36,
+    standWalking: 0.305,
+    standWalkingBackwards: 0.325,
+    crouch: 0.34,
+    crouchWalking: 0.315,
+    prone: 0.25,
+    proneWalking: 0.24,
+  },
   stanceScale: { stand: 1, crouch: 0.65, prone: 0.15 },
   skipLadderAfterJumpMs: 300,
 };
 
 interface Row {
   t: number;
+  x?: number;
   z?: number;
   vel?: [number, number, number];
   flags?: number;
@@ -45,7 +55,7 @@ function replay(rows: Row[], markers: ReplayMarker[] = [], fps = 125): ReplaySam
     finished: true,
     t: rows.map((row) => row.t),
     // Constant-speed rows move along x so no segment looks like a teleport.
-    pos: rows.flatMap((row) => [((row.vel?.[0] ?? 0) * row.t) / 1000, 0, row.z ?? 0]),
+    pos: rows.flatMap((row) => [row.x ?? ((row.vel?.[0] ?? 0) * row.t) / 1000, 0, row.z ?? 0]),
     ang: rows.flatMap(() => [0, 0, 0]),
     vel: rows.flatMap((row) => row.vel ?? [0, 0, 0]),
     stance: rows.map(() => 0),
@@ -96,12 +106,12 @@ describe("landing (PM_CrashLand)", () => {
 });
 
 describe("footsteps (PM_Footsteps)", () => {
-  const running = (fps: number) =>
+  const running = (fps: number, input = 32) =>
     replay(
       [0, 250, 500, 750, 1000, 1250].map((t) => ({
         t,
         vel: [190, 0, 0] as [number, number, number],
-        input: 32,
+        input,
       })),
       [],
       fps,
@@ -142,6 +152,31 @@ describe("footsteps (PM_Footsteps)", () => {
     // lands at 768 ms rather than 756 ms (256 ms after the key went down at 500 ms).
     const steps = run(sliding, 1024).filter((event) => event.kind === "step");
     expect(steps.map((event) => event.t)).toEqual([768]);
+  });
+
+  it("does not step when the idle branch resets the cycle", () => {
+    // The cycle is at 130 when the speed lerps to 0 at 550 ms; the reset to 0 crosses 64 but the
+    // idle branch returns before PM_FootstepEvent.
+    const stopping = replay([
+      { t: 0, vel: [190, 0, 0], input: 32 },
+      { t: 250, vel: [190, 0, 0], input: 32 },
+      { t: 500, vel: [190, 0, 0], input: 32 },
+      { t: 550, x: 95, input: 32 },
+      { t: 600, x: 95, input: 32 },
+    ]);
+    const steps = run(stopping, 650).filter((event) => event.kind === "step");
+    expect(steps.map((event) => event.t)).toEqual([256]);
+  });
+
+  it("is silent while aiming down the sights", () => {
+    expect(run(running(125, 32 | 1024), 1024)).toEqual([]);
+  });
+
+  it("walks while leaning: walk sounds at the 0.4-scaled walking cadence", () => {
+    // 190 / (190 * 0.4) * 0.305 * 8 = 6.1, so +6 per frame: crossings at frames 11, 32, 54, 75, 96.
+    const steps = run(running(125, 32 | 2048), 800).filter((event) => event.kind === "step");
+    expect(steps.map((event) => event.t)).toEqual([88, 256, 432, 600, 768]);
+    expect(steps[0].tables).toEqual(["footstepWalk.wood", "gearRattleWalk"]);
   });
 
   it("can be resumed from its cursor without losing or repeating steps", () => {
