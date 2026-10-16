@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { getMapVideos, parseYouTubeVideoUrl } from "./mapVideos";
+import { getMapVideos, parseYouTubeVideoUrl } from "./mapVideoModel";
 
 describe("map videos", () => {
   it("resolves a source-neutral multi-video catalog by normalized map name", () => {
