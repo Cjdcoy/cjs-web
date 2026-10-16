@@ -33,11 +33,6 @@
   height: 100%;
 }
 
-/* A display-only brightness on the map render; overlays drawn over the canvas are unaffected. */
-.cjs-map-viewer__canvas {
-  filter: brightness(var(--cjs-map-viewer-brightness, 1.3));
-}
-
 .cjs-map-viewer__view:not([tabindex="-1"]) .cjs-map-viewer__canvas {
   cursor: crosshair;
 }

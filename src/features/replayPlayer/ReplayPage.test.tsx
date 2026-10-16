@@ -244,13 +244,12 @@ describe("ReplayPage", () => {
 
     const hud = await screen.findByRole("group", { name: "HUD" });
     const brightness = within(hud).getByRole("slider", { name: /Brightness/ });
-    const player = screen.getByRole("region", { name: "Replay player" });
     expect(brightness).toHaveAttribute("aria-valuetext", "130%");
-    expect(player.style.getPropertyValue("--cjs-map-viewer-brightness")).toBe("1.3");
+    expect(viewerProps.current?.brightness).toBe(1.3);
 
     fireEvent.change(brightness, { target: { value: "1.75" } });
     expect(brightness).toHaveAttribute("aria-valuetext", "175%");
-    expect(player.style.getPropertyValue("--cjs-map-viewer-brightness")).toBe("1.75");
+    expect(viewerProps.current?.brightness).toBe(1.75);
     expect(JSON.parse(storageValues.get("cjs.replay-hud") ?? "{}")).toMatchObject({
       brightness: 1.75,
     });

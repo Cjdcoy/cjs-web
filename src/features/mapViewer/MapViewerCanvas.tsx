@@ -43,7 +43,11 @@ import {
   loadSurfaceLighting,
   type SurfaceMaterials,
 } from "./legacySurface";
+import "./displayGamma";
 import "./mapViewer.css";
+
+/** Display gamma (CoD2's r_gamma) of the map render when no brightness is given. */
+const DEFAULT_MAP_BRIGHTNESS = 1.3;
 
 export interface MapViewerProps {
   modelUrl: string;
@@ -65,6 +69,8 @@ export interface MapViewerProps {
   viewmodel?: ViewmodelOptions;
   /** Receives a ground probe once the map's collision has loaded, and null on unmount. */
   onCollision?: (probe: CollisionProbe | null) => void;
+  /** Display gamma of the map render (see displayGamma.ts); above 1 lifts shadows. */
+  brightness?: number;
 }
 
 /** Ground queries against the map's player-solid collision (solid, playerclip, slick, ladder). */
@@ -142,6 +148,7 @@ const VIEWMODEL_PLACEMENT = {
 class ModelNotFoundError extends Error {}
 
 export default function MapViewerCanvas({
+  brightness = DEFAULT_MAP_BRIGHTNESS,
   children,
   getFrame,
   initialPose,
@@ -156,6 +163,7 @@ export default function MapViewerCanvas({
   const stageRef = useRef<HTMLDivElement>(null);
   const getFrameRef = useRef(getFrame);
   const viewmodelRef = useRef(viewmodel);
+  const brightnessRef = useRef(brightness);
   const onCollisionRef = useRef(onCollision);
   const startRef = useRef({ initialPose, path });
   const objectsRef = useRef(new Map<number, Object3D>());
@@ -180,6 +188,10 @@ export default function MapViewerCanvas({
     viewmodelRef.current = viewmodel;
     onCollisionRef.current = onCollision;
   }, [getFrame, onCollision, viewmodel]);
+
+  useEffect(() => {
+    brightnessRef.current = brightness;
+  }, [brightness]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -209,6 +221,10 @@ export default function MapViewerCanvas({
     stage.append(canvas);
 
     const scene = new Scene();
+    // The display gamma (displayGamma.ts), set before each frame; the weapon pass keeps it.
+    scene.onBeforeRender = () => {
+      renderer.toneMappingExposure = brightnessRef.current;
+    };
     scene.background = new Color(styles.getPropertyValue("--cjs-color-elevated").trim() || "black");
     scene.add(new HemisphereLight(0xffffff, 0x404850, 1.6));
     const sun = new DirectionalLight(0xffffff, 1.2);

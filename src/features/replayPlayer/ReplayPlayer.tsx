@@ -9,7 +9,7 @@ import {
   SkipBack,
   SkipForward,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, IconButton, Select, VisuallyHidden } from "../../components/ui";
 import type { ReplayMarkerKind, ReplaySamples } from "../../lib/api";
 import { getViewmodelUrl } from "../../lib/mapModels";
@@ -299,10 +299,9 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
       aria-label="Replay player"
       data-view={mode === "normal" ? undefined : mode}
       data-controls={controlsHidden ? "hidden" : undefined}
-      // The viewer's canvas reads this, in every view mode (the section is the full-screen element).
-      style={{ "--cjs-map-viewer-brightness": preferences.brightness } as CSSProperties}
     >
       <MapViewer
+        brightness={preferences.brightness}
         getFrame={getFrame}
         mapName={samples.mapname}
         modelUrl={modelUrl}

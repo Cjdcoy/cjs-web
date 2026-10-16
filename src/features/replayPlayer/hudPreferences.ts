@@ -19,7 +19,10 @@ export interface HudPreferences {
   heatmap: boolean;
   /** Sound volume, 0..1. */
   volume: number;
-  /** Map render brightness multiplier, 0.5..2.5. */
+  /**
+   * Map render display gamma, 0.5..2.5 (the game's r_gamma; above 1 lifts shadows). Values stored
+   * when this was a plain multiplier are kept as is: both darken or brighten mid-tones alike.
+   */
   brightness: number;
 }
 
