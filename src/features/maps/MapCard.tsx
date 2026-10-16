@@ -6,7 +6,7 @@ import { getMapImageSources } from "../../lib/mapImages";
 import { mapDetailPath } from "../../lib/routing";
 import { getMapDifficulty, type PreparedMap } from "./mapDiscovery";
 import { getSafeMediaUrl } from "./mapDetailModel";
-import { getMapVideos } from "./mapVideos";
+import { getMapVideos } from "./mapVideoModel";
 
 export interface MapCardProps {
   item: PreparedMap;

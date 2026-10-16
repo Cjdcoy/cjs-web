@@ -1,7 +1,7 @@
 import { ExternalLink, Play, Video, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Button, IconButton, Link, VisuallyHidden } from "../../components/ui";
-import type { MapVideo } from "./mapVideos";
+import type { MapVideo } from "./mapVideoModel";
 
 const youtubeIframeApiUrl = "https://www.youtube.com/iframe_api";
 const youtubePausedState = 2;

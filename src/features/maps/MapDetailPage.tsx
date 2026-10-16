@@ -53,7 +53,7 @@ import {
 import { useMapRecord, useMapTopRuns } from "./useMapDetail";
 import { ReplayAnalyticsPanel } from "../replay";
 import { MapVideos } from "./MapVideos";
-import { getMapVideos } from "./mapVideos";
+import { getMapVideos } from "./mapVideoModel";
 import "./maps.css";
 
 const numberFormatter = new Intl.NumberFormat();
