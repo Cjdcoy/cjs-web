@@ -351,7 +351,8 @@ export function normalizeReplayWebViewAggregate(
   value: unknown,
   path: string,
 ): ReplayWebViewAggregate {
-  const completion = nullableNumber(record(value, path, "$response"), "avg_completion", path);
+  const object = wireStruct(value, path, "$response", 12);
+  const completion = nullableNumber(object, "avg_completion", path, 11);
   if (completion !== null && (completion < 0 || completion > 1)) {
     throw invalidResponse(path, "$response.avg_completion");
   }
@@ -359,15 +360,20 @@ export function normalizeReplayWebViewAggregate(
 }
 
 export function normalizeReplayWebViewSummary(value: unknown, path: string): ReplayWebViewSummary {
-  const heatValue = record(value, path, "$response").heat;
+  const heatValue = field(wireStruct(value, path, "$response", 15), "heat", 14);
   if (heatValue === undefined || heatValue === null) {
     return { heat: { bucket_ms: REPLAY_HEAT_BUCKET_MS, view_count: [], watch_ms: [] } };
   }
-  const heat = record(heatValue, path, "$response.heat");
-  const bucketMs = requiredNumber(heat, "bucket_ms", path, "$response.heat");
+  const heat = wireStruct(heatValue, path, "$response.heat", 3);
+  const bucketMs = requiredNumber(heat, "bucket_ms", path, "$response.heat", 0);
   if (bucketMs <= 0) throw invalidResponse(path, "$response.heat.bucket_ms");
-  const viewCount = numberArray(heat.view_count, path, "$response.heat.view_count");
-  const watchMs = numberArray(heat.watch_ms, path, "$response.heat.watch_ms", viewCount.length);
+  const viewCount = numberArray(field(heat, "view_count", 1), path, "$response.heat.view_count");
+  const watchMs = numberArray(
+    field(heat, "watch_ms", 2),
+    path,
+    "$response.heat.watch_ms",
+    viewCount.length,
+  );
   const negative = [...viewCount, ...watchMs].findIndex((entry) => entry < 0);
   if (negative >= 0) throw invalidResponse(path, "$response.heat");
   const normalized: ReplayWebViewHeat = {
@@ -390,12 +396,12 @@ export function normalizeReplayViewCounts(
       const entry = object[String(runId)];
       if (entry === undefined || entry === null) return [runId, { web: 0, in_game: 0 }];
       const at = `$response.${runId}`;
-      const counts = record(entry, path, at);
+      const counts = wireStruct(entry, path, at, 2);
       return [
         runId,
         {
-          web: requiredNumber(counts, "web", path, at),
-          in_game: requiredNumber(counts, "in_game", path, at),
+          web: requiredNumber(counts, "web", path, at, 0),
+          in_game: requiredNumber(counts, "in_game", path, at, 1),
         },
       ];
     }),

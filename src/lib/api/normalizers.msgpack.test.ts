@@ -9,7 +9,10 @@ import {
   normalizePlayers,
   normalizeRankLeaderboard,
   normalizeRecentRunsPage,
+  normalizeReplayViewCounts,
   normalizeReplayWatchRankings,
+  normalizeReplayWebViewAggregate,
+  normalizeReplayWebViewSummary,
   normalizeTopRuns,
 } from "./normalizers";
 
@@ -52,6 +55,21 @@ describe("Go positional MessagePack normalization", () => {
       normalizeReplayWatchRankings,
       "kZYBozEyNadtcF9qdW1wpmp1bXBlcqJIS5kLCQcIBs3UMbQyMDI2LTA5LTA1VDAxOjAyOjAzWrQyMDI2LTA5LTA1VDAxOjAyOjAzWrQyMDI2LTA5LTA1VDAxOjAyOjAzWg==",
       '[{"rank":1,"fps":"125","mapname":"mp_jump","owner_playername":"jumper","country":"HK","run_id":11,"mapid":9,"owner_player_id":7,"watch_count":8,"unique_viewer_count":6,"total_watch_ms":54321,"first_watched_at":"2026-09-05T01:02:03Z","last_watched_at":"2026-09-05T01:02:03Z","updated_at":"2026-09-05T01:02:03Z"}]',
+    ],
+    [
+      normalizeReplayWebViewAggregate,
+      "ncDAFBYHzgArcNO0MjAyNi0xMC0xN1QwNTo1NzowN1q0MjAyNi0xMC0xN1QxNjoyNjoyNlq0MjAyNi0xMC0xN1QxNjoyNjoyNloBzgBQYsLLP8F7nsTvm4+ZFoWlb3RoZXIAo21hcAimcmVjZW50AKZwbGF5ZXILpmRpcmVjdAOCpm1vYmlsZQinZGVza3RvcA6VkqJQTAySokNaBpKiREUCkqJGUgGSolNLAZXLP6MZa/jo1jLLAAAAAAAAAADLP+7HlfN2bkLLAAAAAAAAAADLP0tNM+wRagfLP/AAAAAAAADLP8F0XRdF0XTLP9F0XRdF0XTLQCUXRdF0XRc=",
+      '{"replay_count":20,"watch_count":22,"unique_viewer_count":7,"total_watch_ms":2846931,"first_watched_at":"2026-10-17T05:57:07Z","last_watched_at":"2026-10-17T16:26:26Z","updated_at":"2026-10-17T16:26:26Z","completed_count":1,"total_covered_ms":5268162,"avg_completion":0.1365850888825801}',
+    ],
+    [
+      normalizeReplayWebViewSummary,
+      "nwsJBwIBzR9AtDIwMjYtMDktMDVUMDE6MDI6MDNatDIwMjYtMDktMDVUMDE6MDI6MDNatDIwMjYtMDktMDVUMDE6MDI6MDNazScQAc0fQMs/4AAAAAAAAMCTzROIkgIBks0TiM0LuA==",
+      '{"run_id":11,"heat":{"bucket_ms":5000,"view_count":[2,1],"watch_ms":[5000,3000]}}',
+    ],
+    [
+      (value: unknown, path: string) => normalizeReplayViewCounts(value, [7001], path),
+      "gaQ3MDAxks0E0s0BVA==",
+      '{"7001":{"web":1234,"in_game":340}}',
     ],
     [
       normalizeTopRuns,
