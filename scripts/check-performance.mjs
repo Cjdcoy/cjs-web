@@ -11,10 +11,12 @@ const mapViewerEntryKey = "src/features/mapViewer/MapViewerCanvas.tsx";
 const budgets = {
   initialJavaScriptGzip: 75 * 1024,
   initialCssGzip: 8 * 1024,
-  routeIncrementGzip: 36 * 1024,
+  // 37 KiB since PR #33 (3D replay viewer); measured at 36.0 KiB.
+  routeIncrementGzip: 37 * 1024,
   // 158 KiB since replay viewmodel motion and HUD controls; measured at 157.4 KiB.
   totalJavaScriptGzip: 158 * 1024,
-  totalCssGzip: 22 * 1024,
+  // 23 KiB since PR #33 (3D replay viewer); measured at 22.7 KiB.
+  totalCssGzip: 23 * 1024,
   mapViewerGzip: 170 * 1024,
 };
 
