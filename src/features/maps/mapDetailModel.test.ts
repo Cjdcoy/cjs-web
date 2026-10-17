@@ -92,7 +92,7 @@ describe("map detail model", () => {
     expect(selectCheckpoint(record, 0).cp_id).toBe(102);
   });
 
-  it("selects an available profile FPS in 125, 250, 333, mix order", () => {
+  it("selects an available profile FPS in 125, 250, 333, mix, 43, 76 order", () => {
     const map: GameMap = {
       mapid: 1,
       mapname: "target",
@@ -102,6 +102,7 @@ describe("map detail model", () => {
         "250": { difficulty: 3, nb_tops: 4 },
         "333": { difficulty: 4, nb_tops: 2 },
         "0": { difficulty: 5, nb_tops: 1 },
+        "43": { difficulty: 6, nb_tops: 3 },
       },
     };
     const uncounted: GameMap = {
@@ -118,6 +119,8 @@ describe("map detail model", () => {
     expect(hasMapTopRuns(map, "250")).toBe(true);
     expect(selectMapProfileFps(map, "125")).toBe("250");
     expect(selectMapProfileFps(map, "333")).toBe("333");
+    expect(selectMapProfileFps(map, "43")).toBe("43");
+    expect(selectMapProfileFps(map, "76")).toBe("250");
     expect(selectMapProfileFps({ ...map, difficulty: null }, "333")).toBe("125");
   });
 

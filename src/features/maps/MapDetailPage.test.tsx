@@ -284,6 +284,8 @@ describe("MapDetailPage", () => {
     ).toBeVisible();
     expect(window.location.search).toContain("view=played");
     expect(playtimeRequest.mock.calls.map(([options]) => options.fps)).toEqual([
+      "43",
+      "76",
       "125",
       "250",
       "333",
@@ -330,13 +332,13 @@ describe("MapDetailPage", () => {
       }),
     );
     await screen.findByRole("table", { name: /at all FPS/ });
-    expect(playtimeRequest).toHaveBeenCalledTimes(4);
+    expect(playtimeRequest).toHaveBeenCalledTimes(6);
 
     await user.click(screen.getByRole("radio", { name: "main" }));
     expect(
       await screen.findByRole("heading", { name: "Most played at all FPS (on route main)" }),
     ).toBeVisible();
-    expect(playtimeRequest).toHaveBeenCalledTimes(8);
+    expect(playtimeRequest).toHaveBeenCalledTimes(12);
     expect(playtimeRequest).toHaveBeenLastCalledWith(expect.objectContaining({ ender: "main" }));
   });
 

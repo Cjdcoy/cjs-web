@@ -1,4 +1,10 @@
-import { type Fps, type GameMap, type MapPlayerPlaytime, type TopRun } from "../../lib/api";
+import {
+  FPS_VALUES,
+  type Fps,
+  type GameMap,
+  type MapPlayerPlaytime,
+  type TopRun,
+} from "../../lib/api";
 import { stripCodColorCodes } from "../../lib/codName";
 import { defineQuerySchema, enumQueryParam, integerQueryParam } from "../../lib/routing";
 
@@ -10,8 +16,17 @@ export interface MapRecord {
   checkpoints: GameMap[];
 }
 
-export const MAP_PROFILE_FPS_VALUES = ["125", "250", "333", "0"] as const satisfies readonly Fps[];
+export const MAP_PROFILE_FPS_VALUES = FPS_VALUES;
 export type MapProfileFps = (typeof MAP_PROFILE_FPS_VALUES)[number];
+/** A map without tops at the requested FPS opens on the first of these that has some. */
+const FALLBACK_FPS_VALUES = [
+  "125",
+  "250",
+  "333",
+  "0",
+  "43",
+  "76",
+] as const satisfies readonly MapProfileFps[];
 
 export const MAP_DETAIL_VIEWS = ["tops", "played"] as const;
 export type MapDetailView = (typeof MAP_DETAIL_VIEWS)[number];
@@ -140,7 +155,7 @@ export function describeUnratedDifficulty(map: GameMap, fps: Fps | string): stri
 
 export function selectMapProfileFps(map: GameMap, requestedFps: MapProfileFps): MapProfileFps {
   if (hasMapTopRuns(map, requestedFps)) return requestedFps;
-  return MAP_PROFILE_FPS_VALUES.find((fps) => hasMapTopRuns(map, fps)) ?? "125";
+  return FALLBACK_FPS_VALUES.find((fps) => hasMapTopRuns(map, fps)) ?? "125";
 }
 
 /** The route's name, or "Route N" when it has none. */
