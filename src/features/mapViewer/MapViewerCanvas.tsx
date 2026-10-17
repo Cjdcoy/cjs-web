@@ -34,10 +34,12 @@ import {
   codToScenePosition,
   codToSceneRotation,
   METRES_PER_COD_UNIT,
+  sceneToCodPose,
   VIEW_FIELD_OF_VIEW,
   type CodPose,
   type ViewerFrame,
 } from "./codSpace";
+import { cameraReadout, flySpeedAfterWheel, hipReticle } from "./viewerHud";
 import { loadLegacySky } from "./legacySky";
 import {
   createSurfaceMaterials,
@@ -45,6 +47,7 @@ import {
   type SurfaceMaterials,
 } from "./legacySurface";
 import { instanceMeshes } from "./instancing";
+import { viewmodelMotion } from "./viewmodelMotion";
 import "./displayGamma";
 import "./mapViewer.css";
 
@@ -73,6 +76,8 @@ export interface MapViewerProps {
   onCollision?: (probe: CollisionProbe | null) => void;
   /** Display gamma of the map render (see displayGamma.ts); above 1 lifts shadows. */
   brightness?: number;
+  /** Draws CoD2's hip reticle at the view centre; on unless false. */
+  crosshair?: boolean;
 }
 
 /** Ground queries against the map's player-solid collision (solid, playerclip, slick, ladder). */
@@ -152,6 +157,7 @@ class ModelNotFoundError extends Error {}
 export default function MapViewerCanvas({
   brightness = DEFAULT_MAP_BRIGHTNESS,
   children,
+  crosshair = true,
   getFrame,
   initialPose,
   mapName,
@@ -163,6 +169,7 @@ export default function MapViewerCanvas({
 }: MapViewerProps) {
   const hostRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
+  const readoutRef = useRef<HTMLSpanElement>(null);
   const getFrameRef = useRef(getFrame);
   const viewmodelRef = useRef(viewmodel);
   const brightnessRef = useRef(brightness);
@@ -267,6 +274,9 @@ export default function MapViewerCanvas({
     weapon.position.set(...VIEWMODEL_PLACEMENT.position);
     weapon.rotation.set(...VIEWMODEL_PLACEMENT.rotation);
     weapon.scale.setScalar(VIEWMODEL_PLACEMENT.scale);
+    // The frame's swing and lean, in the model's own frame (viewmodelMotion.ts).
+    const weaponMotion = new Group();
+    weapon.add(weaponMotion);
     weaponScene.add(weapon);
     let weaponState: "idle" | "loading" | "ready" | "failed" = "idle";
     renderer.autoClear = false;
@@ -289,7 +299,7 @@ export default function MapViewerCanvas({
           if (!mesh.isMesh || !mesh.material || Array.isArray(mesh.material)) return;
           mesh.material = weaponSurfaces.material(object as Mesh);
         });
-        weapon.add(gltf.scene);
+        weaponMotion.add(gltf.scene);
         weaponScene.updateMatrixWorld(true);
         weaponState = "ready";
       } catch {
@@ -307,6 +317,10 @@ export default function MapViewerCanvas({
       camera.updateProjectionMatrix();
       weaponCamera.aspect = width / height;
       weaponCamera.updateProjectionMatrix();
+      // The reticle is DOM sized from the view height, like the game's 640×480 virtual screen.
+      for (const [name, value] of Object.entries(hipReticle(height))) {
+        host.style.setProperty(`--cjs-reticle-${name}`, `${value}px`);
+      }
       needsRenderRef.current = true;
     };
     const observer = new ResizeObserver(resize);
@@ -317,9 +331,14 @@ export default function MapViewerCanvas({
     let isFree = true;
     let reportedFree = true;
     let speed = FLY_SPEED;
+    let currentSpeed = 0;
+    // Set by a click into the free view: the wheel then sets the fly speed instead of scrolling.
+    let capturing = false;
+    const stopCapture = () => (capturing = false);
     const isFlying = () =>
       isFree && (controls.isLocked || document.activeElement === hostRef.current);
     const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") capturing = false;
       if (event.altKey || event.ctrlKey || event.metaKey) return;
       if (!FLY_KEYS.has(event.code) || !isFlying()) return;
       keys.add(event.code);
@@ -327,11 +346,18 @@ export default function MapViewerCanvas({
       event.stopPropagation();
     };
     const onKeyUp = (event: KeyboardEvent) => keys.delete(event.code);
-    const clearKeys = () => keys.clear();
-    const onWheel = (event: WheelEvent) => {
-      if (!controls.isLocked) return;
-      speed = Math.min(20_000, Math.max(10, speed * (event.deltaY < 0 ? 1.25 : 0.8)));
+    const onWindowBlur = () => {
+      keys.clear();
+      capturing = false;
     };
+    // Under pointer lock Chrome and WebKit dispatch wheel events to the locked canvas, which bubble
+    // here. Pinch zoom (ctrl+wheel) keeps the browser default.
+    const onWheel = (event: WheelEvent) => {
+      if (!capturing || !isFree || event.ctrlKey) return;
+      event.preventDefault();
+      speed = flySpeedAfterWheel(speed, event.deltaY, event.deltaMode);
+    };
+    const onCanvasPointerDown = () => (capturing = isFree);
     const onCanvasClick = () => {
       if (!isFree || controls.isLocked) return;
       // Pointer lock can be refused (no user activation, embedded frames); keyboard flying still works.
@@ -342,12 +368,15 @@ export default function MapViewerCanvas({
     const onLock = () => setLocked(true);
     const onUnlock = () => {
       keys.clear();
+      capturing = false;
       setLocked(false);
     };
     document.addEventListener("keydown", onKeyDown);
     document.addEventListener("keyup", onKeyUp);
-    window.addEventListener("blur", clearKeys);
-    window.addEventListener("wheel", onWheel, { passive: true });
+    window.addEventListener("blur", onWindowBlur);
+    host.addEventListener("wheel", onWheel, { passive: false });
+    host.addEventListener("focusout", stopCapture);
+    canvas.addEventListener("pointerdown", onCanvasPointerDown);
     canvas.addEventListener("click", onCanvasClick);
     canvas.addEventListener("webglcontextrestored", onContextRestored);
     controls.addEventListener("lock", onLock);
@@ -365,7 +394,34 @@ export default function MapViewerCanvas({
     const drawnMarker = new Vector3();
     let drawnRunner = false;
     let drawnWeapon = false;
+    const drawnWeaponPosition = new Vector3();
+    const drawnWeaponQuaternion = new Quaternion();
     needsRenderRef.current = true;
+    // What the free-camera readout last showed; it is rewritten at most every 100 ms on a change.
+    const shownPosition = new Vector3(Number.NaN, 0, 0);
+    const shownQuaternion = new Quaternion();
+    let shownSpeeds = "";
+    let shownAt = Number.NEGATIVE_INFINITY;
+    const updateReadout = (now: number) => {
+      const readout = readoutRef.current;
+      const speeds = `${currentSpeed} ${speed}`;
+      if (
+        !readout ||
+        now - shownAt < 100 ||
+        (shownSpeeds === speeds &&
+          shownPosition.equals(camera.position) &&
+          shownQuaternion.equals(camera.quaternion))
+      ) {
+        return;
+      }
+      shownAt = now;
+      shownSpeeds = speeds;
+      shownPosition.copy(camera.position);
+      shownQuaternion.copy(camera.quaternion);
+      look.setFromQuaternion(camera.quaternion);
+      const pose = sceneToCodPose(camera.position.toArray(), [look.x, look.y]);
+      readout.textContent = cameraReadout(pose, currentSpeed, speed);
+    };
 
     const fly = (seconds: number) => {
       const fast = keys.has("ShiftLeft") || keys.has("ShiftRight") ? 4 : 1;
@@ -378,6 +434,7 @@ export default function MapViewerCanvas({
       if (keys.has("KeyA")) move.sub(right);
       if (keys.has("Space") || keys.has("KeyE")) move.y += 1;
       if (keys.has("KeyC") || keys.has("KeyQ")) move.y -= 1;
+      currentSpeed = move.lengthSq() > 0 ? speed * fast : 0;
       if (move.lengthSq() > 0) {
         camera.position.addScaledVector(
           move.normalize(),
@@ -411,18 +468,25 @@ export default function MapViewerCanvas({
         marker.position.set(...codToScenePosition(frame.pose.x, frame.pose.y, frame.pose.z));
         marker.updateMatrixWorld(true);
       }
-      if (isFree) fly(seconds);
+      if (isFree) {
+        fly(seconds);
+        updateReadout(now);
+      }
       const weaponOptions = frame && !isFree ? viewmodelRef.current : undefined;
       if (weaponOptions?.visible && weaponState === "idle") void loadWeapon(weaponOptions.url);
-      // The weapon is fixed in camera space, so whether it is drawn is all of its state.
+      // The weapon lives in camera space: whether it is drawn and its swing/lean offset are its state.
       const drawWeapon = Boolean(weaponOptions?.visible) && weaponState === "ready";
+      viewmodelMotion(frame?.weapon, weaponMotion.position, weaponMotion.quaternion);
       if (
         !needsRenderRef.current &&
         drawnPosition.equals(camera.position) &&
         drawnQuaternion.equals(camera.quaternion) &&
         drawnMarker.equals(marker.position) &&
         drawnRunner === runner.visible &&
-        drawnWeapon === drawWeapon
+        drawnWeapon === drawWeapon &&
+        (!drawWeapon ||
+          (drawnWeaponPosition.equals(weaponMotion.position) &&
+            drawnWeaponQuaternion.equals(weaponMotion.quaternion)))
       ) {
         return;
       }
@@ -432,6 +496,8 @@ export default function MapViewerCanvas({
       drawnMarker.copy(marker.position);
       drawnRunner = runner.visible;
       drawnWeapon = drawWeapon;
+      drawnWeaponPosition.copy(weaponMotion.position);
+      drawnWeaponQuaternion.copy(weaponMotion.quaternion);
       renderer.clear();
       renderer.render(scene, camera);
       if (drawWeapon) {
@@ -513,8 +579,10 @@ export default function MapViewerCanvas({
       observer.disconnect();
       document.removeEventListener("keydown", onKeyDown);
       document.removeEventListener("keyup", onKeyUp);
-      window.removeEventListener("blur", clearKeys);
-      window.removeEventListener("wheel", onWheel);
+      window.removeEventListener("blur", onWindowBlur);
+      host.removeEventListener("wheel", onWheel);
+      host.removeEventListener("focusout", stopCapture);
+      canvas.removeEventListener("pointerdown", onCanvasPointerDown);
       canvas.removeEventListener("click", onCanvasClick);
       canvas.removeEventListener("webglcontextrestored", onContextRestored);
       controls.removeEventListener("lock", onLock);
@@ -586,7 +654,20 @@ export default function MapViewerCanvas({
         >
           <div ref={stageRef} className="cjs-map-viewer__stage" />
           {load.status === "ready" && overlay}
-          {locked && <span className="cjs-map-viewer__crosshair" aria-hidden="true" />}
+          {load.status === "ready" && crosshair && (
+            <span className="cjs-map-viewer__reticle" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+              <span />
+            </span>
+          )}
+          <span
+            ref={readoutRef}
+            className="cjs-map-viewer__readout"
+            aria-hidden="true"
+            hidden={!free || load.status !== "ready"}
+          />
           {load.status !== "ready" && (
             <div className="cjs-map-viewer__overlay">
               <ViewerStatus load={load} mapName={mapName} onRetry={retry} />
@@ -657,8 +738,8 @@ export default function MapViewerCanvas({
       {free && (
         <p className="cjs-map-viewer__help" id={helpId}>
           Focus or click the view, then fly with W A S D, rise with Space or E, sink with Q, and
-          look with the arrow keys. Clicking captures the mouse for looking; Esc releases it. Hold
-          Shift to move faster.
+          look with the arrow keys. Clicking captures the mouse for looking and the scroll wheel for
+          the fly speed; Esc releases them. Hold Shift to move faster.
         </p>
       )}
     </div>

@@ -249,18 +249,48 @@ export function positionHudLines(feet: CodPose): [string, string] {
   return [format([feet.x, feet.y, feet.z]), format([feet.pitch, feet.yaw, 0])];
 }
 
+/** Land slowdown lengths in ms (bg_jump.cpp JUMP_LAND_SLOWDOWN_TIME, Jump_ApplySlowdown). */
+const JUMP_LAND_SLOWDOWN_MS = 1800;
+const JUMP_LAND_HIGH_SLOWDOWN_MS = 1200;
+/** Landing this far above the jump origin takes the shorter slowdown. */
+const JUMP_LAND_HIGH_Z = 18;
+const INPUT_JUMP = 2;
+
 /**
- * Jump timer (replay_jumptimer_update) at playback `time`: seconds airborne (flags bit 4) truncated
- * to 0.1, timed from the first sample of the current airborne stretch so a seek lands on the right
- * value, and 0 on the ground. Null when the replay has no flags.
+ * Jump timer as the live J4L HUD (_nadejumps.gsc while_alive): int(getjumpslowdowntimer() / 100) / 10,
+ * the seconds of land slowdown left (ps->pm_time) before a jump reaches full height again.
+ * CoD2 (CoD2rev bg_jump.cpp Jump_Start / Jump_ApplySlowdown): a jump sets pm_time to 0, so the timer
+ * reads 0 in the air; the first ground frame after a jump sets it to 1800 ms, or 1200 ms when
+ * landing 18+ units above the jump origin, and PM_DropTimers counts it down on the ground and in
+ * the air alike. A jump made before it reaches 0 gets height / (1 + 1.5 * pm_time / 1700) (2.5 at
+ * 1700+). Rebuilt from the samples at playback `time` so seeking is exact: a jump is a takeoff
+ * (flags bit 4) moving up with jump held. Null when the replay has no flags.
+ * ponytail: ignores Jump_ActivateSlowdown on going prone and slide/knockback pm_time, both rare in
+ * runs; add them from `stance` if a replay shows the gap.
  */
 export function jumpTimerAt(samples: ReplaySamples, index: number, time: number): number | null {
-  const { flags, t } = samples;
+  const { flags, input, pos, t, vel } = samples;
   if (!flags || index < 0 || index >= flags.length) return null;
-  if ((flags[index] & FLAG_IN_AIR) === 0) return 0;
-  let start = index;
-  while (start > 0 && (flags[start - 1] & FLAG_IN_AIR) !== 0) start -= 1;
-  return Math.max(0, Math.trunc((time - t[start]) / 100) / 10);
+  const inAir = (i: number) => (flags[i] & FLAG_IN_AIR) !== 0;
+  let landing = -1;
+  for (let i = index; i > 0; i -= 1) {
+    if (!inAir(i)) {
+      // Any jump before an expired landing landed even earlier, so its slowdown is over too.
+      if (time - t[i] >= JUMP_LAND_SLOWDOWN_MS) return 0;
+      landing = i;
+      continue;
+    }
+    const jumped =
+      !inAir(i - 1) &&
+      vel[i * 3 + 2] > 0 &&
+      (!input || ((input[i] | input[i - 1]) & INPUT_JUMP) !== 0);
+    if (!jumped) continue;
+    if (landing < 0) return 0;
+    const high = pos[landing * 3 + 2] >= pos[(i - 1) * 3 + 2] + JUMP_LAND_HIGH_Z;
+    const left = (high ? JUMP_LAND_HIGH_SLOWDOWN_MS : JUMP_LAND_SLOWDOWN_MS) - (time - t[landing]);
+    return Math.max(0, Math.trunc(left / 100) / 10);
+  }
+  return 0;
 }
 
 function speed2d(samples: ReplaySamples, index: number): number {

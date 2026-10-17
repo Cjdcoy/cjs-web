@@ -17,6 +17,26 @@ export interface CodPose {
 export interface ViewerFrame {
   pose: CodPose;
   follow: boolean;
+  /** First-person weapon state; the weapon rests at its idle pose without it. */
+  weapon?: WeaponMotion;
+}
+
+export interface WeaponMotion {
+  /** CoD2 playerState leanf: -0.5 (full left) to 0.5 (full right), ±0.25 prone. */
+  lean: number;
+  /** Milliseconds since the current melee swing started, or null. */
+  meleeMs: number | null;
+  /** Milliseconds since the weapon raise (pullout) started, or null. */
+  raiseMs?: number | null;
+  /** Gun offset from the eye along the view's forward, left and up axes, CoD units. */
+  offset?: readonly [number, number, number];
+  /** Gun pitch (down), yaw (left) and roll relative to the view, degrees, before the lean roll. */
+  angles?: readonly [number, number, number];
+}
+
+/** GetLeanFraction (q_shared): eases leanf, (2 - |f|) * f. */
+export function leanFraction(leanf: number): number {
+  return (2 - Math.abs(leanf)) * leanf;
 }
 
 /** Parses the shareable `#x,y,z,yaw,pitch` camera hash used by the map converter viewer. */
@@ -41,4 +61,19 @@ export function codToScenePosition(x: number, y: number, z: number): [number, nu
 export function codToSceneRotation(pitch: number, yaw: number): [number, number, number] {
   const radians = Math.PI / 180;
   return [-pitch * radians, (yaw - 90) * radians, 0];
+}
+
+/** The CoD pose of a three.js camera: the inverse of codToScenePosition and codToSceneRotation, yaw in [-180, 180). */
+export function sceneToCodPose(
+  [x, y, z]: readonly [number, number, number],
+  [rx, ry]: readonly [number, number],
+): CodPose {
+  const degrees = 180 / Math.PI;
+  return {
+    x: x / METRES_PER_COD_UNIT,
+    y: -z / METRES_PER_COD_UNIT,
+    z: y / METRES_PER_COD_UNIT,
+    pitch: -rx * degrees,
+    yaw: ((((ry * degrees + 90 + 180) % 360) + 360) % 360) - 180,
+  };
 }

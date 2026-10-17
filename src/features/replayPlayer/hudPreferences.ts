@@ -14,10 +14,11 @@ export interface HudPreferences {
   jumpTimer: boolean;
   autoSkip: boolean;
   viewmodel: boolean;
-  sound: boolean;
+  /** The centre mark of the 3D view. */
+  crosshair: boolean;
   /** Web watch heat on the timeline (ADR 0005). */
   heatmap: boolean;
-  /** Sound volume, 0..1. */
+  /** Sound volume, 0..1; 0 is muted. */
   volume: number;
   /**
    * Map render display gamma, 0.5..2.5 (the game's r_gamma; above 1 lifts shadows). Values stored
@@ -42,7 +43,7 @@ export const DEFAULT_HUD_PREFERENCES: Readonly<HudPreferences> = {
   // In-game replays auto-skip failed attempts by default.
   autoSkip: true,
   viewmodel: false,
-  sound: true,
+  crosshair: true,
   heatmap: true,
   volume: 0.5,
   brightness: 1.3,
@@ -52,7 +53,8 @@ type PreferenceStorage = Pick<Storage, "getItem" | "setItem">;
 
 /**
  * Stored preferences, falling back to defaults for a missing, malformed, or other-version entry.
- * Fields added since a document was stored take their defaults; retired ones (`trueAngle`) are ignored.
+ * Fields added since a document was stored take their defaults; retired ones (`trueAngle`) are ignored,
+ * except the retired sound toggle: `sound: false` reads as volume 0 so a muted replay stays silent.
  */
 export function readHudPreferences(storage = browserStorage()): HudPreferences {
   try {
@@ -78,6 +80,7 @@ export function readHudPreferences(storage = browserStorage()): HudPreferences {
         preferences[key] = Math.min(max, Math.max(min, value));
       }
     }
+    if (values.sound === false) preferences.volume = 0;
     return preferences;
   } catch {
     return { ...DEFAULT_HUD_PREFERENCES };

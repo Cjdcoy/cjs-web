@@ -1,5 +1,5 @@
 import type { ReplayMarker, ReplayMarkerKind, ReplaySamples } from "../../lib/api";
-import type { CodPose } from "../mapViewer";
+import { leanFraction, type CodPose } from "../mapViewer";
 
 /**
  * CoD2 eye height above the feet origin by recorder stance code (0 stand, 1 crouch, 2 prone),
@@ -68,7 +68,23 @@ export interface ReplayTimeline {
   stance: Uint8Array;
   /** First sample of the stance run each sample belongs to. */
   stanceStart: Int32Array;
+  /** PM_UpdateLean's leanf at each sample's time, see leanAt. */
+  lean: Float64Array;
+  /** Start times (ms) of melee swings, ascending, see meleeElapsed. */
+  meleeStarts: number[];
 }
+
+/** Recorder input_mask bits (_replay_record.gsc build_input_mask). */
+const INPUT_MELEE = 16;
+const INPUT_LEAN_LEFT = 2048;
+const INPUT_LEAN_RIGHT = 4096;
+const INPUT_IN_AIR = 32768;
+/**
+ * meleeTime of the viewer's weapon, luger_mp2 (zzz weapons/mp/luger_mp2: 0.7 s), which PM_Weapon
+ * (CoD2 1.3 mac:149005) sets as weaponTime on the press. PM_Weapon_CheckForMelee ignores a
+ * press while a swing runs and needs a release first (PMF_MELEE).
+ */
+const MELEE_TIME_MS = 700;
 
 export function createTimeline(samples: ReplaySamples): ReplayTimeline {
   const { pos, t, vel } = samples;
@@ -104,7 +120,105 @@ export function createTimeline(samples: ReplaySamples): ReplayTimeline {
       index > 0 && stance[index] === stance[index - 1] ? stanceStart[index - 1] : index;
   }
 
-  return { samples, start: t[0] ?? 0, end: t[count - 1] ?? 0, snap, stance, stanceStart };
+  const lean = new Float64Array(count);
+  for (let index = 1; index < count; index += 1) {
+    const before = index - 1;
+    lean[index] = leanStep(
+      lean[before],
+      t[index] - t[before],
+      leaning(samples, before),
+      stance[before] === 2 ? 0.25 : 0.5,
+    );
+  }
+
+  return {
+    samples,
+    start: t[0] ?? 0,
+    end: t[count - 1] ?? 0,
+    snap,
+    stance,
+    stanceStart,
+    lean,
+    meleeStarts: meleeStarts(samples),
+  };
+}
+
+/**
+ * PM_UpdateLean (bg_pmove) over `msec` with the lean keys held still: toward ±max at max per 350 ms,
+ * back to 0 at max per 280 ms when released. Linear, so one step equals the game's per-frame steps.
+ * ponytail: skips the 8-unit capsule trace that stops a lean at a wall; needs map collision traces.
+ */
+export function leanStep(leanf: number, msec: number, leaning: number, max: number): number {
+  if (leaning > 0) return Math.min(max, leanf + (msec / 350) * max);
+  if (leaning < 0) return Math.max(-max, leanf - (msec / 350) * max);
+  if (leanf > 0) return Math.max(0, leanf - (msec / 280) * max);
+  return Math.min(0, leanf + (msec / 280) * max);
+}
+
+/** Lean direction sample `index` asks for: the lean keys count only on the ground. */
+function leaning(samples: ReplaySamples, index: number): number {
+  const input = samples.input?.[index] ?? 0;
+  if (input & INPUT_IN_AIR) return 0;
+  return Number((input & INPUT_LEAN_RIGHT) !== 0) - Number((input & INPUT_LEAN_LEFT) !== 0);
+}
+
+/** leanf at `time`, stepped from the sample at or before it, so seeking needs no history. */
+export function leanAt(timeline: ReplayTimeline, time: number): number {
+  const { t } = timeline.samples;
+  const index = findSampleIndex(t, time);
+  if (index < 0) return 0;
+  const max = timeline.stance[index] === 2 ? 0.25 : 0.5;
+  const msec = Math.max(0, time - t[index]);
+  return leanStep(timeline.lean[index], msec, leaning(timeline.samples, index), max);
+}
+
+/**
+ * AddLeanToPosition(eye, yaw, leanf, 16, 20): the eye moves 20 units times the lean fraction along
+ * the right vector rolled by 16° times it, so a full lean is ~14.7 units sideways and ~3.1 down.
+ * CoD2 does not roll the camera itself (CG_CalcViewValues adds no lean to the view angles).
+ */
+export function addLean(pose: CodPose, leanf: number): CodPose {
+  if (leanf === 0) return pose;
+  const fraction = leanFraction(leanf);
+  const roll = (fraction * 16 * Math.PI) / 180;
+  const yaw = (pose.yaw * Math.PI) / 180;
+  const distance = fraction * 20;
+  // AngleVectors' right vector at pitch 0: (cos r sin y, -cos r cos y, -sin r).
+  return {
+    ...pose,
+    x: pose.x + distance * Math.cos(roll) * Math.sin(yaw),
+    y: pose.y - distance * Math.cos(roll) * Math.cos(yaw),
+    z: pose.z - distance * Math.sin(roll),
+  };
+}
+
+/**
+ * Melee swing starts: a press (input bit 16) with a weapon out, not within MELEE_TIME_MS of the
+ * last swing. ponytail: presses shorter than the 50 ms sample spacing are missed, and reload,
+ * raise/drop and grenade states that also block a swing are not recorded.
+ */
+function meleeStarts(samples: ReplaySamples): number[] {
+  const starts: number[] = [];
+  const { aux, input, t } = samples;
+  if (!input) return starts;
+  let held = false;
+  for (let index = 0; index < t.length; index += 1) {
+    const pressed = (input[index] & INPUT_MELEE) !== 0;
+    const armed = (((aux?.[index] ?? 0) >> 1) & 3) < 2;
+    const last = starts.at(-1);
+    if (pressed && !held && armed && (last === undefined || t[index] - last >= MELEE_TIME_MS)) {
+      starts.push(t[index]);
+    }
+    held = pressed;
+  }
+  return starts;
+}
+
+/** Milliseconds since the latest melee swing started at or before `time`, or null. */
+export function meleeElapsed(timeline: ReplayTimeline, time: number): number | null {
+  const starts = timeline.meleeStarts;
+  const index = findSampleIndex(starts, time);
+  return index < 0 || starts[index] > time ? null : time - starts[index];
 }
 
 /**

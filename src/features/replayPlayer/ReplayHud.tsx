@@ -26,7 +26,7 @@ export function ReplayHud({
 }: {
   fps: number | null;
   helper: AngleHelperState | null;
-  /** Seconds airborne, or null to hide the jump timer. */
+  /** Seconds of jump slowdown left, or null to hide the jump timer. */
   jumpTimer: number | null;
   /** Pressed state per REPLAY_KEYS entry, or null to hide the key display. */
   keys: readonly boolean[] | null;

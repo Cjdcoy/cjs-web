@@ -8,13 +8,22 @@ import {
   RectangleHorizontal,
   SkipBack,
   SkipForward,
+  Sun,
+  Volume1,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, IconButton, Select, VisuallyHidden } from "../../components/ui";
 import type { ReplayMarkerKind, ReplaySamples } from "../../lib/api";
 import { getViewmodelUrl } from "../../lib/mapModels";
 import { MapViewer, type CodPose, type ViewerFrame, type ViewmodelOptions } from "../mapViewer";
-import { useHudPreferences, type HudPreferences, type HudToggleKey } from "./hudPreferences";
+import {
+  DEFAULT_HUD_PREFERENCES,
+  useHudPreferences,
+  type HudPreferences,
+  type HudToggleKey,
+} from "./hudPreferences";
 import { ReplayHud } from "./ReplayHud";
 import {
   angleHelperAt,
@@ -27,16 +36,20 @@ import {
   weaponHolstered,
 } from "./replayHudModel";
 import {
+  addLean,
   createTimeline,
   eyeHeight,
   findMarker,
   findSampleIndex,
   formatReplayClock,
+  leanAt,
+  meleeElapsed,
   pathSegments,
   sampleMotion,
   samplePose,
   type ReplayTimeline,
 } from "./replayPlayback";
+import { createWeaponTrack, weaponAt } from "./replayWeapon";
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { ReplayHeatStrip } from "./ReplayWebViews";
 import { PLAYBACK_SPEEDS, useReplayPlayback, type PlaybackObserver } from "./useReplayPlayback";
@@ -57,6 +70,7 @@ const MARKER_LABELS: Readonly<Record<TimelineKind, string>> = {
 
 export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples: ReplaySamples }) {
   const timeline = useMemo(() => createTimeline(samples), [samples]);
+  const weaponTrack = useMemo(() => createWeaponTrack(timeline), [timeline]);
   const path = useMemo(() => pathSegments(timeline), [timeline]);
   const { start, end } = timeline;
   const [preferences, setPreference] = useHudPreferences();
@@ -69,7 +83,6 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
   const { executedSkips, flushSegment, getTime, playing, seek, setPlaying, setSpeed, speed, time } =
     playback;
   const sound = useReplaySound({
-    enabled: preferences.sound,
     getTime,
     playing,
     speed,
@@ -104,11 +117,12 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
       autoSkip: samples.skips !== undefined,
       speed: true,
       viewmodel: viewmodelUrl !== null && !viewmodelMissing,
-      sound: sound.status !== "unavailable",
+      crosshair: true,
       heatmap: heatReady,
     }),
-    [heatReady, samples, sound.status, viewmodelMissing, viewmodelUrl],
+    [heatReady, samples, viewmodelMissing, viewmodelUrl],
   );
+  const soundAvailable = sound.status !== "unavailable";
   const fps = fpsAt(samples, time);
   const skipped = skippedFails(executedSkips, time);
   const [follow, setFollow] = useState(true);
@@ -138,10 +152,26 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     followRef.current = follow;
   }, [follow]);
 
-  const getFrame = useCallback(
-    (): ViewerFrame => ({ pose: samplePose(timeline, getTime()), follow: followRef.current }),
-    [getTime, timeline],
-  );
+  const getFrame = useCallback((): ViewerFrame => {
+    const time = getTime();
+    const lean = leanAt(timeline, time);
+    const eye = samplePose(timeline, time);
+    const gun = weaponAt(weaponTrack, time, eye.pitch);
+    const pose = addLean({ ...eye, z: eye.z + gun.dip }, lean);
+    // CG_CalcViewValues keeps the eye at least 8 units above the feet (mac:349292-349294).
+    const feet = eye.z - eyeHeight(timeline, time);
+    return {
+      pose: { ...pose, z: Math.max(pose.z, feet + 8) },
+      follow: followRef.current,
+      weapon: {
+        lean,
+        meleeMs: meleeElapsed(timeline, time),
+        raiseMs: gun.raiseMs,
+        offset: gun.offset,
+        angles: gun.angles,
+      },
+    };
+  }, [getTime, timeline, weaponTrack]);
 
   const timelineMarkers = useMemo(
     () => samples.markers.filter((marker) => marker.kind !== "fps"),
@@ -156,18 +186,30 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
   const { unlock: unlockSound } = sound;
   const togglePlaying = useCallback(() => {
     // Play is the user gesture that lets the browser start audio.
-    if (!playing && preferences.sound) unlockSound();
+    if (!playing && preferences.volume > 0) unlockSound();
     setPlaying(!playing);
     setAnnouncement(playing ? "Paused" : "Playing");
-  }, [playing, preferences.sound, setPlaying, unlockSound]);
+  }, [playing, preferences.volume, setPlaying, unlockSound]);
 
-  const changePreference = useCallback(
-    (key: HudToggleKey, value: boolean) => {
-      if (key === "sound" && value) unlockSound();
-      setPreference(key, value);
+  // Unmute restores the last audible volume.
+  const audibleVolume = useRef(preferences.volume || DEFAULT_HUD_PREFERENCES.volume);
+  const changeVolume = useCallback(
+    (next: number) => {
+      // A volume change is also an audio-starting gesture; decide on the new value, not the
+      // rendered one, which is still the old volume during this event.
+      if (next > 0) {
+        unlockSound();
+        audibleVolume.current = next;
+      }
+      setPreference("volume", next);
     },
     [setPreference, unlockSound],
   );
+  const toggleMute = useCallback(() => {
+    const next = preferences.volume > 0 ? 0 : audibleVolume.current;
+    changeVolume(next);
+    setAnnouncement(next > 0 ? "Sound on" : "Muted");
+  }, [changeVolume, preferences.volume]);
 
   const changeSpeed = useCallback(
     (next: number) => {
@@ -251,8 +293,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
           break;
         case "m":
         case "M":
-          changePreference("sound", !preferences.sound);
-          setAnnouncement(preferences.sound ? "Sound off" : "Sound on");
+          toggleMute();
           break;
         case "?":
           shortcutsRef.current?.showModal();
@@ -287,9 +328,8 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     speed,
     toggleFollow,
     toggleMode,
+    toggleMute,
     togglePlaying,
-    changePreference,
-    preferences.sound,
   ]);
 
   return (
@@ -302,6 +342,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     >
       <MapViewer
         brightness={preferences.brightness}
+        crosshair={preferences.crosshair}
         getFrame={getFrame}
         mapName={samples.mapname}
         modelUrl={modelUrl}
@@ -318,7 +359,10 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
             }
             jumpTimer={preferences.jumpTimer ? jumpTimerAt(samples, sampleIndex, time) : null}
             keys={preferences.keys ? keysAt(samples, sampleIndex) : null}
-            position={preferences.position ? positionHudLines(feetPose(timeline, time)) : null}
+            // The free camera shows its own position readout in the same corner.
+            position={
+              preferences.position && follow ? positionHudLines(feetPose(timeline, time)) : null
+            }
             speed={preferences.speed ? speedAt(samples, sampleIndex) : null}
           />
         }
@@ -353,6 +397,14 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
               >
                 <SkipForward size={18} aria-hidden="true" />
               </IconButton>
+              <Levels
+                brightness={preferences.brightness}
+                soundAvailable={soundAvailable}
+                volume={preferences.volume}
+                onBrightnessChange={(brightness) => setPreference("brightness", brightness)}
+                onVolumeChange={changeVolume}
+                onToggleMute={toggleMute}
+              />
               <span className="cjs-replay-player__clock">
                 {formatReplayClock(time - start)} <span aria-hidden="true">/</span>
                 <VisuallyHidden> of </VisuallyHidden> {formatReplayClock(span)}
@@ -464,9 +516,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
                   : undefined
               }
               preferences={preferences}
-              onChange={changePreference}
-              onVolumeChange={(volume) => setPreference("volume", volume)}
-              onBrightnessChange={(brightness) => setPreference("brightness", brightness)}
+              onChange={setPreference}
               autoSkipStatus={
                 available.autoSkip
                   ? `Auto-skip: ${preferences.autoSkip ? "ON" : "OFF"}${skipped > 0 ? ` · Skipped ${skipped} fails` : ""}`
@@ -491,24 +541,86 @@ const HUD_TOGGLES: readonly {
   label: string;
   unavailable: string;
 }[] = [
-  { key: "angleHelper", label: "Angle helper", unavailable: "not recorded in this replay" },
+  { key: "angleHelper", label: "Anglehelper", unavailable: "not recorded in this replay" },
   { key: "keys", label: "Keys", unavailable: "not recorded in this replay" },
   { key: "speed", label: "Speed", unavailable: "not recorded in this replay" },
   { key: "fps", label: "FPS", unavailable: "unknown for this run" },
   { key: "position", label: "Position", unavailable: "not recorded in this replay" },
-  { key: "jumpTimer", label: "Jump timer", unavailable: "not recorded in this replay" },
-  { key: "viewmodel", label: "Hand and gun", unavailable: "weapon model unavailable" },
+  { key: "jumpTimer", label: "Jumptimer", unavailable: "not recorded in this replay" },
+  { key: "viewmodel", label: "Draw gun", unavailable: "weapon model unavailable" },
+  { key: "crosshair", label: "Crosshair", unavailable: "" },
   { key: "autoSkip", label: "Auto-skip fails", unavailable: "no skip plan in this replay" },
-  { key: "sound", label: "Sound", unavailable: "sounds unavailable" },
 ];
+
+/** Volume and brightness, video-player style: an icon and a short slider each. */
+function Levels({
+  brightness,
+  onBrightnessChange,
+  onToggleMute,
+  onVolumeChange,
+  soundAvailable,
+  volume,
+}: {
+  brightness: number;
+  onBrightnessChange: (brightness: number) => void;
+  onToggleMute: () => void;
+  onVolumeChange: (volume: number) => void;
+  soundAvailable: boolean;
+  volume: number;
+}) {
+  const VolumeIcon = volume === 0 ? VolumeX : volume < 0.5 ? Volume1 : Volume2;
+  const volumeText = `${Math.round(volume * 100)}%`;
+  const brightnessText = `${Math.round(brightness * 100)}%`;
+  return (
+    <div className="cjs-replay-player__levels">
+      <span className="cjs-replay-player__level">
+        <IconButton
+          label={!soundAvailable ? "Sound unavailable" : volume === 0 ? "Unmute" : "Mute"}
+          aria-keyshortcuts="M"
+          disabled={!soundAvailable}
+          size="small"
+          variant="ghost"
+          onClick={onToggleMute}
+        >
+          <VolumeIcon size={18} aria-hidden="true" />
+        </IconButton>
+        <input
+          type="range"
+          aria-label="Volume"
+          title={`Volume ${volumeText}`}
+          min={0}
+          max={1}
+          step={0.05}
+          value={volume}
+          disabled={!soundAvailable}
+          aria-valuetext={volumeText}
+          onChange={(event) => onVolumeChange(Number(event.currentTarget.value))}
+        />
+      </span>
+      <label className="cjs-replay-player__level" title={`Brightness ${brightnessText}`}>
+        <span className="cjs-replay-player__level-icon">
+          <Sun size={18} aria-hidden="true" />
+        </span>
+        <input
+          type="range"
+          aria-label="Brightness"
+          min={0.5}
+          max={2.5}
+          step={0.05}
+          value={brightness}
+          aria-valuetext={brightnessText}
+          onChange={(event) => onBrightnessChange(Number(event.currentTarget.value))}
+        />
+      </label>
+    </div>
+  );
+}
 
 function HudToggles({
   autoSkipStatus,
   available,
   heatNote,
   onChange,
-  onBrightnessChange,
-  onVolumeChange,
   preferences,
 }: {
   autoSkipStatus: string | null;
@@ -516,11 +628,8 @@ function HudToggles({
   /** Undefined hides the watch heat toggle (feature off); null means the heat is shown. */
   heatNote: string | null | undefined;
   onChange: (key: HudToggleKey, value: boolean) => void;
-  onVolumeChange: (volume: number) => void;
-  onBrightnessChange: (brightness: number) => void;
   preferences: HudPreferences;
 }) {
-  const soundOn = available.sound && preferences.sound;
   return (
     <fieldset className="cjs-replay-player__hud">
       <legend>HUD</legend>
@@ -548,32 +657,6 @@ function HudToggles({
           {heatNote && <span className="cjs-replay-player__hud-note">({heatNote})</span>}
         </label>
       )}
-      <label className="cjs-replay-player__slider">
-        Volume
-        <input
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={preferences.volume}
-          disabled={!soundOn}
-          aria-valuetext={`${Math.round(preferences.volume * 100)}%`}
-          onChange={(event) => onVolumeChange(Number(event.currentTarget.value))}
-        />
-      </label>
-      <label className="cjs-replay-player__slider">
-        Brightness
-        <input
-          type="range"
-          min={0.5}
-          max={2.5}
-          step={0.05}
-          value={preferences.brightness}
-          aria-valuetext={`${Math.round(preferences.brightness * 100)}%`}
-          onChange={(event) => onBrightnessChange(Number(event.currentTarget.value))}
-        />
-        <span aria-hidden="true">{Math.round(preferences.brightness * 100)}%</span>
-      </label>
       {autoSkipStatus && <span className="cjs-replay-player__auto-skip">{autoSkipStatus}</span>}
     </fieldset>
   );

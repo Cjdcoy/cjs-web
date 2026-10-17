@@ -103,10 +103,12 @@
   cursor: none;
 }
 
+/* Transport and options share a row while both fit; the options wrap below it otherwise. */
 .cjs-replay-player__controls {
-  display: grid;
-  grid-template-columns: 1fr auto;
-  align-items: end;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
   gap: var(--cjs-space-3);
   padding: var(--cjs-space-3) var(--cjs-space-4);
   border: var(--cjs-border-width) solid var(--cjs-color-border);
@@ -141,7 +143,35 @@
 
 .cjs-replay-player__timeline,
 .cjs-replay-player__legend {
-  grid-column: 1 / -1;
+  flex-basis: 100%;
+}
+
+/* Volume and brightness: kept together on one line next to the playback buttons. */
+.cjs-replay-player__levels,
+.cjs-replay-player__level {
+  display: inline-flex;
+  align-items: center;
+}
+
+.cjs-replay-player__levels {
+  gap: var(--cjs-space-3);
+}
+
+.cjs-replay-player__level {
+  gap: var(--cjs-space-1);
+}
+
+.cjs-replay-player__level-icon {
+  display: inline-grid;
+  width: var(--cjs-control-height-sm);
+  place-items: center;
+  color: var(--cjs-color-text-muted);
+}
+
+.cjs-replay-player__level input {
+  width: 5rem;
+  margin: 0;
+  accent-color: var(--cjs-color-accent);
 }
 
 .cjs-replay-player__timeline {
@@ -282,7 +312,7 @@
 
 .cjs-replay-player__hud {
   display: flex;
-  grid-column: 1 / -1;
+  flex-basis: 100%;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--cjs-space-2) var(--cjs-space-4);
@@ -311,10 +341,6 @@
 
 .cjs-replay-player__hud input {
   accent-color: var(--cjs-color-accent);
-}
-
-.cjs-replay-player__slider input {
-  width: 7rem;
 }
 
 .cjs-replay-player__hud label:has(input:disabled) {
@@ -406,8 +432,8 @@
   text-shadow: 1px 1px 0 var(--cjs-color-cod-0);
 }
 
-.cjs-replay-hud__speed[data-trend="up"],
-.cjs-replay-hud__jump-timer {
+/* The live jump timer hudelem keeps the default white (_nadejumps.gsc). */
+.cjs-replay-hud__speed[data-trend="up"] {
   color: var(--cjs-color-cod-2);
 }
 
@@ -459,12 +485,6 @@
   font-size: max(var(--cjs-font-size-xs), calc(0.75 * 12 / 480 * 100cqh));
   line-height: var(--cjs-line-height-tight);
   white-space: pre;
-}
-
-@media (max-width: 47.999rem) {
-  .cjs-replay-player__controls {
-    grid-template-columns: 1fr;
-  }
 }
 
 /* Web watch heat (ADR 0005): one gradient band in the marker lane, under the ticks. */

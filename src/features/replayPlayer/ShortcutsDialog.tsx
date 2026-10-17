@@ -10,7 +10,7 @@ const SHORTCUTS: readonly [keys: string, action: string][] = [
   ["C", "Free camera on or off"],
   ["F", "Full screen on or off"],
   ["T", "Cinema mode on or off"],
-  ["M", "Sound on or off"],
+  ["M", "Mute or unmute"],
   ["Esc", "Leave cinema mode or full screen"],
   ["?", "Show these shortcuts"],
 ];

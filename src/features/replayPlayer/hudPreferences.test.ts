@@ -45,12 +45,29 @@ describe("replay HUD preferences", () => {
     expect(preferences).not.toHaveProperty("trueAngle");
   });
 
-  it("keeps the volume in range and defaults sound on at half volume", () => {
-    expect(DEFAULT_HUD_PREFERENCES).toMatchObject({ sound: true, volume: 0.5 });
+  it("keeps the volume in range and defaults to half volume", () => {
+    expect(DEFAULT_HUD_PREFERENCES.volume).toBe(0.5);
+    expect(DEFAULT_HUD_PREFERENCES).not.toHaveProperty("sound");
     const stored = (volume: unknown) => memoryStorage(JSON.stringify({ version: 1, volume }));
     expect(readHudPreferences(stored(0.2)).volume).toBe(0.2);
     expect(readHudPreferences(stored(3)).volume).toBe(1);
     expect(readHudPreferences(stored("loud")).volume).toBe(0.5);
+  });
+
+  it("reads the retired sound toggle: off becomes volume 0, on keeps the volume", () => {
+    const stored = (sound: boolean) =>
+      memoryStorage(JSON.stringify({ version: 1, sound, volume: 0.7 }));
+    expect(readHudPreferences(stored(false)).volume).toBe(0);
+    expect(readHudPreferences(stored(true)).volume).toBe(0.7);
+    expect(readHudPreferences(stored(false))).not.toHaveProperty("sound");
+  });
+
+  it("shows the crosshair by default, also for documents stored before it existed", () => {
+    expect(DEFAULT_HUD_PREFERENCES.crosshair).toBe(true);
+    const stored = (crosshair?: boolean) =>
+      memoryStorage(JSON.stringify({ version: 1, crosshair }));
+    expect(readHudPreferences(stored()).crosshair).toBe(true);
+    expect(readHudPreferences(stored(false)).crosshair).toBe(false);
   });
 
   it("defaults brightness to 130% for older documents and keeps it in range", () => {

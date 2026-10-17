@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { ReplayMarker, ReplaySamples } from "../../lib/api";
 import {
+  addLean,
   createTimeline,
   effectiveStance,
   eyeHeight,
@@ -8,7 +9,10 @@ import {
   findSampleIndex,
   formatReplayClock,
   hermite,
+  leanAt,
+  leanStep,
   lerpAngle,
+  meleeElapsed,
   pathSegments,
   sampleMotion,
   samplePose,
@@ -162,6 +166,74 @@ describe("replay interpolation", () => {
     expect(findSampleIndex(t, 399)).toBe(3);
     expect(findSampleIndex(t, 9_000)).toBe(4);
     expect(findSampleIndex([], 10)).toBe(-1);
+  });
+});
+
+describe("lean and melee", () => {
+  const LEFT = 2048;
+  const RIGHT = 4096;
+  const MELEE = 16;
+  const IN_AIR = 32768;
+  // 50 ms samples standing still at the origin, facing yaw 90 (CoD +Y), with these input masks.
+  function held(input: number[], aux: number[] = input.map(() => 0)): ReplaySamples {
+    return {
+      ...samples(input.map((_, index) => ({ t: index * 50, pos: [0, 0, 0] }))),
+      input,
+      aux,
+    };
+  }
+
+  it("ramps leanf like PM_UpdateLean: 350 ms to full, 280 ms back", () => {
+    expect(leanStep(0, 175, 1, 0.5)).toBeCloseTo(0.25);
+    expect(leanStep(0, 1_000, 1, 0.5)).toBe(0.5);
+    expect(leanStep(0, 1_000, -1, 0.25)).toBe(-0.25);
+    expect(leanStep(0.5, 140, 0, 0.5)).toBeCloseTo(0.25);
+    expect(leanStep(-0.5, 1_000, 0, 0.5)).toBe(0);
+    // Going prone while leaning snaps to the prone limit.
+    expect(leanStep(0.5, 4, 1, 0.25)).toBe(0.25);
+  });
+
+  it("steps leanf from the sample history, so a seek lands on the same value", () => {
+    const timeline = createTimeline(
+      held([RIGHT, RIGHT, RIGHT, RIGHT, RIGHT, RIGHT, RIGHT, RIGHT, 0, 0]),
+    );
+    expect(leanAt(timeline, 0)).toBe(0);
+    expect(leanAt(timeline, 175)).toBeCloseTo(0.25);
+    expect(leanAt(timeline, 360)).toBe(0.5);
+    // Released at sample 8 (400 ms): 140 ms later halfway back.
+    expect(leanAt(timeline, 540)).toBeCloseTo(0.25);
+    expect(leanAt(timeline, 175)).toBeCloseTo(0.25);
+  });
+
+  it("ignores the lean keys in the air", () => {
+    const timeline = createTimeline(held([LEFT | IN_AIR, LEFT | IN_AIR, LEFT]));
+    expect(leanAt(timeline, 100)).toBe(0);
+    expect(leanAt(timeline, 135)).toBeCloseTo(-0.05);
+  });
+
+  it("moves the eye like AddLeanToPosition with no camera roll", () => {
+    const pose = { x: 0, y: 0, z: 60, pitch: 0, yaw: 90 };
+    // Full right lean facing +Y: right is +X; fraction 0.75 over 20 units, rolled by 12°.
+    const right = addLean(pose, 0.5);
+    expect(right.x).toBeCloseTo(15 * Math.cos(Math.PI / 15));
+    expect(right.y).toBeCloseTo(0);
+    expect(right.z).toBeCloseTo(60 - 15 * Math.sin(Math.PI / 15));
+    const left = addLean(pose, -0.5);
+    expect(left.x).toBeCloseTo(-right.x);
+    expect(left.z).toBeCloseTo(right.z);
+    expect(addLean(pose, 0)).toBe(pose);
+  });
+
+  it("starts a melee swing per press, not while one runs or without a weapon", () => {
+    const noWeapon = 3 << 1;
+    const input = [0, MELEE, MELEE, 0, MELEE, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, MELEE, 0, MELEE];
+    const aux = input.map((_, index) => (index === 18 ? noWeapon : 0));
+    const timeline = createTimeline(held(input, aux));
+    // Pressed at 50 ms; held, then re-pressed at 200 ms mid-swing (ignored); again at 800 ms.
+    expect(timeline.meleeStarts).toEqual([50, 800]);
+    expect(meleeElapsed(timeline, 40)).toBeNull();
+    expect(meleeElapsed(timeline, 300)).toBe(250);
+    expect(meleeElapsed(timeline, 950)).toBe(150);
   });
 });
 

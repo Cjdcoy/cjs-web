@@ -155,21 +155,36 @@ describe("position HUD and jump timer", () => {
     );
   });
 
-  it("times the current airborne stretch from playback time, truncated to 0.1 s", () => {
-    const run = samples({
-      t: [0, 100, 200, 300, 400, 500],
-      flags: [0, 4, 4, 4, 0, 4],
-      pos: Array(18).fill(0),
-      ang: Array(18).fill(0),
-      vel: Array(18).fill(0),
-      stance: Array(6).fill(0),
-    });
-    expect(jumpTimerAt(run, 0, 50)).toBe(0);
-    expect(jumpTimerAt(run, 1, 199)).toBe(0); // 99 ms
-    // Seeking straight to 390 ms finds the stretch that began at 100 ms.
-    expect(jumpTimerAt(run, 3, 390)).toBe(0.2);
-    expect(jumpTimerAt(run, 4, 400)).toBe(0);
-    expect(jumpTimerAt(run, 5, 1_750)).toBe(1.2);
+  it("counts down the land slowdown left after a jump, truncated to 0.1 s", () => {
+    // Jump at 100, land level at 300, walk off at 400, land 500, jump at 600, land 20 units up at 700.
+    const z = [0, 30, 10, 0, -5, -5, 20, 15];
+    const run = (input?: number[]) =>
+      samples({
+        t: [0, 100, 200, 300, 400, 500, 600, 700],
+        flags: [0, 4, 4, 0, 4, 0, 4, 0],
+        input,
+        pos: z.flatMap((value) => [0, 0, value]),
+        ang: Array(24).fill(0),
+        vel: [0, 200, -50, 0, -10, 0, 180, 0].flatMap((value) => [0, 0, value]),
+        stance: Array(8).fill(0),
+      });
+    const replay = run([2, 2, 0, 0, 2, 0, 2, 0]);
+    expect(jumpTimerAt(replay, 0, 50)).toBe(0);
+    expect(jumpTimerAt(replay, 2, 250)).toBe(0); // airborne after a jump
+    expect(jumpTimerAt(replay, 3, 300)).toBe(1.8);
+    expect(jumpTimerAt(replay, 3, 350)).toBe(1.7);
+    // Walking off (jump held, but not moving up) keeps counting down in the air.
+    expect(jumpTimerAt(replay, 4, 450)).toBe(1.6);
+    expect(jumpTimerAt(replay, 5, 599)).toBe(1.5);
+    // A jump resets it to 0; landing 18+ units above the jump origin gives 1.2 s.
+    expect(jumpTimerAt(replay, 6, 650)).toBe(0);
+    expect(jumpTimerAt(replay, 7, 700)).toBe(1.2);
+    expect(jumpTimerAt(replay, 7, 1_799)).toBe(0.1);
+    expect(jumpTimerAt(replay, 7, 1_801)).toBe(0);
+    expect(jumpTimerAt(replay, 7, 5_000)).toBe(0);
+    // Moving up without jump held is not a jump; without recorded input any upward takeoff is.
+    expect(jumpTimerAt(run([2, 2, 0, 0, 0, 0, 0, 0]), 7, 700)).toBe(1.4);
+    expect(jumpTimerAt(run(), 7, 700)).toBe(1.2);
     expect(jumpTimerAt(samples(), 1, 50)).toBeNull();
   });
 });

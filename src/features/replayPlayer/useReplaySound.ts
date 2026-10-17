@@ -29,25 +29,24 @@ const MAX_CONTINUOUS_MS = 400;
 const MAX_LATE_SECONDS = 0.15;
 
 /**
- * Plays replay sound events through Web Audio. The manifest loads on first enable; the audio
- * context starts on a user gesture (`unlock`, called from Play). Sounds play only during forward
- * playback at up to 2× speed.
+ * Plays replay sound events through Web Audio. Volume 0 is off: nothing loads or plays. The
+ * manifest loads once the volume is up; the audio context starts on a user gesture (`unlock`,
+ * called from Play or a volume change). Sounds play only during forward playback at up to 2× speed.
  */
 export function useReplaySound({
-  enabled,
   getTime,
   playing,
   speed,
   timeline,
   volume,
 }: {
-  enabled: boolean;
   getTime: () => number;
   playing: boolean;
   speed: number;
   timeline: ReplayTimeline;
   volume: number;
 }) {
+  const enabled = volume > 0;
   const manifestUrl = modelAssetUrl("sounds/sounds.json");
   const [manifest, setManifest] = useState<SoundManifest | null>(null);
   const [failed, setFailed] = useState(false);
@@ -81,7 +80,8 @@ export function useReplaySound({
 
   /**
    * Starts (or resumes) audio from a user gesture such as the Play click. Not gated on `enabled`:
-   * the sound toggle calls it in the same gesture, before its new value has rendered.
+   * a volume change calls it in the same gesture, before its new value has rendered, so the caller
+   * decides from the incoming volume.
    */
   const unlock = useCallback(() => {
     if (typeof AudioContext === "undefined") return;

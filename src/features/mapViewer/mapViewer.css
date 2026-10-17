@@ -37,16 +37,60 @@
   cursor: crosshair;
 }
 
-.cjs-map-viewer__crosshair {
+/*
+ * CoD2's hip reticle: four side ticks around an empty centre, white with the texture's dark
+ * outline. Sizes are set per view height (viewerHud.ts hipReticle); game colours, not brand ones.
+ */
+.cjs-map-viewer__reticle {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: var(--cjs-space-2);
-  height: var(--cjs-space-2);
-  border: var(--cjs-border-width) solid var(--cjs-color-text);
-  border-radius: var(--cjs-radius-pill);
+  top: round(down, 50%, 1px);
+  left: round(down, 50%, 1px);
   pointer-events: none;
-  transform: translate(-50%, -50%);
+}
+
+/*
+ * One top tick, turned about the view centre for the other three sides. The nudge moves the centre
+ * to a pixel's middle for odd line widths, inside the transform since layout offsets get snapped.
+ */
+.cjs-map-viewer__reticle > span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--cjs-reticle-width, 1px);
+  height: var(--cjs-reticle-length, 4px);
+  background: var(--cjs-color-cod-7);
+  box-shadow: 0 0 0 var(--cjs-reticle-outline, 1px) var(--cjs-color-cod-0);
+  transform: translate(var(--cjs-reticle-nudge, 0.5px), var(--cjs-reticle-nudge, 0.5px))
+    rotate(var(--cjs-reticle-turn, 0deg))
+    translate(-50%, calc(-100% - var(--cjs-reticle-offset, 7px) - var(--cjs-reticle-nudge, 0.5px)));
+  transform-origin: 0 0;
+}
+
+.cjs-map-viewer__reticle > span:nth-child(2) {
+  --cjs-reticle-turn: 90deg;
+}
+
+.cjs-map-viewer__reticle > span:nth-child(3) {
+  --cjs-reticle-turn: 180deg;
+}
+
+.cjs-map-viewer__reticle > span:nth-child(4) {
+  --cjs-reticle-turn: 270deg;
+}
+
+/* Free-camera position, angles and speed, placed like the game's poshud (top left at 8, 28). */
+.cjs-map-viewer__readout {
+  position: absolute;
+  top: calc(28 / 480 * 100%);
+  left: calc(8 / 640 * 100%);
+  color: var(--cjs-color-cod-7);
+  font-family: var(--cjs-font-mono);
+  font-size: var(--cjs-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--cjs-line-height-tight);
+  text-shadow: 1px 1px 0 var(--cjs-color-cod-0);
+  white-space: pre;
+  pointer-events: none;
 }
 
 .cjs-map-viewer__overlay {

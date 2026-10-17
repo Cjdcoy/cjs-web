@@ -115,10 +115,10 @@ describe("ReplayPage", () => {
     expect(container.querySelectorAll(".cjs-replay-hud__bar")).toHaveLength(2);
     expect(container.querySelector("[data-zone]")).toHaveAttribute("data-zone", "deadzone");
     expect(within(hud).queryByText(/real-world scale/)).not.toBeInTheDocument();
-    // Position and jump timer start off; on, they show the feet origin and green 0 at the start.
+    // Position and jump timer start off; on, they show the feet origin and white 0 at the start.
     expect(container.querySelector(".cjs-replay-hud__position")).not.toBeInTheDocument();
     await user.click(within(hud).getByRole("checkbox", { name: "Position" }));
-    await user.click(within(hud).getByRole("checkbox", { name: "Jump timer" }));
+    await user.click(within(hud).getByRole("checkbox", { name: "Jumptimer" }));
     expect(container.querySelector(".cjs-replay-hud__position")?.textContent).toBe(
       "0.00 0.00 0.00\n0.00 90.00 0.00",
     );
@@ -141,10 +141,10 @@ describe("ReplayPage", () => {
       speed: false,
     });
 
-    await user.click(within(hud).getByRole("checkbox", { name: "Hand and gun" }));
+    await user.click(within(hud).getByRole("checkbox", { name: "Draw gun" }));
     expect(viewerProps.current?.viewmodel?.visible).toBe(true);
     act(() => viewerProps.current?.viewmodel?.onUnavailable());
-    expect(within(hud).getByRole("checkbox", { name: /Hand and gun/ })).toBeDisabled();
+    expect(within(hud).getByRole("checkbox", { name: /Draw gun/ })).toBeDisabled();
     expect(within(hud).getByText("(weapon model unavailable)")).toBeInTheDocument();
   });
 
@@ -215,7 +215,7 @@ describe("ReplayPage", () => {
     }
   });
 
-  it("offers sound with a volume, toggled with M and remembered", async () => {
+  it("mutes with the volume icon or M, restores the last volume, and remembers it", async () => {
     server.use(
       http.get("*/sounds/sounds.json", () =>
         HttpResponse.json({ surfaceTypes: ["none"], rules: { footsteps: {} } }),
@@ -224,22 +224,22 @@ describe("ReplayPage", () => {
     const user = userEvent.setup();
     render(<ReplayPage apiClient={apiReturning(Promise.resolve(hudSamples))} runId="7001" />);
 
-    const hud = await screen.findByRole("group", { name: "HUD" });
-    const sound = within(hud).getByRole("checkbox", { name: "Sound" });
-    const volume = within(hud).getByRole("slider", { name: "Volume" });
-    expect(sound).toBeChecked();
+    const volume = await screen.findByRole("slider", { name: "Volume" });
     expect(volume).toHaveAttribute("aria-valuetext", "50%");
+    expect(screen.queryByRole("checkbox", { name: /Sound/ })).not.toBeInTheDocument();
+    fireEvent.change(volume, { target: { value: "0.8" } });
     act(() => document.body.focus());
     await user.keyboard("m");
-    expect(sound).not.toBeChecked();
-    expect(volume).toBeDisabled();
-    expect(JSON.parse(storageValues.get("cjs.replay-hud") ?? "{}")).toMatchObject({
-      sound: false,
-      volume: 0.5,
-    });
+    expect(volume).toHaveAttribute("aria-valuetext", "0%");
+    expect(JSON.parse(storageValues.get("cjs.replay-hud") ?? "{}")).toMatchObject({ volume: 0 });
+
+    await user.click(screen.getByRole("button", { name: "Unmute" }));
+    expect(volume).toHaveAttribute("aria-valuetext", "80%");
+    await user.click(screen.getByRole("button", { name: "Mute" }));
+    expect(volume).toHaveAttribute("aria-valuetext", "0%");
   });
 
-  it("starts audio when sound is turned on during playback", async () => {
+  it("starts audio when the volume is raised from 0 during playback", async () => {
     server.use(
       http.get("*/sounds/sounds.json", () =>
         HttpResponse.json({ surfaceTypes: ["none"], rules: { footsteps: {} } }),
@@ -267,21 +267,45 @@ describe("ReplayPage", () => {
     const user = userEvent.setup();
     render(<ReplayPage apiClient={apiReturning(Promise.resolve(hudSamples))} runId="7001" />);
 
-    const hud = await screen.findByRole("group", { name: "HUD" });
-    const sound = within(hud).getByRole("checkbox", { name: "Sound" });
-    await user.click(sound);
+    const volume = await screen.findByRole("slider", { name: "Volume" });
+    fireEvent.change(volume, { target: { value: "0" } });
     await user.click(screen.getByRole("button", { name: "Play" }));
     expect(contexts).toHaveLength(0);
 
-    await user.click(sound);
+    fireEvent.change(volume, { target: { value: "0.3" } });
     expect(contexts).toHaveLength(1);
+  });
+
+  it("keeps a replay muted by the retired sound toggle silent", async () => {
+    storageValues.set("cjs.replay-hud", JSON.stringify({ version: 1, sound: false, volume: 0.5 }));
+    render(<ReplayPage apiClient={apiReturning(Promise.resolve(hudSamples))} runId="7001" />);
+
+    expect(await screen.findByRole("slider", { name: "Volume" })).toHaveAttribute(
+      "aria-valuetext",
+      "0%",
+    );
+    expect(screen.getByRole("button", { name: "Unmute" })).toBeInTheDocument();
+  });
+
+  it("turns the crosshair off and remembers it", async () => {
+    const user = userEvent.setup();
+    render(<ReplayPage apiClient={apiReturning(Promise.resolve(hudSamples))} runId="7001" />);
+
+    const hud = await screen.findByRole("group", { name: "HUD" });
+    const crosshair = within(hud).getByRole("checkbox", { name: "Crosshair" });
+    expect(crosshair).toBeChecked();
+    expect(viewerProps.current?.crosshair).toBe(true);
+    await user.click(crosshair);
+    expect(viewerProps.current?.crosshair).toBe(false);
+    expect(JSON.parse(storageValues.get("cjs.replay-hud") ?? "{}")).toMatchObject({
+      crosshair: false,
+    });
   });
 
   it("sets the map brightness from a remembered percentage slider", async () => {
     render(<ReplayPage apiClient={apiReturning(Promise.resolve(hudSamples))} runId="7001" />);
 
-    const hud = await screen.findByRole("group", { name: "HUD" });
-    const brightness = within(hud).getByRole("slider", { name: /Brightness/ });
+    const brightness = await screen.findByRole("slider", { name: "Brightness" });
     expect(brightness).toHaveAttribute("aria-valuetext", "130%");
     expect(viewerProps.current?.brightness).toBe(1.3);
 
@@ -297,11 +321,10 @@ describe("ReplayPage", () => {
     server.use(http.get("*/sounds/sounds.json", () => new HttpResponse(null, { status: 404 })));
     render(<ReplayPage apiClient={apiReturning(Promise.resolve(hudSamples))} runId="7001" />);
 
-    const hud = await screen.findByRole("group", { name: "HUD" });
     await waitFor(() =>
-      expect(within(hud).getByRole("checkbox", { name: /Sound/ })).toBeDisabled(),
+      expect(screen.getByRole("button", { name: "Sound unavailable" })).toBeDisabled(),
     );
-    expect(within(hud).getByText("(sounds unavailable)")).toBeInTheDocument();
+    expect(screen.getByRole("slider", { name: "Volume" })).toBeDisabled();
   });
 
   it("disables HUD toggles an older replay cannot drive", async () => {
@@ -309,7 +332,7 @@ describe("ReplayPage", () => {
 
     const hud = await screen.findByRole("group", { name: "HUD" });
     expect(
-      within(hud).getByRole("checkbox", { name: /^Angle helper\s*\(not recorded/ }),
+      within(hud).getByRole("checkbox", { name: /^Anglehelper\s*\(not recorded/ }),
     ).toBeDisabled();
     expect(within(hud).getByRole("checkbox", { name: /FPS/ })).toBeDisabled();
     expect(within(hud).getByRole("checkbox", { name: /Keys/ })).toBeDisabled();
@@ -348,6 +371,7 @@ describe("ReplayPage", () => {
     expect(viewerProps.current?.getFrame?.()).toEqual({
       follow: true,
       pose: { x: 0, y: 0, z: 60, pitch: 0, yaw: 90 },
+      weapon: expect.objectContaining({ lean: 0, meleeMs: null, raiseMs: null }),
     });
 
     await user.keyboard("n");

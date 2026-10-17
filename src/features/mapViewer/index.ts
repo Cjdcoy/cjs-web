@@ -1,4 +1,4 @@
 export { MapViewer } from "./MapViewer";
 export type { CollisionProbe, MapViewerProps, ViewmodelOptions } from "./MapViewerCanvas";
-export { parseCameraHash, VIEW_FIELD_OF_VIEW } from "./codSpace";
-export type { CodPose, ViewerFrame } from "./codSpace";
+export { leanFraction, parseCameraHash, VIEW_FIELD_OF_VIEW } from "./codSpace";
+export type { CodPose, ViewerFrame, WeaponMotion } from "./codSpace";
