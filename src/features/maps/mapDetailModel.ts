@@ -1,4 +1,10 @@
-import { type Fps, type GameMap, type TopRun } from "../../lib/api";
+import {
+  FPS_VALUES,
+  type Fps,
+  type GameMap,
+  type MapPlayerPlaytime,
+  type TopRun,
+} from "../../lib/api";
 import { stripCodColorCodes } from "../../lib/codName";
 import { defineQuerySchema, enumQueryParam, integerQueryParam } from "../../lib/routing";
 
@@ -10,13 +16,76 @@ export interface MapRecord {
   checkpoints: GameMap[];
 }
 
-export const MAP_PROFILE_FPS_VALUES = ["125", "250", "333", "0"] as const satisfies readonly Fps[];
+export const MAP_PROFILE_FPS_VALUES = FPS_VALUES;
 export type MapProfileFps = (typeof MAP_PROFILE_FPS_VALUES)[number];
+/** A map without tops at the requested FPS opens on the first of these that has some. */
+const FALLBACK_FPS_VALUES = [
+  "125",
+  "250",
+  "333",
+  "0",
+  "43",
+  "76",
+] as const satisfies readonly MapProfileFps[];
+
+export const MAP_DETAIL_VIEWS = ["tops", "played"] as const;
+export type MapDetailView = (typeof MAP_DETAIL_VIEWS)[number];
+
+/** "all" sums every FPS on the page's list, one request per FPS. */
+export const PLAYTIME_FPS_VALUES = [...MAP_PROFILE_FPS_VALUES, "all"] as const;
+export type PlaytimeFps = (typeof PLAYTIME_FPS_VALUES)[number];
 
 export const mapDetailQuerySchema = defineQuerySchema({
   fps: enumQueryParam(MAP_PROFILE_FPS_VALUES, "125"),
   cp: integerQueryParam({ defaultValue: 0, min: 1 }),
+  view: enumQueryParam(MAP_DETAIL_VIEWS, "tops"),
+  pfps: enumQueryParam(PLAYTIME_FPS_VALUES, "all"),
 });
+
+export interface PlaytimeRow extends MapPlayerPlaytime {
+  /** FPS values the player has playtime at, in page order. */
+  fps: MapProfileFps[];
+}
+
+/**
+ * Route filter for playtime: the selected route's ender on a multi-route map, or null when the
+ * map has one route or the route has no ender to filter on (playtime then covers every route).
+ */
+export function getPlaytimeRouteEnder(record: MapRecord, route: GameMap): string | null {
+  if (record.checkpoints.length < 2) return null;
+  const ender = route.ender === null || route.ender === undefined ? "" : String(route.ender).trim();
+  return ender || null;
+}
+
+/** Playtime as "45s" under a minute, else truncated hours and minutes ("26h 05m", "0h 42m"). */
+export function formatPlaytime(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return "Not available";
+  const total = Math.floor(seconds);
+  if (total < 60) return `${total}s`;
+  const minutes = Math.floor(total / 60);
+  return `${Math.floor(minutes / 60)}h ${String(minutes % 60).padStart(2, "0")}m`;
+}
+
+/** Merges per-FPS playtime by player, summing seconds, most played first. */
+export function mergePlaytime(
+  perFps: readonly (readonly [MapProfileFps, readonly MapPlayerPlaytime[]])[],
+): PlaytimeRow[] {
+  const byPlayer = new Map<number, PlaytimeRow>();
+  for (const [fps, rows] of perFps) {
+    for (const row of rows) {
+      const merged = byPlayer.get(row.player_id);
+      if (merged) {
+        merged.time_played += row.time_played;
+        merged.fps.push(fps);
+      } else {
+        byPlayer.set(row.player_id, { ...row, fps: [fps] });
+      }
+    }
+  }
+  return [...byPlayer.values()].sort(
+    (left, right) => right.time_played - left.time_played || left.player_id - right.player_id,
+  );
+}
 
 export function parseMapRouteId(value: string): number | null {
   const normalized = value.trim();
@@ -86,12 +155,13 @@ export function describeUnratedDifficulty(map: GameMap, fps: Fps | string): stri
 
 export function selectMapProfileFps(map: GameMap, requestedFps: MapProfileFps): MapProfileFps {
   if (hasMapTopRuns(map, requestedFps)) return requestedFps;
-  return MAP_PROFILE_FPS_VALUES.find((fps) => hasMapTopRuns(map, fps)) ?? "125";
+  return FALLBACK_FPS_VALUES.find((fps) => hasMapTopRuns(map, fps)) ?? "125";
 }
 
+/** The route's name, or "Route N" when it has none. */
 export function getMapRouteLabel(map: GameMap, index: number): string {
   const routeName = map.ender === null || map.ender === undefined ? "" : String(map.ender).trim();
-  return routeName ? `Route ${index + 1}: ${routeName}` : `Route ${index + 1}`;
+  return routeName || `Route ${index + 1}`;
 }
 
 export function getSafeMediaUrl(value: string | null | undefined): string | null {

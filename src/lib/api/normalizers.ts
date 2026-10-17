@@ -1,11 +1,13 @@
 import {
   FPS_VALUES,
   PLAYER_LEADERBOARDS,
+  REPLAY_MARKER_KINDS,
   type DifficultyData,
   type Fps,
   type GameMap,
   type GameServer,
   type LeaderboardEntry,
+  type MapPlayerPlaytime,
   type Player,
   type PlayerActivitySummary,
   type PlayerLeaderboard,
@@ -16,8 +18,15 @@ import {
   type PlayerRouteCompletion,
   type RankLeaderboardEntry,
   type RecentRunsPage,
+  type ReplayMarker,
+  type ReplaySamples,
+  type ReplaySkip,
   type ReplayWatchAggregate,
+  type ReplayViewCounts,
   type ReplayWatchRankingEntry,
+  type ReplayWebViewAggregate,
+  type ReplayWebViewHeat,
+  type ReplayWebViewSummary,
   type ServerPlayer,
   type ServerResponse,
   type SimpleTop,
@@ -27,6 +36,8 @@ import { invalidResponse } from "./errors";
 
 type JsonRecord = Record<string, unknown>;
 type WireStruct = JsonRecord | unknown[];
+
+const REPLAY_HEAT_BUCKET_MS = 5_000;
 
 export function normalizeServerResponse(value: unknown, path: string): ServerResponse {
   const object = wireStruct(value, path, "$response", 3);
@@ -49,6 +60,24 @@ export function normalizeMaps(value: unknown, path: string): GameMap[] {
   return array(value, path, "$response").map((map, index) =>
     normalizeMap(map, path, `$response[${index}]`),
   );
+}
+
+export function normalizeMapPlayersPlaytime(value: unknown, path: string): MapPlayerPlaytime[] {
+  // The API encodes an empty result as null, and player ids as decimal strings.
+  if (value === null) return [];
+  return array(value, path, "$response").map((entry, index) => {
+    const at = `$response[${index}]`;
+    const object = wireStruct(entry, path, at, 4);
+    const playerId = Number(requiredString(object, "player_id", path, at, 1));
+    if (!Number.isSafeInteger(playerId) || playerId <= 0) {
+      throw invalidResponse(path, `${at}.player_id`);
+    }
+    return {
+      player_id: playerId,
+      player_name: requiredString(object, "player_name", path, at, 2),
+      time_played: requiredNumber(object, "time_played", path, at, 3),
+    };
+  });
 }
 
 export function normalizePlayers(value: unknown, path: string): Player[] {
@@ -318,6 +347,133 @@ export function normalizeReplayWatchRankings(
   });
 }
 
+export function normalizeReplayWebViewAggregate(
+  value: unknown,
+  path: string,
+): ReplayWebViewAggregate {
+  const completion = nullableNumber(record(value, path, "$response"), "avg_completion", path);
+  if (completion !== null && (completion < 0 || completion > 1)) {
+    throw invalidResponse(path, "$response.avg_completion");
+  }
+  return { ...normalizeReplayWatchAggregate(value, path), avg_completion: completion };
+}
+
+export function normalizeReplayWebViewSummary(value: unknown, path: string): ReplayWebViewSummary {
+  const heatValue = record(value, path, "$response").heat;
+  if (heatValue === undefined || heatValue === null) {
+    return { heat: { bucket_ms: REPLAY_HEAT_BUCKET_MS, view_count: [], watch_ms: [] } };
+  }
+  const heat = record(heatValue, path, "$response.heat");
+  const bucketMs = requiredNumber(heat, "bucket_ms", path, "$response.heat");
+  if (bucketMs <= 0) throw invalidResponse(path, "$response.heat.bucket_ms");
+  const viewCount = numberArray(heat.view_count, path, "$response.heat.view_count");
+  const watchMs = numberArray(heat.watch_ms, path, "$response.heat.watch_ms", viewCount.length);
+  const negative = [...viewCount, ...watchMs].findIndex((entry) => entry < 0);
+  if (negative >= 0) throw invalidResponse(path, "$response.heat");
+  const normalized: ReplayWebViewHeat = {
+    bucket_ms: bucketMs,
+    view_count: viewCount,
+    watch_ms: watchMs,
+  };
+  return { heat: normalized };
+}
+
+/** `{run_id: {web, in_game}}`; a requested run the API leaves out has no views. */
+export function normalizeReplayViewCounts(
+  value: unknown,
+  runIds: readonly number[],
+  path: string,
+): Map<number, ReplayViewCounts> {
+  const object = record(value, path, "$response");
+  return new Map(
+    runIds.map((runId) => {
+      const entry = object[String(runId)];
+      if (entry === undefined || entry === null) return [runId, { web: 0, in_game: 0 }];
+      const at = `$response.${runId}`;
+      const counts = record(entry, path, at);
+      return [
+        runId,
+        {
+          web: requiredNumber(counts, "web", path, at),
+          in_game: requiredNumber(counts, "in_game", path, at),
+        },
+      ];
+    }),
+  );
+}
+
+export function normalizeReplaySamples(value: unknown, path: string): ReplaySamples {
+  const object = record(value, path, "$response");
+  const t = numberArray(object.t, path, "$response.t");
+  const count = t.length;
+  for (let index = 1; index < count; index += 1) {
+    if (t[index] < t[index - 1]) throw invalidResponse(path, `$response.t[${index}]`);
+  }
+  const runFps = optionalNumber(object, "run_fps", path);
+  const skips =
+    object.skips === undefined || object.skips === null
+      ? undefined
+      : array(object.skips, path, "$response.skips").map((entry, index): ReplaySkip => {
+          const at = `$response.skips[${index}]`;
+          const skip = record(entry, path, at);
+          return {
+            start_t: requiredNumber(skip, "start_t", path, at),
+            target_t: requiredNumber(skip, "target_t", path, at),
+            fails: requiredNumber(skip, "fails", path, at),
+          };
+        });
+  const markers: ReplayMarker[] = [];
+  if (object.markers !== undefined && object.markers !== null) {
+    array(object.markers, path, "$response.markers").forEach((entry, index) => {
+      const at = `$response.markers[${index}]`;
+      const marker = record(entry, path, at);
+      // Unknown kinds are newer recorder events; skipping them keeps playback working.
+      if (!REPLAY_MARKER_KINDS.some((kind) => kind === marker.kind)) return;
+      const checkpointId = optionalNumber(marker, "cp_id", path);
+      const fps = optionalNumber(marker, "fps", path);
+      markers.push({
+        t: requiredNumber(marker, "t", path, at),
+        kind: marker.kind as ReplayMarker["kind"],
+        ...(checkpointId === undefined ? {} : { cp_id: checkpointId }),
+        ...(fps === undefined || fps <= 0 ? {} : { fps }),
+      });
+    });
+  }
+
+  return {
+    run_id: requiredNumber(object, "run_id", path, "$response"),
+    mapname: requiredString(object, "mapname", path, "$response"),
+    player_id: requiredNumber(object, "player_id", path, "$response"),
+    playername: requiredString(object, "playername", path, "$response"),
+    format_version: requiredNumber(object, "format_version", path, "$response"),
+    tick_ms: requiredNumber(object, "tick_ms", path, "$response"),
+    duration_ms: requiredNumber(object, "duration_ms", path, "$response"),
+    finished: requiredBoolean(object, "finished", path, "$response"),
+    t,
+    pos: numberArray(object.pos, path, "$response.pos", count * 3),
+    ang: numberArray(object.ang, path, "$response.ang", count * 3),
+    vel: numberArray(object.vel, path, "$response.vel", count * 3),
+    stance: numberArray(object.stance, path, "$response.stance", count),
+    markers: markers.sort((left, right) => left.t - right.t),
+    ...optionalNumberArray(object, "flags", path, count),
+    ...optionalNumberArray(object, "input", path, count),
+    ...optionalNumberArray(object, "aux", path, count),
+    ...(runFps === undefined ? {} : { run_fps: runFps }),
+    ...(skips === undefined ? {} : { skips }),
+  };
+}
+
+function optionalNumberArray(
+  object: JsonRecord,
+  key: "flags" | "input" | "aux",
+  path: string,
+  count: number,
+): Partial<Record<typeof key, number[]>> {
+  const value = object[key];
+  if (value === undefined || value === null) return {};
+  return { [key]: numberArray(value, path, `$response.${key}`, count) };
+}
+
 function normalizeServer(value: unknown, path: string, at: string): GameServer {
   const object = wireStruct(value, path, at, 10);
   const playersValue = field(object, "players", 6);
@@ -477,6 +633,18 @@ function wireStruct(
 function array(value: unknown, path: string, field: string): unknown[] {
   if (!Array.isArray(value)) throw invalidResponse(path, field);
   return value;
+}
+
+function numberArray(value: unknown, path: string, at: string, length?: number): number[] {
+  const values = array(value, path, at);
+  if (length !== undefined && values.length !== length) throw invalidResponse(path, at);
+  for (let index = 0; index < values.length; index += 1) {
+    const entry = values[index];
+    if (typeof entry !== "number" || !Number.isFinite(entry)) {
+      throw invalidResponse(path, `${at}[${index}]`);
+    }
+  }
+  return values as number[];
 }
 
 function field(object: WireStruct, key: string, nativeIndex?: number): unknown {

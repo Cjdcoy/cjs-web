@@ -7,9 +7,11 @@ import {
   LeaderboardsPage,
   MapDetailPage,
   MapsPage,
+  MapViewerPage,
   PlayerDetailPage,
   PlayersPage,
   RecentPage,
+  ReplayPage,
   ServersPage,
 } from "./routeComponents";
 
@@ -20,11 +22,13 @@ export const appRouteTable: Readonly<Record<AppRouteId, RouteRenderer>> = {
   favorites: () => <FavoritesPage />,
   leaderboards: () => <LeaderboardsPage />,
   "map-detail": ({ params }) => <MapDetailPage mapId={params.mapId} />,
+  "map-viewer": ({ params }) => <MapViewerPage mapId={params.mapId} />,
   maps: () => <MapsPage />,
   "not-found": () => <NotFoundPage />,
   "player-detail": ({ params }) => <PlayerDetailPage playerId={params.playerId} />,
   players: () => <PlayersPage />,
   recent: () => <RecentPage />,
+  replay: ({ params }) => <ReplayPage runId={params.runId} />,
   servers: () => <ServersPage />,
 };
 

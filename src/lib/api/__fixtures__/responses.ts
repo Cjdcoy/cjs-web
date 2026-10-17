@@ -94,6 +94,11 @@ const topRunResponse = {
 
 export const topRunsFixture: unknown = [topRunResponse];
 
+/** Live `/map/players-playtime` shape: string ids, playtime in seconds. */
+export const mapPlayersPlaytimeFixture: unknown = [
+  { map_id: "101", player_id: "501", player_name: "^2Runner", time_played: 7_440, ender: "" },
+];
+
 export const recentRunsFixture: unknown = {
   runs: [
     topRunResponse,
@@ -140,6 +145,22 @@ export const replayWatchRankingsFixture: unknown = [
     updated_at: "2026-08-01T11:05:00Z",
   },
 ];
+
+/** Web replay views (ADR 0005), shapes from the replay web analytics design. */
+export const replayWebViewSummaryFixture: unknown = {
+  run_id: 7001,
+  watch_count: 3,
+  unique_viewer_count: 2,
+  avg_completion: 0.5,
+  heat: { bucket_ms: 5_000, view_count: [1, 3, 3, 2], watch_ms: [5_000, 15_000, 16_000, 9_000] },
+};
+
+export const replayWebViewAggregateFixture: unknown = {
+  ...(replayWatchAggregateFixture as Record<string, unknown>),
+  avg_completion: 0.42,
+};
+
+export const replayViewCountsFixture: unknown = { "7001": { web: 1_234, in_game: 340 } };
 
 export const playerPerformanceFixture: unknown = {
   total_maps_completed: 18,
@@ -285,3 +306,25 @@ export const j4lPlayersFixture: unknown = [
     },
   },
 ];
+
+export const replaySamplesFixture = {
+  run_id: 7001,
+  mapname: "mp_cjs_training",
+  player_id: 501,
+  playername: "^2Runner",
+  format_version: 11,
+  tick_ms: 50,
+  duration_ms: 100,
+  finished: true,
+  t: [0, 50, 100],
+  pos: [0, 0, 0, 5, 0, 0, 10, 0, 0],
+  ang: [0, 90, 0, 0, 90, 0, 0, 90, 0],
+  vel: [100, 0, 0, 100, 0, 0, 100, 0, 0],
+  stance: [0, 0, 1],
+  markers: [
+    { t: 100, kind: "finish" },
+    { t: 50, kind: "save" },
+    { t: 50, kind: "teleport" },
+    { t: 0, kind: "checkpoint", cp_id: 3 },
+  ],
+};

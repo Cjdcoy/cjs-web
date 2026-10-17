@@ -2321,6 +2321,216 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   budgets, and release artifact checks. Workflow/docs formatting and `git diff --check` passed.
   API boundary and ADR notes cover CI selection, final bundle budgets, and version compatibility.
 
+### CJS-067 — 3D map viewer and Jump4Life replay playback
+
+- **Status:** done
+- **Owner/handoff:** Claude / frontend 3D viewer and replay playback worker
+- **Dependencies:** CJS-017, backend `GET /api/v1/replay/samples`, web-ready map models
+- **Scope change:** replay playback and 3D map views were post-MVP (CJS-017 covered replay
+  analytics only). The owner explicitly reprioritized them on 2026-10-16.
+- **Primary boundary:** `src/features/mapViewer`, `src/features/replayPlayer`,
+  `src/components/ReplayLink.tsx`, `src/lib/mapModels.ts`, the replay-samples API boundary, route
+  table/metadata, entry links on recent runs, map tops, and player best runs, performance budgets,
+  CSP, and [ADR 0004](adr/0004-lazy-three-map-viewer.md)
+- **Goal:** let visitors fly through a map in 3D and watch archived J4L runs on the map.
+- **Acceptance:** `three` loads only in the lazy viewer chunk; all 3D entry points are hidden
+  without `VITE_MAP_MODEL_BASE_URL`; `/maps/:mapId/3d` and `/replays/:runId` direct-load; model
+  download progress, missing-model, WebGL-error, loading, 404/400 unavailable, 422 unsupported,
+  retryable error, and success states are deliberate; playback interpolates with Hermite position
+  and shortest-arc angles and snaps across loads and teleports; play/pause, seek, 0.25–4× speed,
+  marker timeline, save/load jumps, free camera, and keyboard shortcuts work without a mouse;
+  geometry, materials, textures, and the renderer are disposed on unmount; `npm run verify` passes.
+- **Validation:** `npm run verify` passes (50 files / 337 tests; budgets: initial JS 69.6/75 KiB,
+  route 35.0/36 KiB, total JS 142.3/144 KiB, total CSS 20.7/21 KiB, lazy viewer 161.5/170 KiB).
+  Run on a case-sensitive checkout with `LANG=en_US.UTF-8`: on macOS's default case-insensitive
+  volume the pre-existing `MapVideos.tsx`/`mapVideos.ts` pair breaks `tsc`, and the existing
+  run-progression chart test assumes an en-US date locale. Real system Chrome (via Playwright, at
+  1440×1000 and 390×844) loaded run 28591 from the local backend and `jm_pier_250`/`jm_memento`
+  models: follow camera, 4× playback (2 s advanced 8.07 s), N/P jumps, free-fly camera, path and
+  marker, layer toggles, download progress, 404/422 states, and the map-detail 3D and replay links
+  all worked, with no console errors (beyond the expected 404/422 resource lines), no horizontal
+  overflow, and one canvas after 18 viewer mount/unmount cycles.
+- **Remaining work/risks:** collision layers start visible because the current GLBs do not mark them
+  `extras.hidden`; the viewer follows the asset contract, so the export decides. Free-fly needs a
+  keyboard (no touch look on phones; follow playback works). Only BSP lightmaps are applied; model
+  light probes wait for mapconv's export format. The production model host and its CORS policy are
+  not chosen yet; set `VITE_MAP_MODEL_BASE_URL` as a repository variable once it exists.
+
+### CJS-068 — Replay HUD overlays and auto-skip
+
+- **Status:** done
+- **Owner/handoff:** Claude / frontend replay HUD worker
+- **Dependencies:** CJS-067, backend `flags`, `input`, `run_fps`, `skips`, and `fps` markers
+- **Primary boundary:** `src/features/replayPlayer` (HUD model, overlay, preferences, playback
+  clock), the optional replay fields at the API boundary, and the viewer's overlay slot and
+  first-person weapon pass
+- **Goal:** match the in-game replay HUD: the J4L angle helper (an exact port of
+  `anglehelper_apply`), the speed meter, the configured FPS, in-game auto-skip of failed attempts,
+  and an optional hand-and-gun model.
+- **Outcome:** each overlay and auto-skip is a toggle remembered in a versioned `cjs.replay-hud`
+  local preference that recovers from malformed storage. Older payloads without the new fields
+  still play, and the toggles they cannot drive are disabled with a note. Auto-skip fires while
+  playing forward in `start_t <= now < target_t`, except in a window the viewer seeked into past its
+  start. It counts the loads it jumps over, and shows the in-game total over executed skips up to the
+  current time. The weapon model loads on first enable, draws in a depth-cleared second pass only
+  while following, and disables its toggle when the file is missing. `g_speed` is fixed at 190 (not
+  recorded). The placement constant `VIEWMODEL_PLACEMENT` awaits the converter's numbers.
+- **Angle helper refinement:** the helper keeps `anglehelper_apply`'s math but drops HUD limits. It
+  is evaluated every rendered frame with interpolated velocity and the camera's yaw (keys, ground
+  state, and fps still come from the current sample), uses float edges without the 2..90 bar
+  clamp, colours the centre line by zone (gain green, deadzone white, past the gain limit red), and
+  offers a "True angle scale" option (off by default) that projects each offset through the
+  camera's horizontal FOV, CGaz-style. Parity tests round the floats with `int()` and match a literal
+  GSC port on mid-air states from run 28591.
+- **Validation:** `npm run verify` passes (52 files / 362 tests; total JS 144.6/146 KiB and total
+  CSS 21.2/21.5 KiB after narrow raises, viewer chunk 162.4/170 KiB). Real Chrome against the live
+  backend for run 28591 showed the helper, the speed trend colours, "250 fps", and auto-skip from the
+  first save reaching 14 then 28 fails, dropping on rewind, and not re-firing inside a seeked window.
+
+### CJS-069 — Replay keys, view modes, readable panels, and smooth stance changes
+
+- **Status:** done
+- **Owner/handoff:** Claude / frontend replay HUD worker
+- **Dependencies:** CJS-068, backend `aux` samples
+- **Primary boundary:** `src/features/replayPlayer`, the viewer's frame, layer panel, and fly keys
+- **Outcome:**
+  - Keys display: W A S D, C, Space, and Ctrl are drawn as keyboard keys on hud.menu's
+    replay_key grid, dim when released and bright when pressed, from each sample's recorded input.
+    The "Keys" toggle defaults on and is disabled when input is absent.
+  - View modes: the view is a fixed 16:9. Cinema mode (`?view=cinema`, Esc leaves) and full screen
+    (button or F; hidden without the Fullscreen API) letterbox it, and the renderer follows through
+    its ResizeObserver. Free camera moved to C, and Q alone now sinks while flying.
+  - Readable panels: a body-size "Layers" panel opens from the controls bar, and a native
+    "Keyboard shortcuts" dialog opens from a button or `?`. Both work inside full screen.
+  - The real-world-scale toggle has a self-explanatory label and description.
+  - Stance changes: the eye height eases through CoD2's view-height tables. Stance comes from flags
+    bit 1, not the crouch and prone keys. The ease is evaluated per frame from the timeline and snaps
+    across loads.
+  - The weapon hides while the aux weapon state is 3 (no active weapon, as on ladders).
+- **Validation:** `npm run verify` passes (52 files / 369 tests; total JS 146.4/148 KiB and total CSS
+  21.6/22 KiB after narrow raises). Real Chrome at 1280×720, 1440×900, 390×844, and 200% zoom showed
+  no overflow, a 16:9 view whose canvas buffer follows each mode, the dialog inside full screen, and
+  focus moving into the Layers panel and back to its button on Esc.
+- **Remaining work/risks:** at 1280×720 the seek bar sits below the fold in normal mode; cinema mode
+  fits everything. CoD2rev's `PM_GetViewHeightLerpTime` gives crouch to stand 200 ms (any non-crouch,
+  non-prone target), not 400 ms; the port follows the code.
+
+### CJS-070 — Replay sound playback
+
+- **Status:** done
+- **Owner/handoff:** Claude / frontend replay HUD worker
+- **Dependencies:** CJS-069, `sounds/sounds.json` and WAV assets beside the map models
+- **Primary boundary:** `src/features/replayPlayer` (`replaySound.ts` pure engine, `useReplaySound.ts`
+  Web Audio player), the viewer's collision probe, HUD preferences, and the shortcut dialog
+- **Outcome:** the replay follows the manifest's engine rules:
+  - landings by `PM_CrashLand` tiers;
+  - footsteps from the per-pmove-frame bob cycle at the configured fps;
+  - jumps, including off ladders;
+  - ladder steps, skipped for 300 ms after a jump;
+  - weapon raises on a switch into slot 0 or 1.
+
+  Surfaces come from a down-raycast against hidden player-solid collision, cached per sample.
+  Variants are weighted and never repeat the last pick when there are more than two, and null
+  variants stay silent. Sound plays only during forward playback at up to 2×; pauses, seeks, and
+  auto-skip jumps restart the simulation without a backlog. The "Sound" toggle (on) and volume
+  (0.5) are persisted, and M toggles sound. The manifest loads on first enable and audio starts on
+  the Play gesture.
+
+- **Validation:** `npm run verify` passes (53 files / 390 tests; total JS 149.4/151 KiB after a
+  narrow raise). Over the whole of run 28591 at 250 fps the engine produces:
+  - 505 steps, 403 jumps, and 193 landings (186 hard);
+  - 17 ladder steps and 8 weapon raises;
+  - 1.98 steps/s on its longest ground run (1.95 expected).
+
+  Real Chrome played `footsteps_land_wood.wav` for a pier landing and wood footsteps about 0.51 s
+  apart, and nothing while paused or at 4×.
+
+- **Remaining work/risks:** the pain tier, lean (walk) steps, stair step-up steps, and the ladder
+  brush's own surface are skipped (`ponytail:` notes). Footsteps follow the recorded move keys like
+  `PM_Footsteps`: without forward or side keys the cycle still advances but no step plays.
+
+### CJS-071 — Replay position HUD, jump timer, and immersive full screen
+
+- **Status:** done
+- **Owner/handoff:** Claude / frontend replay HUD worker
+- **Dependencies:** CJS-070
+- **Primary boundary:** `src/features/replayPlayer` (HUD model, preferences, view modes, CSS)
+- **Outcome:**
+  - "Position" (off by default) ports poshud: the feet origin `x y z` and `pitch yaw roll` at the
+    top left, truncated toward zero and printed with two decimals.
+  - "Jump timer" (off by default) ports `replay_jumptimer_update`: green airborne seconds truncated
+    to 0.1, or 0 on the ground. It is timed from the first sample of the current airborne
+    stretch, so it is correct after a seek.
+  - The "Angle helper: real-world scale" option and its projection are removed. Stored
+    preferences keep version 1: old documents still load, `trueAngle` is ignored, and the new
+    toggles take their defaults.
+  - Cinema (button or T) is the old full screen: browser full screen with the controls below the
+    letterboxed view. Full screen (button or F) puts the replay on black with the controls laid
+    over it. They start hidden, show on pointer move, touch, or keyboard focus, and hide after
+    2.5 s. They stay up while the bar is hovered, has keyboard focus, or Layers or the shortcuts
+    dialog is open. The cursor hides with them.
+  - Switching between the two modes stays in browser full screen. Without the Fullscreen API,
+    both modes use a fixed in-page overlay that Esc closes. `?view=cinema` is gone.
+- **Validation:** `npm run verify` passes on a case-sensitive copy (53 files / 395 tests; total CSS
+  21.8/22 KiB). Real Chrome checked run 28591 at 1280×720: mid-air poshud and jump timer, a timer
+  that is right after seeking, and canvas buffers that follow each mode. Full screen controls hid after 2.5 s and stayed up for hover,
+  Layers, and Tab focus. The 390×844 fallback overlay had no overflow and closed with Esc.
+- **Remaining work/risks:** a control focused by mouse does not hold the full-screen bar. Chrome
+  marks it `:focus-visible` after any shortcut key, which would otherwise keep the bar up.
+
+### CJS-072 — CoD2 lighting and sky from the map converter's glTF extensions
+
+- **Status:** done
+- **Owner/handoff:** Claude / frontend map viewer worker
+- **Dependencies:** CJS-067, map converter `MAPCONV_legacy_surface` and `MAPCONV_legacy_sky`
+- **Primary boundary:** `src/features/mapViewer` (`legacySurface.ts`, `legacySky.ts`, the load
+  path of `MapViewerCanvas.tsx`)
+- **Outcome:**
+  - Render materials read `MAPCONV_legacy_surface`: lightmap plus visible sun on lightmapped BSP
+    surfaces, the 8-direction probe plus sun on model placements, the probe mean for `ambient`,
+    detail maps, add and multiply blends, and `gt0`/`ge128`/`lt128` alpha tests (also on top of
+    blends). Light is applied as linear colour × pow(light, 2.2).
+  - Fallback colours for missing game materials take their placement's probe light, or Lambert
+    under the scene lights, instead of glowing.
+  - `MAPCONV_legacy_sky` becomes the scene background as an unrotated sRGB cube texture.
+  - The material-extras code path (lightmap, detail, blend) is removed. Collision, layers, the
+    brightness filter, and the weapon pass are unchanged.
+- **Validation:** `npm run verify` on a case-sensitive copy. Unit tests cover extension parsing,
+  the CoD → scene direction, probe and ambient math, the lighting table, and the shader patches.
+  Real Chrome rendered raw and optimized (meshopt, quantized, WebP) jm_pier_250, mp_toujane, and
+  jm_pier_2_pro with lighting and sky, and run 28591 with the weapon. Viewer chunk 164.1/170 KiB.
+- **Remaining work/risks:** normal maps and specular are not applied (as in the converter's
+  preview). Back faces reuse the front normal.
+
+### CJS-073 — Anonymous web replay-view analytics (frontend)
+
+- **Status:** done (behind `VITE_REPLAY_VIEW_ANALYTICS`; backend endpoints land separately)
+- **Owner/handoff:** Claude / frontend replay analytics worker
+- **Dependencies:** CJS-067, cjs-backend `POST /replay/views` and the web-view read endpoints, the
+  J4L `run_replay_web_*` tables
+- **Primary boundary:** `src/features/replayPlayer` (`replayViewTracker.ts`,
+  `useReplayViewAnalytics.ts`, `replayHeat.ts`, `ReplayWebViews.tsx`, `useReplayWebViews.ts`,
+  playback callbacks), `src/features/replay` (In-game | Web), `src/lib/api` (`replayViews.ts`,
+  web-view endpoints), the router's previous-route record
+- **Outcome:**
+  - The player counts visible-tab playback from the first Play: watched ranges, per-flush played
+    segments, wall time per speed, seeks (a drag counts once), auto-skip and skipped fails,
+    cinema and full screen, entry route, and viewport class. It sends sequence-numbered
+    `text/plain` beacons every 30 s, on hide, on `pagehide`, and on in-app navigation, never
+    under 5 s of playback or with Do Not Track or GPC on (ADR 0005).
+  - The replay page shows web and in-game view counts and a watch heat strip on the timeline
+    with a HUD toggle. The map and player replay panels switch between in-game and web views.
+  - No About-page privacy text for now, by owner decision.
+- **Validation:** `npm run verify` on a case-sensitive copy. Unit tests cover range merging and
+  the 64-pair cap, sequence numbers and unchanged flushes, the 5 s floor, seek merging, DNT and
+  GPC, the hidden-tab pause, the 30 s, `pagehide`, and unmount flushes, and the beacon fallback.
+  Component tests cover the count badge and heat strip states with MSW, the HUD toggle, and the
+  In-game | Web panel. Total JavaScript budget raised narrowly from 151 to 155 KiB (154.0 KiB),
+  per ADR 0005. Read shapes follow the backend's final `api-contract.md`.
+- **Remaining work/risks:** run lists (phase 2) do not show view counts yet. The read shapes for
+  the breakdowns are not consumed; only `heat`, the aggregate, rankings, and view counts are.
+  Turn the flag on only after the backend is deployed with writes enabled.
+
 ## Agent handoff template
 
 ```md

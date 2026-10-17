@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Page } from "../../components";
+import { ReplayLink } from "../../components/ReplayLink";
 import {
   Badge,
   Button,
@@ -48,6 +49,7 @@ import {
   type SimpleTop,
   type TopRun,
 } from "../../lib/api";
+import { hasMapModels } from "../../lib/mapModels";
 import { mapDetailPath, useQueryState, useSourceContext } from "../../lib/routing";
 import { formatDate, timeAgo } from "../../lib/format";
 import {
@@ -961,6 +963,22 @@ function BestRunsSection({
         defaultOrder: "desc",
         cell: (run) => (run.time_created ? formatDate(run.time_created) : "—"),
       },
+      ...(source === "j4l" && hasMapModels()
+        ? [
+            {
+              id: "replay",
+              header: "Replay",
+              align: "end" as const,
+              cell: (run: TopRun) => (
+                <ReplayLink
+                  label={`Watch replay of ${run.mapname} in ${formatRunTime(run)}`}
+                  runId={run.run_id}
+                  source={source}
+                />
+              ),
+            },
+          ]
+        : []),
     ],
     [maxScore, skillPoints, source],
   );

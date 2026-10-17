@@ -1,19 +1,32 @@
+import { useState } from "react";
 import {
   Button,
   CodPlayerName,
   Link,
   Panel,
+  SegmentedControl,
   SkeletonGroup,
   VisuallyHidden,
 } from "../../components/ui";
-import type {
-  ReplayWatchAggregate,
-  ReplayWatchRankingEntry,
-  ReplayWatchScope,
-  Source,
+import {
+  type ReplayWatchAggregate,
+  type ReplayWatchRankingEntry,
+  type ReplayWatchScope,
+  type Source,
 } from "../../lib/api";
+import { isReplayViewAnalyticsEnabled } from "../../lib/api/replayViews";
 import { mapDetailPath, playerDetailPath } from "../../lib/routing";
-import { useReplayAnalytics, type ReplayAnalyticsApi } from "./useReplayAnalytics";
+import {
+  useReplayAnalytics,
+  type ReplayAnalyticsApi,
+  type ReplayAudience,
+  type ReplayAudienceAggregate,
+} from "./useReplayAnalytics";
+
+const AUDIENCE_OPTIONS = [
+  { value: "in-game", label: "In-game" },
+  { value: "web", label: "Web" },
+] as const;
 
 export function ReplayAnalyticsPanel({
   apiClient,
@@ -24,7 +37,11 @@ export function ReplayAnalyticsPanel({
   scope: ReplayWatchScope;
   source: Source;
 }) {
-  const resources = useReplayAnalytics({ apiClient, scope, source });
+  const webEnabled = isReplayViewAnalyticsEnabled();
+  const [selectedAudience, setAudience] = useState<ReplayAudience>("in-game");
+  const audience = webEnabled ? selectedAudience : "in-game";
+  const web = audience === "web";
+  const resources = useReplayAnalytics({ apiClient, audience, scope, source });
   const isPlayer = "ownerPlayerId" in scope;
   const isRefreshing = [resources.aggregate, resources.rankings].some(
     (resource) => resource.status === "refreshing",
@@ -67,8 +84,16 @@ export function ReplayAnalyticsPanel({
       <Panel className="cjs-replay-analytics__panel cjs-stack" padding="small">
         <div className="cjs-replay-analytics__header cjs-cluster">
           <div>
-            <h2 id={headingId}>{isPlayer ? "Replay reach" : "In-game Replay views"}</h2>
+            <h2 id={headingId}>{isPlayer ? "Replay reach" : "Replay views"}</h2>
           </div>
+          {webEnabled && (
+            <SegmentedControl
+              ariaLabel="Replay audience"
+              options={AUDIENCE_OPTIONS}
+              value={audience}
+              onChange={setAudience}
+            />
+          )}
           {isPlayer && (
             <Button
               isLoading={isRefreshing}
@@ -114,18 +139,28 @@ export function ReplayAnalyticsPanel({
 
         {isEmpty && (
           <div className="cjs-state">
-            <h3 className="cjs-state__title">No replay audience yet</h3>
+            <h3 className="cjs-state__title">
+              {web ? "No web views yet" : "No replay audience yet"}
+            </h3>
             <p className="cjs-state__description">
-              {isPlayer
-                ? "This player's replays have no recorded watches yet."
-                : "No replays on this map have recorded watches yet."}
+              {web
+                ? isPlayer
+                  ? "Nobody has played this player's replays on this site yet."
+                  : "Nobody has played replays on this map on this site yet."
+                : isPlayer
+                  ? "This player's replays have no recorded watches yet."
+                  : "No replays on this map have recorded watches yet."}
             </p>
           </div>
         )}
 
-        {aggregate && !isEmpty && <ReplaySummary aggregate={aggregate} playerScope={isPlayer} />}
+        {aggregate && !isEmpty && web && <WebReplaySummary aggregate={aggregate} />}
 
-        {rankings && rankings.length > 0 && isPlayer && (
+        {aggregate && !isEmpty && !web && (
+          <ReplaySummary aggregate={aggregate} playerScope={isPlayer} />
+        )}
+
+        {rankings && rankings.length > 0 && isPlayer && !web && (
           <ol className="cjs-replay-analytics__runs" aria-label="Most viewed runs by this player">
             {rankings.map((entry) => (
               <li key={entry.run_id}>
@@ -149,7 +184,9 @@ export function ReplayAnalyticsPanel({
           </ol>
         )}
 
-        {topRanking && !isPlayer && <CompactReplayRanking entry={topRanking} source={source} />}
+        {topRanking && (web || !isPlayer) && (
+          <CompactReplayRanking entry={topRanking} source={source} web={web} />
+        )}
       </Panel>
     </section>
   );
@@ -192,6 +229,23 @@ function ReplaySummary({
   );
 }
 
+/** Web views count viewer-days: a viewer is counted once per replay per UTC day. */
+function WebReplaySummary({ aggregate }: { aggregate: ReplayAudienceAggregate }) {
+  const completion = aggregate.avg_completion;
+  return (
+    <dl className="cjs-replay-analytics__totals" aria-label="Web replay audience summary">
+      <ReplayStat label="Web views" value={formatNumber(aggregate.watch_count)} />
+      <ReplayStat label="Viewer-days" value={formatNumber(aggregate.unique_viewer_count)} />
+      <ReplayStat
+        label="Avg. completion"
+        value={
+          completion === null || completion === undefined ? "—" : `${Math.round(completion * 100)}%`
+        }
+      />
+    </dl>
+  );
+}
+
 function ReplayStat({ label, value }: { label: string; value: string }) {
   return (
     <div>
@@ -204,13 +258,16 @@ function ReplayStat({ label, value }: { label: string; value: string }) {
 function CompactReplayRanking({
   entry,
   source,
+  web,
 }: {
   entry: ReplayWatchRankingEntry;
   source: Source;
+  web: boolean;
 }) {
+  const viewers = entry.unique_viewer_count;
   return (
     <div className="cjs-replay-analytics__map-highlight">
-      <p>Most watched replay</p>
+      <p>{web ? "Most watched on the web" : "Most watched replay"}</p>
       <div>
         <Link href={playerDetailPath(entry.owner_player_id, source)} variant="player">
           <CodPlayerName value={entry.owner_playername || `Player #${entry.owner_player_id}`} />
@@ -220,8 +277,8 @@ function CompactReplayRanking({
         </strong>
       </div>
       <span>
-        {formatNumber(entry.unique_viewer_count)}{" "}
-        {entry.unique_viewer_count === 1 ? "viewer" : "viewers"}
+        {formatNumber(viewers)} {web ? "viewer-day" : "viewer"}
+        {viewers === 1 ? "" : "s"}
         {" · "}
         {formatWatchTime(entry.total_watch_ms)} watched
         {" · "}

@@ -1,6 +1,7 @@
 export { MapDetailPage } from "./MapDetailPage";
 export { MapCard } from "./MapCard";
 export { MapsPage } from "./MapsPage";
+export { MapViewerPage } from "./MapViewerPage";
 export {
   filterAndSortMaps,
   getAvailableRouteTypes,

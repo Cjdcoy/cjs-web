@@ -28,6 +28,11 @@ const routeMetadata: Readonly<Record<AppRouteId, RouteMetadataResolver>> = {
     description:
       "Explore available map metadata, completion difficulty, checkpoints, and top runs from the public CJ Stats API.",
   }),
+  "map-viewer": (match) => ({
+    title: `${routeParameter(match, "mapId", "Map")} in 3D | CJS`,
+    description:
+      "Explore a 3D model of this CodJumper map in your browser with a free-flying camera and toggleable collision layers.",
+  }),
   maps: () => ({
     title: "CodJumper maps | CJS",
     description:
@@ -52,6 +57,11 @@ const routeMetadata: Readonly<Record<AppRouteId, RouteMetadataResolver>> = {
     title: "Recent updates | CJS",
     description:
       "Follow a chronological feed of the latest JumpersHeaven and Jump4Life activity, with the map, route, time, and FPS of every finish.",
+  }),
+  replay: (match) => ({
+    title: `Replay ${routeParameter(match, "runId", "viewer")} | CJS`,
+    description:
+      "Watch a recorded Jump4Life run in 3D on its map, with seeking, playback speed, and save, load, checkpoint, and finish markers.",
   }),
   servers: () => ({
     title: "Live CodJumper servers | CJS",

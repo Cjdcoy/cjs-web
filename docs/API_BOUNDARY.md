@@ -28,7 +28,10 @@ sessionStorage.removeItem("cjs-api-format");
 
 The override intentionally uses session storage because application routing canonicalizes query
 parameters. Both API bases use the selected transport. MessagePack requires a matching content type
-and never falls back to JSON.
+and never falls back to JSON. The one exception is `replaySamples` (`/replay/samples`), which always
+requests v2 JSON from the replay base: only v2 is compressed, and the flat sample arrays gain nothing
+from a positional encoding. Its 404 and 400 mean no archived replay (or not a J4L run), and 422 an
+unsupported replay format; error bodies are plain text.
 
 V2 JSON keeps the documented object fields. V2 MessagePack encodes known Go structs as positional
 arrays to avoid field-name and conversion overhead; maps and dictionary-like records remain maps.

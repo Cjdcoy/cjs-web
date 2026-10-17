@@ -4,8 +4,10 @@ export const routeDefinitions = [
   { id: "recent", path: "/recent" },
   { id: "maps", path: "/maps" },
   { id: "map-detail", path: "/maps/:mapId" },
+  { id: "map-viewer", path: "/maps/:mapId/3d" },
   { id: "players", path: "/players" },
   { id: "player-detail", path: "/players/:playerId" },
+  { id: "replay", path: "/replays/:runId" },
   { id: "favorites", path: "/favorites" },
   { id: "about", path: "/about" },
   { id: "not-found", path: "*" },
@@ -85,6 +87,14 @@ export function mapDetailPath(
   return buildDetailPath(appPaths.maps, mapId, options);
 }
 
+export function mapViewerPath(mapId: number | string, source?: string): string {
+  return buildDetailPath(appPaths.maps, mapId, { source }, "/3d");
+}
+
+export function replayPath(runId: number | string): string {
+  return `/replays/${encodeURIComponent(String(runId))}`;
+}
+
 export function playerDetailPath(playerId: number | string, source?: string): string {
   return buildDetailPath(appPaths.players, playerId, { source });
 }
@@ -114,11 +124,12 @@ function buildDetailPath(
   basePath: string,
   id: number | string,
   query: { lookup?: "cpid"; source?: string },
+  suffix = "",
 ): string {
   const search = new URLSearchParams();
   if (query.source) search.set("source", query.source);
   if (query.lookup) search.set("lookup", query.lookup);
-  return appendLocation(`${basePath}/${encodeURIComponent(String(id))}`, search, "");
+  return appendLocation(`${basePath}/${encodeURIComponent(String(id))}${suffix}`, search, "");
 }
 
 function appendLocation(pathname: string, search: URLSearchParams, hash: string): string {

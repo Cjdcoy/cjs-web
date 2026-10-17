@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   leaderboardFixture,
+  mapPlayersPlaytimeFixture,
   mapsFixture,
   playerActivityFixture,
   playerJumpScoresFixture,
@@ -13,7 +14,10 @@ import {
   rankLeaderboardFixture,
   recentRunsFixture,
   replayWatchAggregateFixture,
+  replayViewCountsFixture,
   replayWatchRankingsFixture,
+  replayWebViewAggregateFixture,
+  replayWebViewSummaryFixture,
   topRunsFixture,
   trackerServersFixture,
 } from "./__fixtures__/responses";
@@ -48,6 +52,9 @@ describe("typed CJS API endpoints", () => {
     await expect(
       api.mapTops({ source: "jh", checkpointId: "route / 1", fps: "125", limit: 2 }),
     ).resolves.toHaveLength(1);
+    await expect(
+      api.mapPlayersPlaytime({ source: "j4l", mapId: 101, fps: "0", ender: "hard", limit: 50 }),
+    ).resolves.toEqual([{ player_id: 501, player_name: "^2Runner", time_played: 7_440 }]);
     await expect(api.players({ source: "jh", sort: "last-seen" })).resolves.toHaveLength(1);
     await expect(
       api.searchPlayers({ source: "jh", name: "^1 Runner / ?", limit: 2 }),
@@ -99,6 +106,7 @@ describe("typed CJS API endpoints", () => {
       "https://example.test/proxy/api/v1/leaderboard/rank-xp?source=j4l&limit=2",
       "https://example.test/proxy/api/v1/map/all?source=jh",
       "https://example.test/proxy/api/v1/map/tops?source=jh&fps=125&cpid=route+%2F+1&limit=2",
+      "https://example.test/proxy/api/v1/map/players-playtime?source=j4l&mapid=101&fps=0&ender=hard&limit=50",
       "https://example.test/proxy/api/v1/player/all?source=jh&sort=last-seen",
       "https://example.test/proxy/api/v1/player/id-from-name?source=jh&name=%5E1+Runner+%2F+%3F&limit=2",
       "https://example.test/proxy/api/v1/player/performance-stats?source=jh&playerid=501",
@@ -208,6 +216,83 @@ describe("typed CJS API endpoints", () => {
     ).rejects.toMatchObject({ kind: "invalid-response" });
   });
 
+  it("requests and validates the web replay-view endpoints", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json(replayWebViewSummaryFixture))
+      .mockResolvedValueOnce(Response.json(replayWebViewAggregateFixture))
+      .mockResolvedValueOnce(Response.json(replayWatchRankingsFixture))
+      .mockResolvedValueOnce(Response.json(replayViewCountsFixture));
+    const api = createCjsApi(
+      createJsonClient({ baseUrl: "https://example.test", fetch: fetchMock as typeof fetch }),
+    );
+
+    await expect(api.replayWebViewSummary({ source: "j4l", runId: 7001 })).resolves.toEqual({
+      heat: {
+        bucket_ms: 5_000,
+        view_count: [1, 3, 3, 2],
+        watch_ms: [5_000, 15_000, 16_000, 9_000],
+      },
+    });
+    await expect(
+      api.replayWebViewAggregate({ source: "j4l", ownerPlayerId: 501 }),
+    ).resolves.toMatchObject({ watch_count: 18, unique_viewer_count: 11, avg_completion: 0.42 });
+    await expect(
+      api.replayWebViewRankings({ source: "j4l", mapId: 101, metric: "watch_count", limit: 1 }),
+    ).resolves.toHaveLength(1);
+    const counts = await api.replayViewCounts({ source: "j4l", runIds: [7001, 7002, 7001] });
+    expect([...counts]).toEqual([
+      [7001, { web: 1_234, in_game: 340 }],
+      [7002, { web: 0, in_game: 0 }],
+    ]);
+
+    expect(fetchMock.mock.calls.map(([url]) => url)).toEqual([
+      "https://example.test/api/v1/replay/web-view-summary?source=j4l&run_id=7001",
+      "https://example.test/api/v1/replay/web-view-aggregate?source=j4l&owner_playerid=501",
+      "https://example.test/api/v1/replay/web-view-rankings?source=j4l&metric=watch_count&mapid=101&limit=1",
+      "https://example.test/api/v1/replay/view-counts?source=j4l&run_ids=7001%2C7002",
+    ]);
+  });
+
+  it("rejects invalid web replay-view arguments and responses", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        Response.json({ heat: { bucket_ms: 5_000, view_count: [1, 2], watch_ms: [1] } }),
+      )
+      .mockResolvedValueOnce(
+        Response.json({ ...(replayWebViewAggregateFixture as object), avg_completion: 1.5 }),
+      )
+      .mockResolvedValueOnce(Response.json({ "7001": { web: "many", in_game: 0 } }));
+    const api = createCjsApi(
+      createJsonClient({ baseUrl: "https://example.test", fetch: fetchMock as typeof fetch }),
+    );
+
+    await expect(api.replayViewCounts({ source: "j4l", runIds: [] })).rejects.toMatchObject({
+      kind: "invalid-argument",
+    });
+    await expect(
+      api.replayViewCounts({ source: "j4l", runIds: Array.from({ length: 101 }, (_, i) => i + 1) }),
+    ).rejects.toMatchObject({ kind: "invalid-argument" });
+    await expect(api.replayWebViewSummary({ source: "j4l", runId: 0 })).rejects.toMatchObject({
+      kind: "invalid-argument",
+    });
+    await expect(api.replayWebViewSummary({ source: "jh", runId: 1 })).rejects.toBeInstanceOf(
+      UnsupportedCapabilityError,
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await expect(api.replayWebViewSummary({ source: "j4l", runId: 7001 })).rejects.toMatchObject({
+      kind: "invalid-response",
+    });
+    await expect(
+      api.replayWebViewAggregate({ source: "j4l", ownerPlayerId: 501 }),
+    ).rejects.toMatchObject({ kind: "invalid-response" });
+    await expect(api.replayViewCounts({ source: "j4l", runIds: [7001] })).rejects.toMatchObject({
+      kind: "invalid-response",
+    });
+  });
+
   it("omits FPS for the howmany leaderboard because the API does not support it", async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json(leaderboardFixture));
     const api = createCjsApi(
@@ -283,6 +368,7 @@ function responseFor(pathname: string): unknown {
   if (pathname.includes("/leaderboard/")) return leaderboardFixture;
   if (pathname.endsWith("/map/all")) return mapsFixture;
   if (pathname.endsWith("/map/tops")) return topRunsFixture;
+  if (pathname.endsWith("/map/players-playtime")) return mapPlayersPlaytimeFixture;
   if (pathname.endsWith("/player/all") || pathname.endsWith("/player/id-from-name")) {
     return playersFixture;
   }

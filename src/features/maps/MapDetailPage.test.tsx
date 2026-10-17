@@ -128,7 +128,12 @@ describe("MapDetailPage", () => {
         signal: expect.any(AbortSignal),
       }),
     );
-    expect(screen.getByRole("combobox", { name: "Route" })).toHaveValue("102");
+    expect(
+      within(screen.getByRole("radiogroup", { name: "Route" })).getByRole("radio", {
+        name: "bonus",
+      }),
+    ).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText("Route: bonus")).toBeVisible();
     expect(
       within(screen.getByRole("radiogroup", { name: "Top runs FPS" })).getByRole("radio", {
         name: "333",
@@ -151,7 +156,7 @@ describe("MapDetailPage", () => {
       "href",
       "https://media.example.invalid/maps/mp_alpha",
     );
-    expect(await screen.findByRole("heading", { name: "In-game Replay views" })).toBeVisible();
+    expect(await screen.findByRole("heading", { name: "Replay views" })).toBeVisible();
     await waitFor(() =>
       expect(api.replayWatchAggregate).toHaveBeenCalledWith(
         expect.objectContaining({ mapId: 1, source: "j4l" }),
@@ -167,7 +172,7 @@ describe("MapDetailPage", () => {
     expect(resultsLayout?.firstElementChild).toHaveClass("cjs-map-detail__insights");
     expect(
       within(screen.getByRole("complementary", { name: "Map insights" })).getByRole("heading", {
-        name: "In-game Replay views",
+        name: "Replay views",
       }),
     ).toBeVisible();
     expect(resultsLayout?.lastElementChild).toHaveClass("cjs-map-detail__runs");
@@ -243,8 +248,117 @@ describe("MapDetailPage", () => {
         name: "333",
       }),
     ).toHaveAttribute("aria-checked", "true");
-    expect(screen.queryByRole("combobox", { name: "Route" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("radiogroup", { name: "Route" })).not.toBeInTheDocument();
     expect(screen.queryByText(/^Route 1/)).not.toBeInTheDocument();
+  });
+
+  it("loads Most played lazily per route, sums every FPS for All and caches each FPS", async () => {
+    vi.spyOn(api, "maps").mockResolvedValue(alphaCheckpoints);
+    vi.spyOn(api, "mapTops").mockResolvedValue([
+      alphaRun,
+      topRun({ player_id: 7, playername: "Slower Alpha", rank: 4 }),
+    ]);
+    const playtimeRequest = vi.spyOn(api, "mapPlayersPlaytime").mockImplementation(({ fps }) =>
+      Promise.resolve(
+        fps === "125"
+          ? [
+              { player_id: 7, player_name: "^1Alpha ^2Runner", time_played: 3_600 },
+              { player_id: 8, player_name: "Beta Runner", time_played: 4_000 },
+            ]
+          : fps === "333"
+            ? [{ player_id: 7, player_name: "^1Alpha ^2Runner", time_played: 1_500 }]
+            : [],
+      ),
+    );
+    const user = userEvent.setup();
+    window.history.replaceState(null, "", "/maps/1?source=j4l&cp=102");
+
+    renderMapDetail();
+    await screen.findByRole("heading", { name: "Top runs at 125 FPS" });
+    expect(playtimeRequest).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("radio", { name: "Most played" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Most played at all FPS (on route bonus)" }),
+    ).toBeVisible();
+    expect(window.location.search).toContain("view=played");
+    expect(playtimeRequest.mock.calls.map(([options]) => options.fps)).toEqual([
+      "43",
+      "76",
+      "125",
+      "250",
+      "333",
+      "0",
+    ]);
+    expect(playtimeRequest).toHaveBeenCalledWith({
+      source: "j4l",
+      mapId: 1,
+      fps: "125",
+      ender: "bonus",
+      limit: 100,
+    });
+    const allTable = await screen.findByRole("table", {
+      name: /by playtime on mp_alpha at all FPS/,
+    });
+    const allRows = within(allTable).getAllByRole("row").slice(1);
+    expect(allRows[0]).toHaveAccessibleName("Rank 1, Alpha Runner");
+    expect(within(allRows[0]).getByText("1h 25m")).toBeVisible();
+    expect(within(allRows[0]).getByText("125, 333")).toBeVisible();
+    expect(allRows[1]).toHaveAccessibleName("Rank 2, Beta Runner");
+    expect(within(allRows[1]).getByText("1h 06m")).toBeVisible();
+    expect(within(allRows[0]).getByRole("link", { name: "Alpha Runner" })).toHaveAttribute(
+      "href",
+      "/players/7?source=j4l",
+    );
+
+    await user.click(
+      within(screen.getByRole("radiogroup", { name: "Most played FPS" })).getByRole("radio", {
+        name: "333",
+      }),
+    );
+    const fpsTable = await screen.findByRole("table", { name: /at 333 FPS/ });
+    expect(
+      within(fpsTable).getByRole("columnheader", { name: "Best time on route" }),
+    ).toBeVisible();
+    expect(within(fpsTable).getByText("20.951 (#1)")).toBeVisible();
+    expect(api.mapTops).toHaveBeenLastCalledWith(
+      expect.objectContaining({ checkpointId: 102, fps: "333" }),
+    );
+
+    await user.click(
+      within(screen.getByRole("radiogroup", { name: "Most played FPS" })).getByRole("radio", {
+        name: "All FPS combined",
+      }),
+    );
+    await screen.findByRole("table", { name: /at all FPS/ });
+    expect(playtimeRequest).toHaveBeenCalledTimes(6);
+
+    await user.click(screen.getByRole("radio", { name: "main" }));
+    expect(
+      await screen.findByRole("heading", { name: "Most played at all FPS (on route main)" }),
+    ).toBeVisible();
+    expect(playtimeRequest).toHaveBeenCalledTimes(12);
+    expect(playtimeRequest).toHaveBeenLastCalledWith(expect.objectContaining({ ender: "main" }));
+  });
+
+  it("shows an empty Most played state for JumpersHeaven maps without playtime", async () => {
+    vi.spyOn(api, "maps").mockResolvedValue([betaMap]);
+    vi.spyOn(api, "mapTops").mockResolvedValue([betaRun]);
+    vi.spyOn(api, "mapPlayersPlaytime").mockResolvedValue([]);
+    window.history.replaceState(null, "", "/maps/2?view=played&pfps=125");
+
+    renderMapDetail("2");
+
+    expect(
+      await screen.findByRole("heading", { name: "No playtime recorded at 125 FPS on mp_beta" }),
+    ).toBeVisible();
+    expect(api.mapPlayersPlaytime).toHaveBeenCalledWith({
+      source: "jh",
+      mapId: 2,
+      fps: "125",
+      limit: 100,
+    });
   });
 
   it("shows route selection only for multi-route maps and requests the selected route", async () => {
@@ -254,9 +368,13 @@ describe("MapDetailPage", () => {
 
     renderMapDetail();
     await screen.findByRole("heading", { name: "mp_alpha", level: 1 });
-    expect(screen.getByRole("option", { name: "Route 1: main" })).toBeVisible();
-    expect(screen.getByRole("option", { name: "Route 2: bonus" })).toBeVisible();
-    await user.selectOptions(screen.getByRole("combobox", { name: "Route" }), "102");
+    const routes = screen.getByRole("radiogroup", { name: "Route" });
+    expect(within(routes).getByRole("radio", { name: "main" })).toHaveAttribute(
+      "aria-checked",
+      "true",
+    );
+    expect(within(routes).getByRole("radio", { name: "bonus" })).toBeVisible();
+    await user.click(within(routes).getByRole("radio", { name: "bonus" }));
 
     await waitFor(() => {
       expect(window.location.search).toContain("cp=102");
@@ -265,6 +383,28 @@ describe("MapDetailPage", () => {
       );
     });
     expect(api.maps).toHaveBeenCalledTimes(1);
+  });
+
+  it("falls back to a route dropdown when a map has more than six routes", async () => {
+    const routes = Array.from({ length: 7 }, (_, index) => ({
+      ...alphaCheckpoints[0],
+      cp_id: 101 + index,
+      ender: index === 6 ? null : `route-${index + 1}`,
+    }));
+    vi.spyOn(api, "maps").mockResolvedValue(routes);
+    const topsRequest = vi.spyOn(api, "mapTops").mockResolvedValue([alphaRun]);
+    const user = userEvent.setup();
+
+    renderMapDetail();
+    const routeSelect = await screen.findByRole("combobox", { name: "Route" });
+    expect(screen.queryByRole("radiogroup", { name: "Route" })).not.toBeInTheDocument();
+    expect(within(routeSelect).getByRole("option", { name: "Route 7" })).toBeInTheDocument();
+    await user.selectOptions(routeSelect, "103");
+
+    await waitFor(() =>
+      expect(topsRequest).toHaveBeenLastCalledWith(expect.objectContaining({ checkpointId: 103 })),
+    );
+    expect(screen.getByText("Route: route-3")).toBeVisible();
   });
 
   it("cancels an obsolete route request and never presents it as the new map", async () => {
@@ -447,6 +587,27 @@ describe("MapDetailPage", () => {
 
     expect(await screen.findByRole("heading", { name: "Map unavailable" })).toBeVisible();
     expect(topsRequest).not.toHaveBeenCalled();
+  });
+
+  it("links to the 3D view and to Jump4Life replays only when map models are configured", async () => {
+    vi.stubEnv("VITE_MAP_MODEL_BASE_URL", "https://models.example.test/maps/");
+    vi.spyOn(api, "maps").mockResolvedValue(alphaCheckpoints);
+    vi.spyOn(api, "mapTops").mockResolvedValue([alphaRun]);
+    window.history.replaceState(null, "", "/maps/1?source=j4l&fps=333&cp=102");
+
+    try {
+      renderMapDetail();
+
+      expect(await screen.findByRole("link", { name: "View in 3D" })).toHaveAttribute(
+        "href",
+        "/maps/1/3d?source=j4l",
+      );
+      expect(
+        await screen.findByRole("link", { name: "Watch Alpha Runner's replay, rank 1" }),
+      ).toHaveAttribute("href", "/replays/700");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });
 

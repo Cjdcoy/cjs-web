@@ -27,7 +27,7 @@ export const primaryNavigation: readonly PrimaryNavigationItem[] = [
     label: "Leaderboards",
   },
   {
-    activeRoutes: ["maps", "map-detail"],
+    activeRoutes: ["maps", "map-detail", "map-viewer"],
     href: appPaths.maps,
     icon: Map,
     label: "Maps",

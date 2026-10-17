@@ -52,7 +52,8 @@ export function buildApiUrl(baseUrl: string, path: string, query: ApiQuery = {})
 }
 
 export function createJsonClient(config: JsonClientConfig): JsonClient {
-  const fetchImpl = config.fetch ?? globalThis.fetch.bind(globalThis);
+  // Resolved per call, so a fetch patched after module load (test mocks) is used.
+  const fetchImpl: typeof fetch = config.fetch ?? ((input, init) => globalThis.fetch(input, init));
   const maxRetries = clampInteger(config.maxRetries ?? 1, 0, 3);
   const retryDelayMs = Math.max(0, config.retryDelayMs ?? 250);
   const maxRetryDelayMs = Math.max(retryDelayMs, config.maxRetryDelayMs ?? 2_000);

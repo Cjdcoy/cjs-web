@@ -1,0 +1,219 @@
+.cjs-map-viewer {
+  display: grid;
+  gap: var(--cjs-space-3);
+  min-width: 0;
+}
+
+.cjs-map-viewer__frame {
+  position: relative;
+  min-width: 0;
+}
+
+/* A fixed 16:9 view, as wide as fits under the configurable height cap. */
+.cjs-map-viewer__view {
+  position: relative;
+  overflow: hidden;
+  width: min(100%, calc(var(--cjs-map-viewer-max-height, 70svh) * 16 / 9));
+  aspect-ratio: 16 / 9;
+  margin-inline: auto;
+  border: var(--cjs-border-width) solid var(--cjs-color-border);
+  border-radius: var(--cjs-radius-md);
+  background: var(--cjs-color-elevated);
+}
+
+.cjs-map-viewer__view:focus-visible {
+  outline: 0;
+  box-shadow: var(--cjs-focus-ring);
+}
+
+.cjs-map-viewer__stage,
+.cjs-map-viewer__canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.cjs-map-viewer__view:not([tabindex="-1"]) .cjs-map-viewer__canvas {
+  cursor: crosshair;
+}
+
+/*
+ * CoD2's hip reticle: four side ticks around an empty centre, white with the texture's dark
+ * outline. Sizes are set per view height (viewerHud.ts hipReticle); game colours, not brand ones.
+ */
+.cjs-map-viewer__reticle {
+  position: absolute;
+  top: round(down, 50%, 1px);
+  left: round(down, 50%, 1px);
+  pointer-events: none;
+}
+
+/*
+ * One top tick, turned about the view centre for the other three sides. The nudge moves the centre
+ * to a pixel's middle for odd line widths, inside the transform since layout offsets get snapped.
+ */
+.cjs-map-viewer__reticle > span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--cjs-reticle-width, 1px);
+  height: var(--cjs-reticle-length, 4px);
+  background: var(--cjs-color-cod-7);
+  box-shadow: 0 0 0 var(--cjs-reticle-outline, 1px) var(--cjs-color-cod-0);
+  transform: translate(var(--cjs-reticle-nudge, 0.5px), var(--cjs-reticle-nudge, 0.5px))
+    rotate(var(--cjs-reticle-turn, 0deg))
+    translate(-50%, calc(-100% - var(--cjs-reticle-offset, 7px) - var(--cjs-reticle-nudge, 0.5px)));
+  transform-origin: 0 0;
+}
+
+.cjs-map-viewer__reticle > span:nth-child(2) {
+  --cjs-reticle-turn: 90deg;
+}
+
+.cjs-map-viewer__reticle > span:nth-child(3) {
+  --cjs-reticle-turn: 180deg;
+}
+
+.cjs-map-viewer__reticle > span:nth-child(4) {
+  --cjs-reticle-turn: 270deg;
+}
+
+/* Free-camera position, angles and speed, placed like the game's poshud (top left at 8, 28). */
+.cjs-map-viewer__readout {
+  position: absolute;
+  top: calc(28 / 480 * 100%);
+  left: calc(8 / 640 * 100%);
+  color: var(--cjs-color-cod-7);
+  font-family: var(--cjs-font-mono);
+  font-size: var(--cjs-font-size-xs);
+  font-variant-numeric: tabular-nums;
+  line-height: var(--cjs-line-height-tight);
+  text-shadow: 1px 1px 0 var(--cjs-color-cod-0);
+  white-space: pre;
+  pointer-events: none;
+}
+
+.cjs-map-viewer__overlay {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: var(--cjs-space-4);
+  background: var(--cjs-color-backdrop);
+}
+
+.cjs-map-viewer__overlay > * {
+  max-width: var(--cjs-reading-width);
+}
+
+.cjs-map-viewer__progress {
+  display: grid;
+  justify-items: center;
+  gap: var(--cjs-space-2);
+  width: min(100%, 20rem);
+  color: var(--cjs-color-text);
+  font-size: var(--cjs-font-size-sm);
+}
+
+.cjs-map-viewer__progress progress {
+  width: 100%;
+  accent-color: var(--cjs-color-accent);
+}
+
+.cjs-map-viewer__progress-detail,
+.cjs-map-viewer__help {
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-xs);
+}
+
+.cjs-map-viewer__help {
+  margin: 0;
+}
+
+.cjs-map-viewer__tools {
+  display: flex;
+  justify-content: flex-end;
+}
+
+/*
+ * Readable layer panel rising from the frame's bottom-right, next to the Layers button; it scrolls
+ * when the view is short and keeps clear of the sticky site header when focus scrolls to it.
+ */
+.cjs-map-viewer__layers {
+  position: absolute;
+  z-index: var(--cjs-layer-raised);
+  right: var(--cjs-space-3);
+  bottom: var(--cjs-space-3);
+  scroll-margin-block-start: calc(var(--cjs-space-16) + var(--cjs-space-4));
+  display: grid;
+  gap: var(--cjs-space-2);
+  width: min(20rem, calc(100% - 2 * var(--cjs-space-3)));
+  max-height: calc(100% - 2 * var(--cjs-space-3));
+  overflow: auto;
+  padding: var(--cjs-space-3) var(--cjs-space-4);
+  border: var(--cjs-border-width) solid var(--cjs-color-border-strong);
+  border-radius: var(--cjs-radius-md);
+  background: var(--cjs-color-panel);
+  box-shadow: var(--cjs-shadow-elevated);
+  font-size: var(--cjs-font-size-md);
+}
+
+.cjs-map-viewer__layers:focus-visible {
+  outline: 0;
+  box-shadow: var(--cjs-focus-ring);
+}
+
+.cjs-map-viewer__layers-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--cjs-space-2);
+}
+
+.cjs-map-viewer__layers h2 {
+  margin: 0;
+  font-size: var(--cjs-font-size-md);
+}
+
+.cjs-map-viewer__layers ul {
+  display: grid;
+  gap: var(--cjs-space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cjs-map-viewer__layers li[data-child] {
+  padding-inline-start: var(--cjs-space-5);
+}
+
+.cjs-map-viewer__layers label {
+  display: flex;
+  align-items: center;
+  gap: var(--cjs-space-2);
+  min-height: var(--cjs-control-height-sm);
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.cjs-map-viewer__layers input {
+  flex: none;
+  accent-color: var(--cjs-color-accent);
+}
+
+/* Small screens: the panel joins the page flow under the short view instead of covering it. */
+@media (max-width: 47.999rem) {
+  .cjs-map-viewer__layers {
+    position: static;
+    width: auto;
+    max-height: none;
+    margin-block-start: var(--cjs-space-3);
+  }
+}
+
+.cjs-map-viewer__swatch {
+  width: var(--cjs-space-3);
+  height: var(--cjs-space-3);
+  border: var(--cjs-border-width) solid var(--cjs-color-border-strong);
+  border-radius: var(--cjs-radius-sm);
+}

@@ -534,11 +534,12 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(12rem, 1fr));
   align-items: start;
-  gap: var(--cjs-space-4);
+  gap: var(--cjs-space-4) var(--cjs-space-8);
 }
 
+/* Routes fit between source and FPS, so FPS starts at the centre as it does without routes. */
 .cjs-map-detail__controls[data-has-routes="true"] {
-  grid-template-columns: repeat(3, minmax(11rem, 1fr));
+  grid-template-columns: auto minmax(0, 1fr) calc(50% - var(--cjs-space-8) / 2);
 }
 
 .cjs-map-detail__controls fieldset {
@@ -546,6 +547,18 @@
   margin: 0;
   padding: 0;
   border: 0;
+}
+
+/* Wraps whole route names onto a new line when the row is too narrow, also on small screens where
+   segmented controls otherwise become equal grid columns that break names mid-label. */
+.cjs-map-detail__routes.cjs-segmented-control {
+  display: inline-flex;
+  flex-wrap: wrap;
+}
+
+.cjs-map-detail__routes .cjs-segmented-control__option {
+  flex: 1 1 auto;
+  white-space: normal;
 }
 
 .cjs-map-detail__controls legend {
@@ -929,6 +942,25 @@
   font-size: var(--cjs-font-size-sm);
 }
 
+.cjs-map-detail__view-switch {
+  margin-block-end: var(--cjs-space-4);
+}
+
+.cjs-map-detail__view-switch .cjs-segmented-control__option {
+  gap: var(--cjs-space-2);
+}
+
+.cjs-map-detail__heading-scope {
+  color: var(--cjs-color-text-muted);
+  font-weight: var(--cjs-font-weight-medium);
+}
+
+.cjs-map-detail__note {
+  margin: var(--cjs-space-1) 0 0;
+  color: var(--cjs-color-text-muted);
+  font-size: var(--cjs-font-size-sm);
+}
+
 @keyframes cjs-maps-spin {
   to {
     transform: rotate(1turn);
@@ -1002,11 +1034,11 @@
   }
 
   .cjs-map-detail__loading,
-  .cjs-map-detail__hero,
-  .cjs-map-detail__controls {
+  .cjs-map-detail__hero {
     grid-template-columns: 1fr;
   }
 
+  .cjs-map-detail__controls,
   .cjs-map-detail__controls[data-has-routes="true"] {
     grid-template-columns: 1fr;
   }

@@ -5,12 +5,19 @@ import process from "node:process";
 
 const distDirectory = path.resolve("dist");
 const manifestPath = path.join(distDirectory, ".vite", "manifest.json");
+// The three.js map viewer (ADR 0004) is measured on its own: it must stay a lazily loaded chunk
+// and is excluded from the route and total budgets that every page pays for.
+const mapViewerEntryKey = "src/features/mapViewer/MapViewerCanvas.tsx";
 const budgets = {
   initialJavaScriptGzip: 75 * 1024,
   initialCssGzip: 8 * 1024,
-  routeIncrementGzip: 35 * 1024,
-  totalJavaScriptGzip: 136 * 1024,
-  totalCssGzip: 20 * 1024,
+  // 37 KiB since PR #33 (3D replay viewer); measured at 36.0 KiB.
+  routeIncrementGzip: 37 * 1024,
+  // 158 KiB since replay viewmodel motion and HUD controls; measured at 157.4 KiB.
+  totalJavaScriptGzip: 158 * 1024,
+  // 23 KiB since PR #33 (3D replay viewer); measured at 22.7 KiB.
+  totalCssGzip: 23 * 1024,
+  mapViewerGzip: 170 * 1024,
 };
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
@@ -27,22 +34,34 @@ const javascriptFiles = assetFiles.filter((file) => file.endsWith(".js"));
 const cssFiles = assetFiles.filter((file) => file.endsWith(".css"));
 const initialJavaScript = [...initialAssets].filter((file) => file.endsWith(".js"));
 const initialCss = [...initialAssets].filter((file) => file.endsWith(".css"));
-const dynamicEntries = entries.filter((asset) => asset.isDynamicEntry);
+const mapViewerEntry = manifest[mapViewerEntryKey];
+if (!mapViewerEntry?.isDynamicEntry) {
+  throw new Error(
+    `${mapViewerEntryKey} must stay a dynamic import so three.js never loads eagerly.`,
+  );
+}
+if (entries.some((asset) => asset.imports?.includes(mapViewerEntryKey))) {
+  throw new Error(`${mapViewerEntryKey} must not be imported statically.`);
+}
+const routeEntries = entries.filter((asset) => asset.isDynamicEntry && asset !== mapViewerEntry);
+const routeAssetLists = routeEntries.map(incrementAssets);
 const routeIncrements = await Promise.all(
-  dynamicEntries.map(async (asset) => {
-    const routeAssets = [...collectInitialAssets(asset, manifest)].filter(
-      (file) => !initialAssets.has(file) && /\.(css|js)$/.test(file),
-    );
-    return gzipSize(routeAssets.map(fromDist));
-  }),
+  routeAssetLists.map((routeAssets) => gzipSize(routeAssets.map(fromDist))),
 );
+const routeAssets = new Set(routeAssetLists.flat());
+const mapViewerAssets = incrementAssets(mapViewerEntry);
+const mapViewerOnly = new Set(
+  mapViewerAssets.filter((file) => !routeAssets.has(file)).map(fromDist),
+);
+const isShared = (file) => !mapViewerOnly.has(file);
 
 const measurements = {
   initialJavaScriptGzip: await gzipSize(initialJavaScript.map(fromDist)),
   initialCssGzip: await gzipSize(initialCss.map(fromDist)),
   routeIncrementGzip: Math.max(0, ...routeIncrements),
-  totalJavaScriptGzip: await gzipSize(javascriptFiles),
-  totalCssGzip: await gzipSize(cssFiles),
+  totalJavaScriptGzip: await gzipSize(javascriptFiles.filter(isShared)),
+  totalCssGzip: await gzipSize(cssFiles.filter(isShared)),
+  mapViewerGzip: await gzipSize(mapViewerAssets.map(fromDist)),
 };
 
 let failed = false;
@@ -54,6 +73,12 @@ for (const [name, budget] of Object.entries(budgets)) {
 }
 
 if (failed) process.exitCode = 1;
+
+function incrementAssets(asset) {
+  return [...collectInitialAssets(asset, manifest)].filter(
+    (file) => !initialAssets.has(file) && /\.(css|js)$/.test(file),
+  );
+}
 
 function collectInitialAssets(root, allAssets) {
   const files = new Set([root.file, ...(root.css ?? [])]);

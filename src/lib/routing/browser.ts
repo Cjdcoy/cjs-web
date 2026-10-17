@@ -1,9 +1,12 @@
 import { useMemo, useSyncExternalStore } from "react";
-import type { RouteLocation } from "./routes";
+import type { AppRouteId, RouteLocation } from "./routes";
 
 const navigationEvent = "cjs:navigate";
 let navigationPending = false;
 const navigationPendingListeners = new Set<() => void>();
+
+let currentRoute: { id: AppRouteId; pathname: string } | null = null;
+let previousRoute: AppRouteId | null = null;
 
 export interface NavigateOptions {
   replace?: boolean;
@@ -42,6 +45,18 @@ export function navigate(to: string | URL, options: NavigateOptions = {}): void 
 
 export function markNavigationComplete(): void {
   setNavigationPending(false);
+}
+
+/** The router records each page it shows; query or hash changes on the same page are not new pages. */
+export function recordRouteVisit(id: AppRouteId, pathname: string): void {
+  if (currentRoute?.pathname === pathname) return;
+  previousRoute = currentRoute?.id ?? null;
+  currentRoute = { id, pathname };
+}
+
+/** The in-app page shown before the current one, or null on a direct load. */
+export function previousRouteId(): AppRouteId | null {
+  return previousRoute;
 }
 
 export function parseBrowserHref(href: string): RouteLocation {

@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -62,9 +62,12 @@ describe("ServersPage", () => {
     const { container } = renderPage({ loadServers: loader });
 
     const pageHeading = screen.getByRole("heading", { level: 1, name: "Live servers" });
-    expect(pageHeading).toBeVisible();
-    expect(pageHeading.closest(".cjs-page-heading")).not.toBeNull();
-    expect(screen.getByText(/current JumpersHeaven and Jump4Life servers/i)).toBeVisible();
+    expect(pageHeading).toHaveClass("cjs-visually-hidden");
+    expect(container.querySelector(".cjs-page-heading")).not.toBeInTheDocument();
+    expect(screen.queryByText("Live activity")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/current JumpersHeaven and Jump4Life servers/i),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Loading live server data.")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "cod2.example.invalid" })).toBeVisible();
     expect(screen.getByRole("link", { name: "mp_cjs_training" })).toHaveAttribute(
@@ -89,7 +92,13 @@ describe("ServersPage", () => {
     expect(screen.queryByText("Server address")).not.toBeInTheDocument();
     expect(screen.queryByText("Current map")).not.toBeInTheDocument();
     expect(screen.queryByText("Connected players")).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Players" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: /^Players/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Players" })).toBeVisible();
+    // Only the populated server shows a count over its map art.
+    const playerCounts = container.querySelectorAll(".server-card__count");
+    expect(playerCounts).toHaveLength(1);
+    expect(playerCounts[0]).toHaveTextContent("1 player online");
+    expect(playerCounts[0]?.closest(".server-card__map")).not.toBeNull();
     expect(screen.getByRole("img", { name: "Server online" })).toHaveAttribute(
       "data-tooltip",
       "Online",
@@ -241,48 +250,95 @@ describe("ServersPage", () => {
 
     await user.click(screen.getByRole("radio", { name: "List view" }));
     expect(window.location.search).toContain("view=list");
-    expect(screen.getByLabelText("Jump4Life: 1 matching live servers")).toHaveAttribute(
-      "data-view",
-      "list",
-    );
+    expect(screen.getByLabelText("1 matching live server")).toHaveAttribute("data-view", "list");
   });
 
-  it("folds each server source independently from its heading", async () => {
+  it("warns about one unavailable source and retries it in place", async () => {
+    let jhAttempts = 0;
+    const loader = vi.fn<ServerLoader>(async (source) => {
+      if (source === "jh" && ++jhAttempts === 1) throw new Error("offline");
+      return {
+        servers: [
+          {
+            domain: source === "j4l" ? "visible-j4l.invalid" : "visible-jh.invalid",
+            map: source === "j4l" ? "mp_j4l" : "mp_jh",
+            player_count: 0,
+            online: true,
+          },
+        ],
+      };
+    });
     const user = userEvent.setup();
-    const loader = vi.fn<ServerLoader>(async (source) => ({
-      servers: [
-        {
-          domain: source === "j4l" ? "visible-j4l.invalid" : "visible-jh.invalid",
-          map: source === "j4l" ? "mp_j4l" : "mp_jh",
-          player_count: 0,
-          online: true,
-        },
-      ],
-    }));
     renderPage({ loadServers: loader });
 
     expect(await screen.findByRole("heading", { name: "visible-j4l.invalid" })).toBeVisible();
-    expect(screen.getByRole("heading", { name: "visible-jh.invalid" })).toBeVisible();
+    expect(await screen.findByText("JumpersHeaven is unavailable.")).toBeVisible();
+    expect(screen.queryByRole("button", { name: "Jump4Life" })).not.toBeInTheDocument();
 
-    const j4lToggle = screen.getByRole("button", { name: "Jump4Life" });
-    const jhToggle = screen.getByRole("button", { name: "JumpersHeaven" });
-    expect(j4lToggle).toHaveAttribute("aria-expanded", "true");
-    expect(jhToggle).toHaveAttribute("aria-expanded", "true");
-
-    await user.click(j4lToggle);
-    expect(j4lToggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("heading", { name: "visible-j4l.invalid" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "visible-jh.invalid" })).toBeVisible();
-
-    await user.click(j4lToggle);
-    expect(j4lToggle).toHaveAttribute("aria-expanded", "true");
+    await user.click(screen.getByRole("button", { name: "Retry JumpersHeaven" }));
+    expect(await screen.findByRole("heading", { name: "visible-jh.invalid" })).toBeVisible();
+    expect(screen.queryByText("JumpersHeaven is unavailable.")).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "visible-j4l.invalid" })).toBeVisible();
+  });
 
-    await user.click(jhToggle);
-    expect(jhToggle).toHaveAttribute("aria-expanded", "false");
-    expect(screen.queryByRole("heading", { name: "visible-jh.invalid" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "visible-j4l.invalid" })).toBeVisible();
-    expect(window.location.search).toBe("");
+  it("shows admin levels only for linked admins", async () => {
+    const { container } = renderPage({
+      loadServers: loadJ4l({
+        servers: [
+          {
+            domain: "admins.example.invalid",
+            map: "mp_admins",
+            players: [
+              { playername: "Boss", playerid: 601, ping: 30, admin: 5 },
+              { playername: "Guest", playerid: 0, ping: 40, admin: 3 },
+              { playername: "Regular", playerid: 602, ping: 50, admin: 0 },
+            ],
+            player_count: 3,
+            online: true,
+          },
+        ],
+      }),
+    });
+
+    const boss = (await screen.findByRole("link", { name: "Boss" })).closest("li");
+    const badge = boss?.querySelector(".server-card__admin");
+    // Only the visually hidden prefix adds words; sighted users see just the number.
+    expect(badge).toHaveTextContent(/^Admin level 5$/);
+    expect(badge?.querySelector(".cjs-visually-hidden")).toHaveTextContent("Admin level");
+    expect(badge).toHaveAttribute("title", "Admin level 5");
+    expect(screen.getByText("Guest").closest("li")).not.toHaveTextContent(/Admin/);
+    expect(screen.getByRole("link", { name: "Regular" }).closest("li")).not.toHaveTextContent(
+      /Admin/,
+    );
+    expect(container.querySelectorAll(".server-card__admin")).toHaveLength(1);
+  });
+
+  it("tiers admin levels so 90 and above stand apart from 60-89 and the rest", async () => {
+    const levels = [20, 59, 60, 89, 90, 101];
+    const { container } = renderPage({
+      loadServers: loadJ4l({
+        servers: [
+          {
+            domain: "tiers.example.invalid",
+            map: "mp_tiers",
+            players: levels.map((admin, index) => ({
+              playername: `Admin${admin}`,
+              playerid: 700 + index,
+              ping: 30,
+              admin,
+            })),
+            player_count: levels.length,
+            online: true,
+          },
+        ],
+      }),
+    });
+
+    await screen.findByRole("link", { name: "Admin20" });
+    const tiers = [...container.querySelectorAll(".server-card__admin")].map((badge) =>
+      badge.getAttribute("data-tier"),
+    );
+    expect(tiers).toEqual(["low", "low", "mid", "mid", "top", "top"]);
   });
 
   it("shows JumpersHeaven COD4 servers through a URL-backed game control", async () => {
@@ -385,13 +441,16 @@ describe("ServersPage", () => {
       "href",
       "/maps/202?source=jh&lookup=cpid",
     );
-    const sourceHeadings = screen.getAllByRole("heading", {
-      name: /Jump4Life|JumpersHeaven/,
-    });
-    expect(sourceHeadings.map((heading) => heading.textContent)).toEqual([
-      "Jump4Life",
-      "JumpersHeaven",
-    ]);
+    // One merged list with no per-source sections, Jump4Life first.
+    const grid = screen.getByLabelText("2 matching live servers");
+    expect(
+      within(grid)
+        .getAllByRole("heading", { level: 2 })
+        .map((heading) => heading.textContent),
+    ).toEqual(["fr.jump4life.org", "hk.jumpersheaven.com"]);
+    expect(
+      screen.queryByRole("heading", { name: /Jump4Life|JumpersHeaven/ }),
+    ).not.toBeInTheDocument();
     expect(screen.getByLabelText("France").querySelector("img")).toHaveAttribute(
       "src",
       "/country-flags/fr.svg",
