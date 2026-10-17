@@ -530,12 +530,16 @@
   text-align: end;
 }
 
-/* Source, FPS and route share one row and wrap only when the next control does not fit. */
 .cjs-map-detail__controls {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(12rem, 1fr));
+  align-items: start;
   gap: var(--cjs-space-4) var(--cjs-space-8);
+}
+
+/* Routes fit between source and FPS, so FPS starts at the centre as it does without routes. */
+.cjs-map-detail__controls[data-has-routes="true"] {
+  grid-template-columns: auto minmax(0, 1fr) calc(50% - var(--cjs-space-8) / 2);
 }
 
 .cjs-map-detail__controls fieldset {
@@ -1034,8 +1038,9 @@
     grid-template-columns: 1fr;
   }
 
-  .cjs-map-detail__controls > * {
-    flex-basis: 100%;
+  .cjs-map-detail__controls,
+  .cjs-map-detail__controls[data-has-routes="true"] {
+    grid-template-columns: 1fr;
   }
 
   .cjs-map-videos__dialog {

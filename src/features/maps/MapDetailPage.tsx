@@ -246,6 +246,35 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
                 }))}
               />
             </fieldset>
+            {mapRequest.data.checkpoints.length > MAX_ROUTE_BUTTONS ? (
+              <Select
+                label="Route"
+                value={String(selectedMap.cp_id)}
+                onChange={(event) => selectRoute(event.currentTarget.value)}
+              >
+                {mapRequest.data.checkpoints.map((route, index) => (
+                  <option value={route.cp_id} key={route.cp_id}>
+                    {getMapRouteLabel(route, index)}
+                  </option>
+                ))}
+              </Select>
+            ) : (
+              mapRequest.data.checkpoints.length > 1 && (
+                <fieldset>
+                  <legend>Route</legend>
+                  <SegmentedControl<string>
+                    ariaLabel="Route"
+                    className="cjs-map-detail__routes"
+                    value={String(selectedMap.cp_id)}
+                    onChange={selectRoute}
+                    options={mapRequest.data.checkpoints.map((route, index) => ({
+                      label: getMapRouteLabel(route, index),
+                      value: String(route.cp_id),
+                    }))}
+                  />
+                </fieldset>
+              )
+            )}
             <fieldset>
               <legend>FPS</legend>
               {showMostPlayed ? (
@@ -276,35 +305,6 @@ export function MapDetailPage({ mapId }: { mapId: string }) {
                 />
               )}
             </fieldset>
-            {mapRequest.data.checkpoints.length > MAX_ROUTE_BUTTONS ? (
-              <Select
-                label="Route"
-                value={String(selectedMap.cp_id)}
-                onChange={(event) => selectRoute(event.currentTarget.value)}
-              >
-                {mapRequest.data.checkpoints.map((route, index) => (
-                  <option value={route.cp_id} key={route.cp_id}>
-                    {getMapRouteLabel(route, index)}
-                  </option>
-                ))}
-              </Select>
-            ) : (
-              mapRequest.data.checkpoints.length > 1 && (
-                <fieldset>
-                  <legend>Route</legend>
-                  <SegmentedControl<string>
-                    ariaLabel="Route"
-                    className="cjs-map-detail__routes"
-                    value={String(selectedMap.cp_id)}
-                    onChange={selectRoute}
-                    options={mapRequest.data.checkpoints.map((route, index) => ({
-                      label: getMapRouteLabel(route, index),
-                      value: String(route.cp_id),
-                    }))}
-                  />
-                </fieldset>
-              )
-            )}
           </Panel>
 
           <div
