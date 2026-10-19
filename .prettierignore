@@ -8,3 +8,4 @@ graphify-out
 node_modules
 package-lock.json
 dist-e2e
+src/features/replayPlayer/__fixtures__

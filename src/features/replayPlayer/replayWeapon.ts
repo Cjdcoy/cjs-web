@@ -66,10 +66,17 @@ const FLAG_IN_AIR = 4;
  * swayAngles[0], swayAngles[1] (BG_CalculateWeaponPosition_Sway).
  */
 const STATE = 10;
+/**
+ * Most tracker states kept. A longer replay stores every `stride`-th sample's state and steps the
+ * rest on demand (at most stride - 1 spans per frame), so a 2M-sample replay needs ~8 MB, not 80.
+ */
+const MAX_STATES = 200_000;
 
 export interface WeaponTrack {
   timeline: ReplayTimeline;
+  /** Tracker state at every `stride`-th sample. */
   state: Float32Array;
+  stride: number;
   /** Landing times (ms) and their landChange (negative units), ascending. */
   landTimes: number[];
   landChanges: number[];
@@ -92,14 +99,12 @@ export function createWeaponTrack(timeline: ReplayTimeline): WeaponTrack {
   const { samples } = timeline;
   const { aux, t } = samples;
   const count = t.length;
-  const state = new Float32Array(count * STATE);
+  const stride = Math.max(1, Math.ceil(count / MAX_STATES));
+  const state = new Float32Array(Math.ceil(count / stride) * STATE);
+  const current = new Array<number>(STATE).fill(0);
   for (let index = 1; index < count; index += 1) {
-    const before = index - 1;
-    const { target, rate } = segment(timeline, before);
-    const seconds = (t[index] - t[before]) / 1000;
-    for (let k = 0; k < STATE; k += 1) {
-      state[index * STATE + k] = diffTrack(state[before * STATE + k], target[k], rate[k], seconds);
-    }
+    step(timeline, index - 1, current);
+    if (index % stride === 0) state.set(current, (index / stride) * STATE);
   }
 
   const landTimes: number[] = [];
@@ -121,7 +126,15 @@ export function createWeaponTrack(timeline: ReplayTimeline): WeaponTrack {
       if (into !== from && into <= 1 && from !== 2) raises.push(t[index]);
     }
   }
-  return { timeline, state, landTimes, landChanges, raises };
+  return { timeline, state, stride, landTimes, landChanges, raises };
+}
+
+/** Steps tracker state `s` over the span from sample `index` to the next. */
+function step(timeline: ReplayTimeline, index: number, s: number[]): void {
+  const { t } = timeline.samples;
+  const { target, rate } = segment(timeline, index);
+  const seconds = (t[index + 1] - t[index]) / 1000;
+  for (let k = 0; k < STATE; k += 1) s[k] = diffTrack(s[k], target[k], rate[k], seconds);
 }
 
 /** The gun's tracked motion and the view's landing dip at `time`, for a view `pitch` (degrees). */
@@ -130,10 +143,13 @@ export function weaponAt(track: WeaponTrack, time: number, pitch: number): Weapo
   const index = findSampleIndex(t, time);
   const s = new Array<number>(STATE).fill(0);
   if (index >= 0) {
+    const stored = Math.floor(index / track.stride);
+    for (let k = 0; k < STATE; k += 1) s[k] = track.state[stored * STATE + k];
+    for (let from = stored * track.stride; from < index; from += 1) step(track.timeline, from, s);
     const { target, rate } = segment(track.timeline, index);
     const seconds = Math.max(0, time - t[index]) / 1000;
     for (let k = 0; k < STATE; k += 1) {
-      s[k] = diffTrack(track.state[index * STATE + k], target[k], rate[k], seconds);
+      s[k] = diffTrack(s[k], target[k], rate[k], seconds);
     }
   }
   const dip = landDip(track, time);

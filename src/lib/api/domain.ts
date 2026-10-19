@@ -336,6 +336,21 @@ export interface ReplaySkip {
   fails: number;
 }
 
+/** Per-sample numbers: arrays from the samples payload, typed arrays from a decoded v12 replay. */
+export type ReplayNumbers = ArrayLike<number>;
+
+/** `/replay/meta`: the run behind a replay and its archived format (12+ plays from `/replay/frames`). */
+export interface ReplayMeta {
+  run_id: number;
+  mapname: string;
+  player_id: number;
+  playername: string;
+  format_version: number;
+  finished: boolean;
+  /** Run FPS; 0 means unknown or mixed. */
+  run_fps: number;
+}
+
 /**
  * Decoded J4L replay. Per-sample arrays are flat and parallel: sample i is t[i] (ms),
  * pos[3i..3i+2] (feet origin, CoD units, Z up), ang[3i..3i+2] (pitch, yaw, roll in degrees,
@@ -352,16 +367,16 @@ export interface ReplaySamples {
   tick_ms: number;
   duration_ms: number;
   finished: boolean;
-  t: number[];
-  pos: number[];
-  ang: number[];
-  vel: number[];
-  stance: number[];
+  t: ReplayNumbers;
+  pos: ReplayNumbers;
+  ang: ReplayNumbers;
+  vel: ReplayNumbers;
+  stance: ReplayNumbers;
   markers: ReplayMarker[];
-  flags?: number[];
-  input?: number[];
+  flags?: ReplayNumbers;
+  input?: ReplayNumbers;
   /** Recorder aux state: 1 on ladder, 8 mantle, (aux >> 1) & 3 weapon (3: no active weapon). */
-  aux?: number[];
+  aux?: ReplayNumbers;
   /** Run FPS when no "fps" marker applies; 0 means unknown. */
   run_fps?: number;
   skips?: ReplaySkip[];

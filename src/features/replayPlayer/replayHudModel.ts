@@ -1,5 +1,6 @@
 import type { ReplayMarker, ReplaySamples, ReplaySkip } from "../../lib/api";
 import type { CodPose } from "../mapViewer";
+import { findSampleIndex } from "./replayPlayback";
 
 /**
  * Server g_speed for the angle helper. The replay does not record it.
@@ -166,13 +167,17 @@ export function keysAt(samples: ReplaySamples, index: number): boolean[] | null 
 
 export type SpeedTrend = "up" | "down" | "same";
 
-/** Speed meter for sample `index`: int(length2d(vel)) and its change from the previous sample. */
+/** How far back the speed trend looks: one jittery v9-v11 sample, ~13 v12 frames at 333 fps. */
+const SPEED_TREND_MS = 40;
+
+/** Speed meter for sample `index`: int(length2d(vel)) and its change over the last ~40 ms. */
 export function speedAt(
   samples: ReplaySamples,
   index: number,
 ): { value: number; trend: SpeedTrend } {
   const value = speed2d(samples, index);
-  const previous = index > 0 ? speed2d(samples, index - 1) : value;
+  const before = findSampleIndex(samples.t, samples.t[index] - SPEED_TREND_MS);
+  const previous = index > 0 ? speed2d(samples, before) : value;
   return { value, trend: value > previous ? "up" : value < previous ? "down" : "same" };
 }
 

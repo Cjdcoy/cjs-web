@@ -26,6 +26,7 @@ import type {
   PlayerSort,
   RankLeaderboardEntry,
   RecentRunsPage,
+  ReplayMeta,
   ReplaySamples,
   ReplayViewCounts,
   ReplayWatchAggregate,
@@ -54,6 +55,7 @@ import {
   normalizePlayers,
   normalizeRankLeaderboard,
   normalizeRecentRunsPage,
+  normalizeReplayMeta,
   normalizeReplaySamples,
   normalizeReplayViewCounts,
   normalizeReplayWatchAggregate,
@@ -84,6 +86,8 @@ const PATHS = {
   replayWatchAggregate: "/api/v1/replay/watch-aggregate",
   replayWatchRankings: "/api/v1/replay/watch-rankings",
   replaySamples: "/api/v1/replay/samples",
+  replayMeta: "/api/v1/replay/meta",
+  replayFrames: "/api/v1/replay/frames",
   replayWebViewSummary: "/api/v1/replay/web-view-summary",
   replayWebViewAggregate: "/api/v1/replay/web-view-aggregate",
   replayWebViewRankings: "/api/v1/replay/web-view-rankings",
@@ -148,6 +152,10 @@ export interface CjsApi {
       ReplayWatchFilters & { metric: ReplayWatchMetric; limit?: number; offset?: number },
   ): Promise<ReplayWatchRankingEntry[]>;
   replaySamples(options: RequestContext & { runId: number }): Promise<ReplaySamples>;
+  /** Run and format of an archived replay; format 12+ plays from replayFrames, older from samples. */
+  replayMeta(options: RequestContext & { runId: number }): Promise<ReplayMeta>;
+  /** Raw (decompressed) v12 `.rpl` bytes; 422 when the replay is not format 12. */
+  replayFrames(options: RequestContext & { runId: number }): Promise<ArrayBuffer>;
   replayWebViewSummary(options: RequestContext & { runId: number }): Promise<ReplayWebViewSummary>;
   replayWebViewAggregate(
     options: RequestContext & ReplayWatchScope,
@@ -164,7 +172,7 @@ export interface CjsApi {
 
 /**
  * `replaySamplesClient` must negotiate v2 JSON: the samples payload is large and only v2 is
- * compressed, while MessagePack would encode it positionally.
+ * compressed, while MessagePack would encode it positionally. Replay meta and frames use it too.
  */
 export function createCjsApi(
   client: JsonClient,
@@ -479,6 +487,34 @@ export function createCjsApi(
         throw invalidResponse(PATHS.replaySamples, "$response.run_id.scope");
       }
       return samples;
+    },
+
+    async replayMeta(options) {
+      const path = PATHS.replayMeta;
+      const game = context(options, path);
+      assertCapability("replay-playback", options.source, game);
+      if (!isRunId(options.runId)) throw invalidArgument(path, "runId");
+      const meta = normalizeReplayMeta(
+        await get(replaySamplesClient, path, options, {
+          run_id: options.runId,
+          source: options.source,
+        }),
+        path,
+      );
+      if (meta.run_id !== options.runId) throw invalidResponse(path, "$response.run_id.scope");
+      return meta;
+    },
+
+    async replayFrames(options) {
+      const path = PATHS.replayFrames;
+      const game = context(options, path);
+      assertCapability("replay-playback", options.source, game);
+      if (!isRunId(options.runId)) throw invalidArgument(path, "runId");
+      return replaySamplesClient.getBytes(path, {
+        query: { run_id: options.runId, source: options.source },
+        signal: options.signal,
+        onRetry: options.onRetry,
+      });
     },
 
     async replayWebViewSummary(options) {

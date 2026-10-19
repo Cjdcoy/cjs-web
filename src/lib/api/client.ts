@@ -22,6 +22,8 @@ export interface JsonGetOptions {
 
 export interface JsonClient {
   get(path: string, options?: JsonGetOptions): Promise<unknown>;
+  /** Raw response bytes (Accept: application/octet-stream), with the same retry and errors. */
+  getBytes(path: string, options?: JsonGetOptions): Promise<ArrayBuffer>;
 }
 
 export interface JsonClientConfig {
@@ -69,114 +71,134 @@ export function createJsonClient(config: JsonClientConfig): JsonClient {
         )
       : undefined;
 
-  return {
-    async get(path, options = {}) {
-      const requestPath = format === "legacy" ? path : path.replace(/^\/api\/v1(?=\/)/, "/api/v2");
-      const url = buildApiUrl(config.baseUrl, requestPath, options.query);
-      const safePath = safeEndpointPath(requestPath);
-      const maxAttempts = maxRetries + 1;
+  const request = async (path: string, options: JsonGetOptions, bytes: boolean) => {
+    const requestPath = format === "legacy" ? path : path.replace(/^\/api\/v1(?=\/)/, "/api/v2");
+    const url = buildApiUrl(config.baseUrl, requestPath, options.query);
+    const safePath = safeEndpointPath(requestPath);
+    const maxAttempts = maxRetries + 1;
 
-      for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
-        if (options.signal?.aborted) {
-          throw abortedError(safePath, attempt, options.signal.reason);
-        }
-
-        let response: Response;
-        try {
-          response = await fetchImpl(url, {
-            method: "GET",
-            signal: options.signal,
-            headers: { Accept: format === "msgpack" ? "application/msgpack" : "application/json" },
-          });
-        } catch (cause) {
-          if (isAbort(cause, options.signal)) {
-            throw abortedError(safePath, attempt, cause);
-          }
-
-          if (attempt < maxAttempts) {
-            const delayMs = retryDelay(attempt, retryDelayMs, maxRetryDelayMs);
-            notifyRetry(options.onRetry, {
-              attempt,
-              delayMs,
-              maxAttempts,
-              path: safePath,
-              reason: "network",
-            });
-            await sleepOrAbort(sleep, delayMs, safePath, attempt, options.signal);
-            continue;
-          }
-
-          throw new ApiError({
-            kind: "network",
-            message: `API request could not be completed for ${safePath}`,
-            path: safePath,
-            attempts: attempt,
-            retryable: true,
-            cause,
-          });
-        }
-
-        if (!response.ok) {
-          const retryable = TRANSIENT_STATUSES.has(response.status);
-          if (retryable && attempt < maxAttempts) {
-            const delayMs = retryDelay(attempt, retryDelayMs, maxRetryDelayMs);
-            notifyRetry(options.onRetry, {
-              attempt,
-              delayMs,
-              maxAttempts,
-              path: safePath,
-              reason: "status",
-              status: response.status,
-            });
-            await sleepOrAbort(sleep, delayMs, safePath, attempt, options.signal);
-            continue;
-          }
-
-          throw new ApiError({
-            kind: "http",
-            message: `API request failed (${response.status}) for ${safePath}`,
-            path: safePath,
-            status: response.status,
-            attempts: attempt,
-            retryable,
-          });
-        }
-
-        try {
-          if (format === "msgpack") {
-            const mediaType = response.headers.get("Content-Type")?.split(";", 1)[0]?.trim();
-            if (mediaType?.toLowerCase() !== "application/msgpack") {
-              throw new TypeError("Unexpected content type");
-            }
-            const decode = await messagePackDecoder;
-            if (!decode) throw new TypeError("MessagePack decoder unavailable");
-            return decode(await response.arrayBuffer());
-          }
-          return await response.json();
-        } catch (cause) {
-          if (isAbort(cause, options.signal)) {
-            throw abortedError(safePath, attempt, cause);
-          }
-          const kind = format === "msgpack" ? "invalid-messagepack" : "invalid-json";
-          throw new ApiError({
-            kind,
-            message: `API returned invalid ${format === "msgpack" ? "MessagePack" : "JSON"} for ${safePath}`,
-            path: safePath,
-            status: response.status,
-            attempts: attempt,
-            cause,
-          });
-        }
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      if (options.signal?.aborted) {
+        throw abortedError(safePath, attempt, options.signal.reason);
       }
 
-      throw new ApiError({
-        kind: "network",
-        message: `API request could not be completed for ${safePath}`,
-        path: safePath,
-        attempts: maxAttempts,
-        retryable: true,
-      });
-    },
+      let response: Response;
+      try {
+        response = await fetchImpl(url, {
+          method: "GET",
+          signal: options.signal,
+          headers: {
+            Accept: bytes
+              ? "application/octet-stream"
+              : format === "msgpack"
+                ? "application/msgpack"
+                : "application/json",
+          },
+        });
+      } catch (cause) {
+        if (isAbort(cause, options.signal)) {
+          throw abortedError(safePath, attempt, cause);
+        }
+
+        if (attempt < maxAttempts) {
+          const delayMs = retryDelay(attempt, retryDelayMs, maxRetryDelayMs);
+          notifyRetry(options.onRetry, {
+            attempt,
+            delayMs,
+            maxAttempts,
+            path: safePath,
+            reason: "network",
+          });
+          await sleepOrAbort(sleep, delayMs, safePath, attempt, options.signal);
+          continue;
+        }
+
+        throw new ApiError({
+          kind: "network",
+          message: `API request could not be completed for ${safePath}`,
+          path: safePath,
+          attempts: attempt,
+          retryable: true,
+          cause,
+        });
+      }
+
+      if (!response.ok) {
+        const retryable = TRANSIENT_STATUSES.has(response.status);
+        if (retryable && attempt < maxAttempts) {
+          const delayMs = retryDelay(attempt, retryDelayMs, maxRetryDelayMs);
+          notifyRetry(options.onRetry, {
+            attempt,
+            delayMs,
+            maxAttempts,
+            path: safePath,
+            reason: "status",
+            status: response.status,
+          });
+          await sleepOrAbort(sleep, delayMs, safePath, attempt, options.signal);
+          continue;
+        }
+
+        throw new ApiError({
+          kind: "http",
+          message: `API request failed (${response.status}) for ${safePath}`,
+          path: safePath,
+          status: response.status,
+          attempts: attempt,
+          retryable,
+        });
+      }
+
+      try {
+        if (bytes) return await response.arrayBuffer();
+        if (format === "msgpack") {
+          const mediaType = response.headers.get("Content-Type")?.split(";", 1)[0]?.trim();
+          if (mediaType?.toLowerCase() !== "application/msgpack") {
+            throw new TypeError("Unexpected content type");
+          }
+          const decode = await messagePackDecoder;
+          if (!decode) throw new TypeError("MessagePack decoder unavailable");
+          return decode(await response.arrayBuffer());
+        }
+        return await response.json();
+      } catch (cause) {
+        if (isAbort(cause, options.signal)) {
+          throw abortedError(safePath, attempt, cause);
+        }
+        if (bytes) {
+          throw new ApiError({
+            kind: "network",
+            message: `API response could not be read for ${safePath}`,
+            path: safePath,
+            status: response.status,
+            attempts: attempt,
+            cause,
+          });
+        }
+        const kind = format === "msgpack" ? "invalid-messagepack" : "invalid-json";
+        throw new ApiError({
+          kind,
+          message: `API returned invalid ${format === "msgpack" ? "MessagePack" : "JSON"} for ${safePath}`,
+          path: safePath,
+          status: response.status,
+          attempts: attempt,
+          cause,
+        });
+      }
+    }
+
+    throw new ApiError({
+      kind: "network",
+      message: `API request could not be completed for ${safePath}`,
+      path: safePath,
+      attempts: maxAttempts,
+      retryable: true,
+    });
+  };
+
+  return {
+    get: (path, options = {}) => request(path, options, false),
+    getBytes: (path, options = {}) => request(path, options, true) as Promise<ArrayBuffer>,
   };
 }
 

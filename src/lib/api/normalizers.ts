@@ -19,6 +19,7 @@ import {
   type RankLeaderboardEntry,
   type RecentRunsPage,
   type ReplayMarker,
+  type ReplayMeta,
   type ReplaySamples,
   type ReplaySkip,
   type ReplayWatchAggregate,
@@ -406,6 +407,20 @@ export function normalizeReplayViewCounts(
       ];
     }),
   );
+}
+
+/** `/replay/meta`: a JSON object or a v2 MessagePack tuple in the same field order. */
+export function normalizeReplayMeta(value: unknown, path: string): ReplayMeta {
+  const object = wireStruct(value, path, "$response", 7);
+  return {
+    run_id: requiredNumber(object, "run_id", path, "$response", 0),
+    mapname: requiredString(object, "mapname", path, "$response", 1),
+    player_id: requiredNumber(object, "player_id", path, "$response", 2),
+    playername: requiredString(object, "playername", path, "$response", 3),
+    format_version: requiredNumber(object, "format_version", path, "$response", 4),
+    finished: requiredBoolean(object, "finished", path, "$response", 5),
+    run_fps: requiredNumber(object, "run_fps", path, "$response", 6),
+  };
 }
 
 export function normalizeReplaySamples(value: unknown, path: string): ReplaySamples {

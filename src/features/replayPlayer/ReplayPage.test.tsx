@@ -3,8 +3,10 @@ import userEvent from "@testing-library/user-event";
 import axe from "axe-core";
 import { HttpResponse, http } from "msw";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { replaySamplesFixture } from "../../lib/api/__fixtures__/responses";
-import { ApiError } from "../../lib/api";
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { replayMetaFixture, replaySamplesFixture } from "../../lib/api/__fixtures__/responses";
+import { ApiError, createCjsApiForBases } from "../../lib/api";
 import { normalizeReplaySamples } from "../../lib/api/normalizers";
 import type { MapViewerProps } from "../mapViewer";
 import { replayWebViewHandlers } from "../../test/replayWebViewHandlers";
@@ -68,8 +70,15 @@ const localStorageMock = {
   setItem: (key: string, value: string) => void storageValues.set(key, value),
 };
 
+/** A v11 run: meta first, then the samples. */
+const metaV11 = { ...replayMetaFixture, format_version: 11 };
+
 function apiReturning(result: Promise<typeof samples>): ReplaySamplesApi {
-  return { replaySamples: vi.fn(() => result) };
+  return {
+    replayMeta: vi.fn(async () => metaV11),
+    replayFrames: vi.fn(),
+    replaySamples: vi.fn(() => result),
+  };
 }
 
 function httpError(status: number): ApiError {
@@ -467,12 +476,128 @@ describe("ReplayPage", () => {
     expect(screen.queryByRole("application")).not.toBeInTheDocument();
   });
 
+  it("plays a v12 replay decoded from its raw frames", async () => {
+    // Copy: a Buffer from readFileSync may sit inside a larger pooled ArrayBuffer.
+    const golden = new Uint8Array(
+      readFileSync(resolve("src/features/replayPlayer/__fixtures__/replay_v12_golden.rpl")),
+    );
+    const requests: string[] = [];
+    server.use(
+      http.get("https://replay.example.test/api/v2/replay/meta", ({ request }) => {
+        requests.push(request.url);
+        return HttpResponse.json(replayMetaFixture);
+      }),
+      http.get("https://replay.example.test/api/v2/replay/frames", ({ request }) => {
+        requests.push(request.url);
+        return HttpResponse.arrayBuffer(golden.buffer, {
+          headers: { "Content-Type": "application/octet-stream" },
+        });
+      }),
+    );
+    const apiClient = createCjsApiForBases({
+      apiBase: "https://api.example.test",
+      replayApiBase: "https://replay.example.test",
+    });
+    render(<ReplayPage apiClient={apiClient} runId="7001" />);
+
+    expect(await screen.findByRole("application")).toBeVisible();
+    expect(requests).toEqual([
+      "https://replay.example.test/api/v2/replay/meta?run_id=7001&source=j4l",
+      "https://replay.example.test/api/v2/replay/frames?run_id=7001&source=j4l",
+    ]);
+    expect(screen.getByText("Finished run")).toBeVisible();
+    expect(screen.getByRole("slider", { name: "Replay position" })).toHaveAttribute(
+      "aria-valuetext",
+      "00:00.00 of 00:03.54",
+    );
+  });
+
+  it("falls back to samples when meta answers 404", async () => {
+    const replaySamples = vi.fn(async () => samples);
+    render(
+      <ReplayPage
+        apiClient={{
+          replayMeta: vi.fn(() => Promise.reject(httpError(404))),
+          replayFrames: vi.fn(),
+          replaySamples,
+        }}
+        runId="7001"
+      />,
+    );
+    expect(await screen.findByRole("application")).toBeVisible();
+    expect(replaySamples).toHaveBeenCalledTimes(1);
+  });
+
+  it("maps meta and frames failures like the samples ones", async () => {
+    const { unmount } = render(
+      <ReplayPage
+        apiClient={{
+          replayMeta: vi.fn(() => Promise.reject(httpError(400))),
+          replayFrames: vi.fn(),
+          replaySamples: vi.fn(),
+        }}
+        runId="9"
+      />,
+    );
+    expect(await screen.findByRole("heading", { name: "Replay not available" })).toBeVisible();
+    unmount();
+
+    render(
+      <ReplayPage
+        apiClient={{
+          replayMeta: vi.fn(async () => replayMetaFixture),
+          replayFrames: vi.fn(() => Promise.reject(httpError(422))),
+          replaySamples: vi.fn(),
+        }}
+        runId="7001"
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Replay format not supported" }),
+    ).toBeVisible();
+  });
+
+  it("shows a file in another replay version as unsupported", async () => {
+    const v11 = new Uint8Array([0x4a, 0x34, 0x4c, 0x42, 11, 0, 50, 0]);
+    render(
+      <ReplayPage
+        apiClient={{
+          replayMeta: vi.fn(async () => replayMetaFixture),
+          replayFrames: vi.fn(async () => v11.buffer),
+          replaySamples: vi.fn(),
+        }}
+        runId="7001"
+      />,
+    );
+    expect(
+      await screen.findByRole("heading", { name: "Replay format not supported" }),
+    ).toBeVisible();
+  });
+
+  it("shows a decode failure as an error", async () => {
+    const apiClient: ReplaySamplesApi = {
+      replayMeta: vi.fn(async () => replayMetaFixture),
+      replayFrames: vi.fn(async () => new ArrayBuffer(4)),
+      replaySamples: vi.fn(),
+    };
+    render(<ReplayPage apiClient={apiClient} runId="7001" />);
+
+    const alert = await screen.findByRole("alert");
+    expect(within(alert).getByText("The replay file could not be decoded.")).toBeVisible();
+    expect(apiClient.replaySamples).not.toHaveBeenCalled();
+  });
+
   it("offers a retry for other failures", async () => {
     const replaySamples = vi
       .fn<ReplaySamplesApi["replaySamples"]>()
       .mockRejectedValueOnce(httpError(502))
       .mockResolvedValueOnce(samples);
-    render(<ReplayPage apiClient={{ replaySamples }} runId="7001" />);
+    render(
+      <ReplayPage
+        apiClient={{ replayMeta: vi.fn(async () => metaV11), replayFrames: vi.fn(), replaySamples }}
+        runId="7001"
+      />,
+    );
 
     const alert = await screen.findByRole("alert");
     expect(within(alert).getByText(/502/)).toBeVisible();

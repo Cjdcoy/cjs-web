@@ -99,7 +99,7 @@ function ReplayContent({ apiClient, runId }: { apiClient?: ReplaySamplesApi; run
             {samples.mapname}
           </Link>
         </span>
-        <Badge>{formatReplayClock(samples.t.at(-1) ?? 0)}</Badge>
+        <Badge>{formatReplayClock(samples.t[samples.t.length - 1] ?? 0)}</Badge>
         <ReplayViewCountBadge runId={samples.run_id} />
         <Badge tone={samples.finished ? "success" : "neutral"}>
           {samples.finished ? "Finished run" : "Unfinished run"}
