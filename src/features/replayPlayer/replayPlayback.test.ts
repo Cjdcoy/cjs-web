@@ -126,6 +126,17 @@ describe("replay interpolation", () => {
     expect(sampleMotion(createTimeline(replay), 500)).toEqual({ velX: 200, velY: 50, yaw: -170 });
   });
 
+  it("keeps every path point of a 20 Hz replay with 49-51 ms jitter", () => {
+    const times = [0, 49, 100, 151, 200, 249, 300];
+    const timeline = createTimeline(
+      samples(times.map((t) => ({ t, pos: [t, 0, 0], vel: [1000, 0, 0] }))),
+    );
+
+    expect(pathSegments(timeline)).toEqual(
+      times.slice(1).flatMap((t, index) => [times[index], 0, 0, t, 0, 0]),
+    );
+  });
+
   it("does not interpolate across a load marker", () => {
     const timeline = createTimeline(
       samples(

@@ -33,6 +33,17 @@ requests v2 JSON from the replay base: only v2 is compressed, and the flat sampl
 from a positional encoding. Its 404 and 400 mean no archived replay (or not a J4L run), and 422 an
 unsupported replay format; error bodies are plain text.
 
+Replay playback starts with `replayMeta` (`/replay/meta`: run, player, map, `format_version`,
+`finished`, `run_fps`). A replay in format 12 or newer is then fetched with `replayFrames`
+(`/replay/frames`), which returns the raw decompressed v12 `.rpl` bytes (`application/octet-stream`,
+read through the client's `getBytes`), and decoded in the browser by
+`src/features/replayPlayer/replayV12.ts` (byte contract: jump4life `docs/replay_format.md`, "v12
+per-usercmd blocks"). Older replays keep using `replaySamples`, which answers 422 for v12. Both new
+requests use the same forced v2 JSON client and the `replay-playback` capability. A meta 404 falls back to
+`replaySamples` (so a backend without the meta route still plays v9-v11, and its 404/422 decide);
+a meta 400 means no archived replay, a frames 422 an unsupported format, and a file that does not decode is an error.
+`replayMeta` also accepts a v2 MessagePack tuple in its field order.
+
 V2 JSON keeps the documented object fields. V2 MessagePack encodes known Go structs as positional
 arrays to avoid field-name and conversion overhead; maps and dictionary-like records remain maps.
 `normalizers.ts` reads either representation directly in its existing normalization pass, validates

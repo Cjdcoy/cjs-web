@@ -14,6 +14,13 @@ export const VIEW_HEIGHT_BY_STANCE: readonly number[] = [60, 40, 11];
 const TELEPORT_SPEED_FACTOR = 2;
 const TELEPORT_SLACK_UNITS = 32;
 
+/**
+ * The drawn route skips samples closer than this in time to the last drawn point, stretched so a
+ * long replay stays under MAX_PATH_SEGMENTS. 40 ms keeps every v9-v11 (20 Hz, jittery) sample.
+ */
+const PATH_STEP_MS = 40;
+const MAX_PATH_SEGMENTS = 200_000;
+
 /** View-height waypoints (percent of the lerp, height) from CoD2's bg_pmove viewLerp_* tables. */
 type ViewLerpTable = readonly (readonly [percent: number, height: number])[];
 const VIEW_LERP_CROUCH_PRONE: ViewLerpTable = [
@@ -194,7 +201,8 @@ export function addLean(pose: CodPose, leanf: number): CodPose {
 
 /**
  * Melee swing starts: a press (input bit 16) with a weapon out, not within MELEE_TIME_MS of the
- * last swing. ponytail: presses shorter than the 50 ms sample spacing are missed, and reload,
+ * last swing. ponytail: v9-v11 replays miss presses shorter than their 50 ms sample spacing (v12
+ * has every frame, and a decimated long replay ORs presses into the kept frame), and reload,
  * raise/drop and grenade states that also block a swing are not recorded.
  */
 function meleeStarts(samples: ReplaySamples): number[] {
@@ -292,18 +300,33 @@ function tableLerp(table: ViewLerpTable, percent: number): number {
   return table[table.length - 1][1];
 }
 
-/** Feet path as flat xyz endpoint pairs, leaving out the jumps across loads and teleports. */
+/**
+ * Feet path as flat xyz endpoint pairs, leaving out the jumps across loads and teleports. Thinned by
+ * time (PATH_STEP_MS) so a per-frame replay draws a bounded number of segments.
+ */
 export function pathSegments(timeline: ReplayTimeline): number[] {
-  const { pos } = timeline.samples;
+  const { pos, t } = timeline.samples;
+  const { snap } = timeline;
+  const count = t.length;
+  const stepMs = Math.max(PATH_STEP_MS, (timeline.end - timeline.start) / MAX_PATH_SEGMENTS);
   const segments: number[] = [];
-  timeline.snap.forEach((snap, index) => {
-    if (!snap) segments.push(...pos.slice(index * 3, index * 3 + 6));
-  });
+  let from = 0;
+  for (let index = 1; index < count; index += 1) {
+    if (snap[index - 1]) {
+      from = index;
+      continue;
+    }
+    const runEnd = index === count - 1 || snap[index] === 1;
+    if (!runEnd && t[index] - t[from] < stepMs) continue;
+    segments.push(pos[from * 3], pos[from * 3 + 1], pos[from * 3 + 2]);
+    segments.push(pos[index * 3], pos[index * 3 + 1], pos[index * 3 + 2]);
+    from = index;
+  }
   return segments;
 }
 
 /** Index of the last sample at or before `time`, clamped to the first sample. Binary search. */
-export function findSampleIndex(t: readonly number[], time: number): number {
+export function findSampleIndex(t: ArrayLike<number>, time: number): number {
   let low = 0;
   let high = t.length - 1;
   if (high < 0) return -1;
@@ -434,7 +457,7 @@ function poseAt(timeline: ReplayTimeline, index: number, time: number): CodPose 
   };
 }
 
-function vectorLength(values: readonly number[], index: number): number {
+function vectorLength(values: ArrayLike<number>, index: number): number {
   return Math.hypot(values[index * 3], values[index * 3 + 1], values[index * 3 + 2]);
 }
 

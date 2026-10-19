@@ -307,6 +307,16 @@ export const j4lPlayersFixture: unknown = [
   },
 ];
 
+export const replayMetaFixture = {
+  run_id: 7001,
+  mapname: "mp_cjs_training",
+  player_id: 501,
+  playername: "^2Runner",
+  format_version: 12,
+  finished: false,
+  run_fps: 250,
+};
+
 export const replaySamplesFixture = {
   run_id: 7001,
   mapname: "mp_cjs_training",

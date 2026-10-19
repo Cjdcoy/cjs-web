@@ -133,7 +133,7 @@ describe("footsteps (PM_Footsteps)", () => {
   it("is silent when crouched or on a type-0 surface", () => {
     const crouched = {
       ...running(125),
-      flags: running(125).flags?.map(() => 1),
+      flags: [1, 1, 1, 1, 1, 1],
       stance: [1, 1, 1, 1, 1, 1],
     };
     expect(run(crouched, 1024)).toEqual([]);
