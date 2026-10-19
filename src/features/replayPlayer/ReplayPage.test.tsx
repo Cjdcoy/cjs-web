@@ -477,8 +477,9 @@ describe("ReplayPage", () => {
   });
 
   it("plays a v12 replay decoded from its raw frames", async () => {
-    const golden = readFileSync(
-      resolve("src/features/replayPlayer/__fixtures__/replay_v12_golden.rpl"),
+    // Copy: a Buffer from readFileSync may sit inside a larger pooled ArrayBuffer.
+    const golden = new Uint8Array(
+      readFileSync(resolve("src/features/replayPlayer/__fixtures__/replay_v12_golden.rpl")),
     );
     const requests: string[] = [];
     server.use(
@@ -488,7 +489,7 @@ describe("ReplayPage", () => {
       }),
       http.get("https://replay.example.test/api/v2/replay/frames", ({ request }) => {
         requests.push(request.url);
-        return HttpResponse.arrayBuffer(golden.buffer.slice(0), {
+        return HttpResponse.arrayBuffer(golden.buffer, {
           headers: { "Content-Type": "application/octet-stream" },
         });
       }),
