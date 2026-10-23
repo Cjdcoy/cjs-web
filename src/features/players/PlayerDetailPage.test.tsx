@@ -261,11 +261,36 @@ describe("PlayerDetailPage", () => {
     expect(within(outfits).getByText("Member")).toBeInTheDocument();
   });
 
+  it("hides weekly events and skins while their J4L tables are unavailable (503)", async () => {
+    window.history.replaceState(null, "", "/players/42?source=j4l");
+    const unavailable = (path: string) =>
+      vi
+        .fn()
+        .mockRejectedValue(
+          new ApiError({ kind: "http", message: "API request failed (503)", path, status: 503 }),
+        );
+    const apiClient = createProfileApi({
+      playerEvents: unavailable("/api/v1/player/events"),
+      playerSkins: unavailable("/api/v1/player/skins"),
+    });
+
+    renderProfile(apiClient);
+
+    expect(await screen.findByRole("heading", { name: "Time on Jump4Life" })).toBeInTheDocument();
+    await waitFor(() => expect(apiClient.playerSkins).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "Weekly events" })).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByRole("heading", { name: "Skins" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
+  });
+
   it("shows empty weekly event and skin states for a J4L player without either", async () => {
     window.history.replaceState(null, "", "/players/42?source=j4l");
     const apiClient = createProfileApi({
       playerEvents: vi.fn().mockResolvedValue({ player_id: 42, weeks: [], seasons: [] }),
-      playerSkins: vi.fn().mockResolvedValue([]),
+      // A category this page does not know yet counts as nothing to show.
+      playerSkins: vi.fn().mockResolvedValue([{ ...skin, category: "boots" }]),
     });
 
     renderProfile(apiClient);
