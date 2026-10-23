@@ -368,6 +368,29 @@
   padding: var(--cjs-space-4);
 }
 
+.cjs-player-profile__table-stack {
+  display: grid;
+  gap: var(--cjs-space-4);
+}
+
+.cjs-player-profile__skin-name {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--cjs-space-2);
+}
+
+.cjs-player-profile__skin-preview {
+  display: grid;
+  inline-size: var(--cjs-space-16);
+  aspect-ratio: 4 / 3;
+  place-items: center;
+  border-radius: var(--cjs-radius-sm);
+  background: var(--cjs-color-panel-soft);
+  color: var(--cjs-color-text-muted);
+  object-fit: cover;
+}
+
 .cjs-player-profile__resource-status {
   padding-block-end: var(--cjs-space-3);
   color: var(--cjs-color-text-muted);
