@@ -17,12 +17,14 @@ import type {
   MapPlayerPlaytime,
   Player,
   PlayerActivitySummary,
+  PlayerEvents,
   PlayerLeaderboard,
   PlayerLeaderboardPosition,
   PlayerJumpScores,
   PlayerPerformanceStats,
   PlayerRankInfo,
   PlayerRouteCompletion,
+  PlayerSkin,
   PlayerSort,
   RankLeaderboardEntry,
   RecentRunsPage,
@@ -46,12 +48,14 @@ import {
   normalizeMapPlayersPlaytime,
   normalizeMaps,
   normalizePlayerActivity,
+  normalizePlayerEvents,
   normalizePlayerJumpScores,
   normalizePlayerMapRuns,
   normalizePlayerPerformance,
   normalizePlayerPositions,
   normalizePlayerRank,
   normalizePlayerRoutes,
+  normalizePlayerSkins,
   normalizePlayers,
   normalizeRankLeaderboard,
   normalizeRecentRunsPage,
@@ -82,6 +86,8 @@ const PATHS = {
   playerRoutes: "/api/v1/player/routes-completion",
   playerRank: "/api/v1/player/rank",
   playerActivity: "/api/v1/player/activity-summary",
+  playerEvents: "/api/v1/player/events",
+  playerSkins: "/api/v1/player/skins",
   rankXpLeaderboard: "/api/v1/leaderboard/rank-xp",
   replayWatchAggregate: "/api/v1/replay/watch-aggregate",
   replayWatchRankings: "/api/v1/replay/watch-rankings",
@@ -146,6 +152,10 @@ export interface CjsApi {
   playerActivitySummary(
     options: RequestContext & { playerId: number },
   ): Promise<PlayerActivitySummary>;
+  /** Weekly event and season placements, newest first. */
+  playerEvents(options: RequestContext & { playerId: number }): Promise<PlayerEvents>;
+  /** Unlocked (enabled) skins, with the equipped ones marked `active`. */
+  playerSkins(options: RequestContext & { playerId: number }): Promise<PlayerSkin[]>;
   replayWatchAggregate(options: RequestContext & ReplayWatchScope): Promise<ReplayWatchAggregate>;
   replayWatchRankings(
     options: RequestContext &
@@ -429,6 +439,30 @@ export function createCjsApi(
           playerid: options.playerId,
         }),
         PATHS.playerActivity,
+      );
+    },
+
+    async playerEvents(options) {
+      const game = playerContext(options, PATHS.playerEvents);
+      assertCapability("player-events", options.source, game);
+      return normalizePlayerEvents(
+        await get(client, PATHS.playerEvents, options, {
+          source: options.source,
+          playerid: options.playerId,
+        }),
+        PATHS.playerEvents,
+      );
+    },
+
+    async playerSkins(options) {
+      const game = playerContext(options, PATHS.playerSkins);
+      assertCapability("player-skins", options.source, game);
+      return normalizePlayerSkins(
+        await get(client, PATHS.playerSkins, options, {
+          source: options.source,
+          playerid: options.playerId,
+        }),
+        PATHS.playerSkins,
       );
     },
 

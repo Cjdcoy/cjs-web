@@ -160,6 +160,50 @@ export interface PlayerActivitySummary {
   updated_at: string;
 }
 
+/** One finished weekly event placement from `/player/events`; `fps` is 125 or 250. */
+export interface PlayerEventWeek {
+  event_id: number;
+  season_id: number;
+  week_no: number;
+  ends_at: string;
+  fps: number;
+  rank: number;
+  points: number;
+  maps_finished: number;
+  participants: number;
+}
+
+/** One season placement from `/player/events`; `status` is `active` or `finished`. */
+export interface PlayerEventSeason {
+  season_id: number;
+  status: string;
+  fps: number;
+  rank: number;
+  points: number;
+  weekly_wins: number;
+  participants: number;
+}
+
+/** J4L weekly event history, both lists newest first. */
+export interface PlayerEvents {
+  player_id: number;
+  weeks: PlayerEventWeek[];
+  seasons: PlayerEventSeason[];
+}
+
+/** An unlocked J4L skin; `category` is outfit, hat, cape, or weapon. */
+export interface PlayerSkin {
+  skin_id: number;
+  category: string;
+  item: string;
+  display_name: string;
+  unlock_type: string;
+  image: string | null;
+  source: string;
+  unlocked_at: string;
+  active: boolean;
+}
+
 export interface Player {
   player_id: number;
   playername: string;
