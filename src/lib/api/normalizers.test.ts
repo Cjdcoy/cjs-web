@@ -6,11 +6,13 @@ import {
   mapPlayersPlaytimeFixture,
   mapsFixture,
   playerActivityFixture,
+  playerEventsFixture,
   playerJumpScoresFixture,
   playerPerformanceFixture,
   playerPositionsFixture,
   playerRankFixture,
   playerRoutesFixture,
+  playerSkinsFixture,
   playersFixture,
   rankLeaderboardFixture,
   replayWatchAggregateFixture,
@@ -23,12 +25,14 @@ import {
   normalizeMapPlayersPlaytime,
   normalizeMaps,
   normalizePlayerActivity,
+  normalizePlayerEvents,
   normalizePlayerJumpScores,
   normalizePlayerMapRuns,
   normalizePlayerPerformance,
   normalizePlayerPositions,
   normalizePlayerRank,
   normalizePlayerRoutes,
+  normalizePlayerSkins,
   normalizePlayers,
   normalizeRankLeaderboard,
   normalizeReplayWatchAggregate,
@@ -224,6 +228,23 @@ describe("API response normalizers", () => {
     });
   });
 
+  it("normalizes J4L weekly events and skins", () => {
+    expect(normalizePlayerEvents(playerEventsFixture, path)).toMatchObject({
+      player_id: 501,
+      weeks: [{ event_id: 3, week_no: 3, fps: 125, rank: 1, participants: 14 }],
+      seasons: [{ season_id: 1, status: "active", weekly_wins: 2, participants: 20 }],
+    });
+    expect(normalizePlayerEvents({ player_id: 501, weeks: [], seasons: [] }, path)).toEqual({
+      player_id: 501,
+      weeks: [],
+      seasons: [],
+    });
+    expect(normalizePlayerSkins(playerSkinsFixture, path)).toMatchObject([
+      { skin_id: 4, category: "hat", image: null, source: "buy", active: true },
+      { skin_id: 9, category: "outfit", source: "member", active: false },
+    ]);
+  });
+
   it("normalizes replay aggregates and per-run rankings", () => {
     expect(normalizeReplayWatchAggregate(replayWatchAggregateFixture, path)).toMatchObject({
       owner_player_id: 501,
@@ -285,6 +306,9 @@ describe("API response normalizers", () => {
     ],
     ["rank", () => normalizePlayerRank({ player_id: 1 }, path)],
     ["activity", () => normalizePlayerActivity({ player_id: 1 }, path)],
+    ["events", () => normalizePlayerEvents({ player_id: 1, weeks: null, seasons: [] }, path)],
+    ["event week", () => normalizePlayerEvents({ player_id: 1, weeks: [{ rank: 1 }] }, path)],
+    ["skins", () => normalizePlayerSkins([{ skin_id: 4, active: "yes" }], path)],
     ["replay aggregate", () => normalizeReplayWatchAggregate({ replay_count: "many" }, path)],
     ["replay rankings", () => normalizeReplayWatchRankings([{ rank: 1 }], path)],
   ])("returns a safe structured error for malformed %s payloads", (_label, normalize) => {
