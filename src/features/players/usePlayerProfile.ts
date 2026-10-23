@@ -38,6 +38,9 @@ export type PlayerProfileApi = Pick<
   | "players"
 >;
 
+// A 503 here means the J4L weekly-event or shop tables are not migrated yet: hide, don't fail.
+const HIDDEN_WHEN_UNAVAILABLE = new Set<string>(["events", "skins"]);
+
 // Matches the backend live cache's per-route history limit, so this returns every personal best.
 const PERSONAL_BESTS_LIMIT = 1000;
 
@@ -271,6 +274,14 @@ function useProfileResource<Kind extends ResourceKind>(
       })
       .catch((reason: unknown) => {
         if (controller.signal.aborted) return;
+        if (
+          HIDDEN_WHEN_UNAVAILABLE.has(kind) &&
+          reason instanceof ApiError &&
+          reason.status === 503
+        ) {
+          setState({ data: null, error: null, requestKey, status: "unsupported" });
+          return;
+        }
         setState((current) => ({
           data: current.requestKey === requestKey ? current.data : null,
           error: profileResourceError(reason),

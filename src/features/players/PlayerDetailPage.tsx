@@ -162,9 +162,10 @@ function PlayerProfile({
           : [
               resources.performance,
               resources.positions,
-              ...(source === "j4l"
-                ? [resources.rank, resources.activity, resources.events, resources.skins]
-                : []),
+              // JH, and events/skins before their J4L tables exist, are "unsupported".
+              ...[resources.rank, resources.activity, resources.events, resources.skins].filter(
+                (resource) => resource.status !== "unsupported",
+              ),
             ];
   const isSettling = [resources.directory, ...supportedResources].some(
     (resource) => resource.status === "loading" || resource.status === "refreshing",
@@ -332,14 +333,11 @@ function PlayerProfile({
                       resource={resources.performance}
                       onRetry={resources.reload}
                     />
-                    {source === "j4l" && (
-                      <>
-                        <WeeklyEventsSection
-                          resource={resources.events}
-                          onRetry={resources.reload}
-                        />
-                        <SkinsSection resource={resources.skins} onRetry={resources.reload} />
-                      </>
+                    {resources.events.status !== "unsupported" && (
+                      <WeeklyEventsSection resource={resources.events} onRetry={resources.reload} />
+                    )}
+                    {resources.skins.status !== "unsupported" && (
+                      <SkinsSection resource={resources.skins} onRetry={resources.reload} />
                     )}
                     <Suspense
                       fallback={
@@ -1651,30 +1649,31 @@ function SkinsSection({
       title="Skins"
     >
       <ResourceState resource={resource} label="skins" onRetry={onRetry}>
-        {(skins) =>
-          skins.length ? (
+        {(skins) => {
+          const groups = SKIN_CATEGORIES.map(([category, caption]) => ({
+            caption,
+            rows: skins.filter((skin) => skin.category === category),
+          })).filter((group) => group.rows.length);
+          return groups.length ? (
             <div className="cjs-player-profile__table-stack">
-              {SKIN_CATEGORIES.map(([category, caption]) => {
-                const rows = skins.filter((skin) => skin.category === category);
-                return rows.length ? (
-                  <DataTable
-                    key={category}
-                    caption={caption}
-                    captionVisible
-                    columns={SKIN_COLUMNS}
-                    getRowKey={(skin) => skin.skin_id}
-                    rows={rows}
-                  />
-                ) : null;
-              })}
+              {groups.map(({ caption, rows }) => (
+                <DataTable
+                  key={caption}
+                  caption={caption}
+                  captionVisible
+                  columns={SKIN_COLUMNS}
+                  getRowKey={(skin) => skin.skin_id}
+                  rows={rows}
+                />
+              ))}
             </div>
           ) : (
             <EmptyState
               description="This player has not unlocked any skins yet."
               title="No skins unlocked yet"
             />
-          )
-        }
+          );
+        }}
       </ResourceState>
     </ProfileSection>
   );

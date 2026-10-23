@@ -95,13 +95,13 @@ describe("Go positional MessagePack normalization", () => {
     ],
     [
       normalizePlayerEvents,
-      "k80B9ZGZAwEDtDIwMjYtMTEtMDJUMDE6MDA6MDBafQHNAa8FDpGXAaZhY3RpdmV9As0EsAIU",
-      '{"player_id":501,"weeks":[{"event_id":3,"season_id":1,"week_no":3,"ends_at":"2026-11-02T01:00:00Z","fps":125,"rank":1,"points":431,"maps_finished":5,"participants":14}],"seasons":[{"season_id":1,"status":"active","fps":125,"rank":2,"points":1200,"weekly_wins":2,"participants":20}]}',
+      "k80B9ZGZHwIHtDIwMjYtMTEtMDJUMDE6MDA6MDBafQTNAa8FDpGXBqZhY3RpdmXM+gjNBLAJFA==",
+      '{"player_id":501,"weeks":[{"event_id":31,"season_id":2,"week_no":7,"ends_at":"2026-11-02T01:00:00Z","fps":125,"rank":4,"points":431,"maps_finished":5,"participants":14}],"seasons":[{"season_id":6,"status":"active","fps":250,"rank":8,"points":1200,"weekly_wins":9,"participants":20}]}',
     ],
     [
       normalizePlayerSkins,
-      "kZkEo2hhdKh0ZXN0X2hhdKhUZXN0IGhhdKNidXnAo2J1ebQyMDI2LTEwLTI3VDE4OjAzOjExWsM=",
-      '[{"skin_id":4,"category":"hat","item":"test_hat","display_name":"Test hat","unlock_type":"buy","image":null,"source":"buy","unlocked_at":"2026-10-27T18:03:11Z","active":true}]',
+      "kZkEo2hhdKh0ZXN0X2hhdKhUZXN0IGhhdKNidXm8aHR0cHM6Ly9leGFtcGxlLnRlc3QvaGF0LnBuZ6ZtZW1iZXK0MjAyNi0xMC0yN1QxODowMzoxMVrD",
+      '[{"skin_id":4,"category":"hat","item":"test_hat","display_name":"Test hat","unlock_type":"buy","image":"https://example.test/hat.png","source":"member","unlocked_at":"2026-10-27T18:03:11Z","active":true}]',
     ],
   ] as const)("matches another supplied endpoint fixture", (normalize, msgpack, json) => {
     expect(normalize(decodeBase64(msgpack), "/api/v2/fixture")).toEqual(
