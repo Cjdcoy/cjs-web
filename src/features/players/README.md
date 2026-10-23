@@ -16,6 +16,8 @@ on 2026-08-30.
 | Route completion     | `/api/v1/player/routes-completion`     | `source`, `playerid`                                | JH and J4L |
 | XP rank              | `/api/v1/player/rank`                  | `source`, `playerid`                                | J4L only   |
 | Time on Jump4Life    | `/api/v1/player/activity-summary`      | `source`, `playerid`                                | J4L only   |
+| Weekly events        | `/api/v1/player/events`                | `source`, `playerid`                                | J4L only   |
+| Skins                | `/api/v1/player/skins`                 | `source`, `playerid`                                | J4L only   |
 
 The `leaderboard` parameter accepts `speed`, `jump`, `defrag`, `surf`, or `howmany`. The profile
 keeps `source`, `fps`, selected `map`, and profile `view` in the URL and never requests J4L-only endpoints

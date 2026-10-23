@@ -3,17 +3,21 @@ import { mockApi } from "./fixtures/api";
 import { expect, test } from "./fixtures/test";
 import {
   playerActivityFixture,
+  playerEventsFixture,
   playerPerformanceFixture,
   replayWatchAggregateFixture,
   replayWatchRankingsFixture,
   playerPositionsFixture,
   playerRankFixture,
+  playerSkinsFixture,
   playersFixture,
 } from "../src/lib/api/__fixtures__/responses";
 
 const j4lProfileResponses: Readonly<Record<string, unknown>> = {
   "/api/v1/player/activity-summary": playerActivityFixture,
   "/api/v1/player/all": playersFixture,
+  "/api/v1/player/events": playerEventsFixture,
+  "/api/v1/player/skins": playerSkinsFixture,
   "/api/v1/player/leaderboard-positions": playerPositionsFixture,
   "/api/v1/player/performance-stats": playerPerformanceFixture,
   "/api/v1/player/rank": playerRankFixture,
@@ -136,6 +140,8 @@ test("J4L lifetime activity leads the overview and keeps metric values below lab
   const metricCards = lifetimeActivity.locator(".cjs-player-profile__activity-grid > div");
   const recentActivity = page.locator(".cjs-player-profile__overview-column--recent");
   await expect(page.getByRole("heading", { level: 2, name: "Time on Jump4Life" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Season placements" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Hats" })).toBeVisible();
   await expect(lifetimeActivity.locator(".cjs-player-profile__time-split-bar")).toBeVisible();
   await expect(
     lifetimeActivity.locator(".cjs-player-profile__activity-highlights > div"),

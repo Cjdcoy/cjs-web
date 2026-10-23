@@ -7,11 +7,13 @@ import {
   type GameMap,
   type PlayerActivitySummary,
   type Player,
+  type PlayerEvents,
   type PlayerLeaderboardPosition,
   type PlayerJumpScores,
   type PlayerPerformanceStats,
   type PlayerRankInfo,
   type PlayerRouteCompletion,
+  type PlayerSkin,
   type Source,
   type TopRun,
 } from "../../lib/api";
@@ -22,6 +24,7 @@ export type PlayerProfileApi = Pick<
   CjsApi,
   | "maps"
   | "playerActivitySummary"
+  | "playerEvents"
   | "playerLeaderboardPositions"
   | "playerJumpScores"
   | "playerMapRuns"
@@ -30,6 +33,7 @@ export type PlayerProfileApi = Pick<
   | "replayWatchAggregate"
   | "replayWatchRankings"
   | "playerRoutes"
+  | "playerSkins"
   | "playerTops"
   | "players"
 >;
@@ -53,6 +57,7 @@ export interface ProfileResource<Data> {
 export interface PlayerProfileResources {
   activity: ProfileResource<PlayerActivitySummary>;
   directory: ProfileResource<Player | null>;
+  events: ProfileResource<PlayerEvents>;
   maps: ProfileResource<GameMap[]>;
   performance: ProfileResource<PlayerPerformanceStats>;
   positions: ProfileResource<PlayerLeaderboardPosition[]>;
@@ -60,6 +65,7 @@ export interface PlayerProfileResources {
   rank: ProfileResource<PlayerRankInfo>;
   routes: ProfileResource<PlayerRouteCompletion[]>;
   scores: ProfileResource<PlayerJumpScores>;
+  skins: ProfileResource<PlayerSkin[]>;
   tops: ProfileResource<TopRun[]>;
 }
 
@@ -77,6 +83,7 @@ type ResourceKind = keyof PlayerProfileResources;
 interface ResourceDataMap {
   activity: PlayerActivitySummary;
   directory: Player | null;
+  events: PlayerEvents;
   maps: GameMap[];
   performance: PlayerPerformanceStats;
   positions: PlayerLeaderboardPosition[];
@@ -84,6 +91,7 @@ interface ResourceDataMap {
   rank: PlayerRankInfo;
   routes: PlayerRouteCompletion[];
   scores: PlayerJumpScores;
+  skins: PlayerSkin[];
   tops: TopRun[];
 }
 
@@ -184,11 +192,28 @@ export function usePlayerProfile({
     options,
     reloadVersion,
   );
+  const events = useProfileResource(
+    "events",
+    `${baseKey}:events`,
+    source === "j4l" && view === "overview",
+    apiClient,
+    options,
+    reloadVersion,
+  );
+  const skins = useProfileResource(
+    "skins",
+    `${baseKey}:skins`,
+    source === "j4l" && view === "overview",
+    apiClient,
+    options,
+    reloadVersion,
+  );
   const reload = useCallback(() => setReloadVersion((version) => version + 1), []);
 
   return {
     activity,
     directory,
+    events,
     maps,
     mapRuns,
     performance,
@@ -197,6 +222,7 @@ export function usePlayerProfile({
     reload,
     routes,
     scores,
+    skins,
     tops,
   };
 }
@@ -290,6 +316,8 @@ function loadResource<Kind extends ResourceKind>(
         options.playerId,
         signal,
       ) as Promise<ResourceDataMap[Kind]>;
+    case "events":
+      return apiClient.playerEvents(context) as Promise<ResourceDataMap[Kind]>;
     case "maps":
       return apiClient.maps({ signal, source: options.source }) as Promise<ResourceDataMap[Kind]>;
     case "performance":
@@ -314,6 +342,8 @@ function loadResource<Kind extends ResourceKind>(
         ...context,
         fps: options.fps,
       }) as Promise<ResourceDataMap[Kind]>;
+    case "skins":
+      return apiClient.playerSkins(context) as Promise<ResourceDataMap[Kind]>;
     case "tops":
       return apiClient.playerTops({
         ...context,

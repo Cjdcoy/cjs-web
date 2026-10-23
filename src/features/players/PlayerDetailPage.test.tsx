@@ -8,11 +8,13 @@ import {
   type GameMap,
   type Player,
   type PlayerActivitySummary,
+  type PlayerEvents,
   type PlayerJumpScores,
   type PlayerLeaderboardPosition,
   type PlayerPerformanceStats,
   type PlayerRankInfo,
   type PlayerRouteCompletion,
+  type PlayerSkin,
   type ReplayWatchAggregate,
   type ReplayWatchRankingEntry,
   type TopRun,
@@ -192,15 +194,87 @@ describe("PlayerDetailPage", () => {
     expect(await screen.findByRole("heading", { level: 1, name: "RunnerOne" })).toBeInTheDocument();
     expect(apiClient.playerRank).not.toHaveBeenCalled();
     expect(apiClient.playerActivitySummary).not.toHaveBeenCalled();
+    expect(apiClient.playerEvents).not.toHaveBeenCalled();
+    expect(apiClient.playerSkins).not.toHaveBeenCalled();
     expect(apiClient.replayWatchAggregate).not.toHaveBeenCalled();
     expect(apiClient.replayWatchRankings).not.toHaveBeenCalled();
     expect(screen.queryByRole("heading", { name: "Time on Jump4Life" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Weekly events" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Skins" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Player highlights")).not.toHaveTextContent("Jump4Life rank");
     expect(screen.getByRole("link", { name: "Find this player in Jump4Life" })).toHaveAttribute(
       "href",
       "/players?source=j4l",
     );
     expect(screen.queryByRole("heading", { name: "Jump4Life rank" })).not.toBeInTheDocument();
+  });
+
+  it("shows J4L weekly event placements and unlocked skins by category", async () => {
+    window.history.replaceState(null, "", "/players/42?source=j4l");
+    const apiClient = createProfileApi({
+      playerSkins: vi.fn().mockResolvedValue([
+        skin,
+        {
+          ...skin,
+          active: false,
+          category: "outfit",
+          display_name: "Coat",
+          image: null,
+          skin_id: 7,
+        },
+      ]),
+    });
+
+    renderProfile(apiClient);
+
+    const events = await screen.findByRole("region", { name: "Weekly events" });
+    expect(apiClient.playerEvents).toHaveBeenCalledWith(
+      expect.objectContaining({ playerId: 42, source: "j4l" }),
+    );
+    const seasons = await within(events).findByRole("table", { name: "Season placements" });
+    expect(within(seasons).getAllByRole("row")[1]).toHaveTextContent(
+      "Season 1125#2 of 201,2002In progress",
+    );
+    expect(within(events).getByRole("table", { name: "Recent weeks" })).toHaveTextContent(
+      "Week 3 · Season 1125#1 of 144315",
+    );
+    expect(within(events).getByRole("link", { name: /All events/ })).toHaveAttribute(
+      "href",
+      "https://jump4life.org/events",
+    );
+
+    const skins = screen.getByRole("region", { name: "Skins" });
+    expect(
+      within(skins)
+        .getAllByRole("table")
+        .map((table) => table.querySelector("caption")?.textContent),
+    ).toEqual(["Outfits", "Hats"]);
+    const hats = within(skins).getByRole("table", { name: "Hats" });
+    const outfits = within(skins).getByRole("table", { name: "Outfits" });
+    expect(within(hats).getByText("Equipped")).toBeInTheDocument();
+    expect(hats.querySelector("img")).toHaveAttribute(
+      "src",
+      "https://example.test/skins/test-hat.png",
+    );
+    expect(within(outfits).queryByText("Equipped")).not.toBeInTheDocument();
+    expect(outfits.querySelector("img")).toBeNull();
+    expect(within(outfits).getByText("Member")).toBeInTheDocument();
+  });
+
+  it("shows empty weekly event and skin states for a J4L player without either", async () => {
+    window.history.replaceState(null, "", "/players/42?source=j4l");
+    const apiClient = createProfileApi({
+      playerEvents: vi.fn().mockResolvedValue({ player_id: 42, weeks: [], seasons: [] }),
+      playerSkins: vi.fn().mockResolvedValue([]),
+    });
+
+    renderProfile(apiClient);
+
+    expect(
+      await screen.findByRole("heading", { name: "No weekly events yet" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "No skins unlocked yet" })).toBeInTheDocument();
+    expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
   });
 
   it("recovers JH identity from the directory and treats no placement as empty", async () => {
@@ -639,6 +713,8 @@ function createProfileApi(overrides: Partial<PlayerProfileApi> = {}): PlayerProf
   return {
     maps: vi.fn().mockResolvedValue(routeMaps),
     playerActivitySummary: vi.fn().mockResolvedValue(activity),
+    playerEvents: vi.fn().mockResolvedValue(events),
+    playerSkins: vi.fn().mockResolvedValue([skin]),
     playerJumpScores: vi.fn().mockResolvedValue(jumpScores),
     playerLeaderboardPositions: vi.fn().mockResolvedValue([position]),
     playerMapRuns: vi.fn().mockResolvedValue(mapRuns),
@@ -883,6 +959,46 @@ const activity: PlayerActivitySummary = {
   spectating_afk_ms: 40_000,
   spectating_ms: 500_000,
   updated_at: "2026-08-01T00:00:00Z",
+};
+
+const events: PlayerEvents = {
+  player_id: 42,
+  weeks: [
+    {
+      ends_at: "2026-11-02T01:00:00Z",
+      event_id: 3,
+      fps: 125,
+      maps_finished: 5,
+      participants: 14,
+      points: 431,
+      rank: 1,
+      season_id: 1,
+      week_no: 3,
+    },
+  ],
+  seasons: [
+    {
+      fps: 125,
+      participants: 20,
+      points: 1_200,
+      rank: 2,
+      season_id: 1,
+      status: "active",
+      weekly_wins: 2,
+    },
+  ],
+};
+
+const skin: PlayerSkin = {
+  active: true,
+  category: "hat",
+  display_name: "Test hat",
+  image: "https://example.test/skins/test-hat.png",
+  item: "test_hat",
+  skin_id: 4,
+  source: "member",
+  unlock_type: "member",
+  unlocked_at: "2026-10-27T18:03:11Z",
 };
 
 function createStorage(): Storage {
