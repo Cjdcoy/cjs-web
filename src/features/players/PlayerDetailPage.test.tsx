@@ -8,11 +8,13 @@ import {
   type GameMap,
   type Player,
   type PlayerActivitySummary,
+  type PlayerEvents,
   type PlayerJumpScores,
   type PlayerLeaderboardPosition,
   type PlayerPerformanceStats,
   type PlayerRankInfo,
   type PlayerRouteCompletion,
+  type PlayerSkin,
   type ReplayWatchAggregate,
   type ReplayWatchRankingEntry,
   type TopRun,
@@ -185,22 +187,163 @@ describe("PlayerDetailPage", () => {
   });
 
   it("gates J4L-only requests while keeping the source capability visible", async () => {
+    // JH has no weekly events, so view=events shows the overview.
+    window.history.replaceState(null, "", "/players/42?source=jh&view=events");
     const apiClient = createProfileApi();
 
     renderProfile(apiClient);
 
     expect(await screen.findByRole("heading", { level: 1, name: "RunnerOne" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "Events" })).not.toBeInTheDocument();
     expect(apiClient.playerRank).not.toHaveBeenCalled();
     expect(apiClient.playerActivitySummary).not.toHaveBeenCalled();
+    expect(apiClient.playerEvents).not.toHaveBeenCalled();
+    expect(apiClient.playerSkins).not.toHaveBeenCalled();
     expect(apiClient.replayWatchAggregate).not.toHaveBeenCalled();
     expect(apiClient.replayWatchRankings).not.toHaveBeenCalled();
     expect(screen.queryByRole("heading", { name: "Time on Jump4Life" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Weekly events" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Skins" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Player highlights")).not.toHaveTextContent("Jump4Life rank");
     expect(screen.getByRole("link", { name: "Find this player in Jump4Life" })).toHaveAttribute(
       "href",
       "/players?source=j4l",
     );
     expect(screen.queryByRole("heading", { name: "Jump4Life rank" })).not.toBeInTheDocument();
+  });
+
+  it("shows every J4L weekly event placement in the Events tab", async () => {
+    window.history.replaceState(null, "", "/players/42?source=j4l&view=events");
+    const weeks = Array.from({ length: 13 }, (_, index) => ({
+      ...events.weeks[0],
+      event_id: 3 + index,
+      week_no: 3 + index,
+    }));
+    const apiClient = createProfileApi({
+      playerEvents: vi.fn().mockResolvedValue({ ...events, weeks }),
+      // Without a directory entry, the rank response names the player.
+      players: vi.fn().mockResolvedValue([]),
+    });
+
+    renderProfile(apiClient);
+
+    expect(await screen.findByRole("heading", { level: 1, name: "RunnerOne" })).toBeInTheDocument();
+    expect(apiClient.playerPerformance).not.toHaveBeenCalled();
+    const tab = await screen.findByRole("link", { name: "Events" });
+    expect(tab).toHaveAttribute("aria-current", "page");
+    const section = await screen.findByRole("region", { name: "Weekly events" });
+    expect(apiClient.playerEvents).toHaveBeenCalledWith(
+      expect.objectContaining({ playerId: 42, source: "j4l" }),
+    );
+    expect(apiClient.playerSkins).not.toHaveBeenCalled();
+    const seasons = await within(section).findByRole("table", { name: "Season placements" });
+    expect(within(seasons).getAllByRole("row")[1]).toHaveTextContent(
+      "Season 1125#2 of 201,2002In progress",
+    );
+    const weekTable = within(section).getByRole("table", { name: "Weeks" });
+    expect(within(weekTable).getAllByRole("row")).toHaveLength(14);
+    expect(weekTable).toHaveTextContent("Week 3 · Season 1125#1 of 144315");
+    expect(within(section).getByRole("link", { name: /All events/ })).toHaveAttribute(
+      "href",
+      "https://jump4life.org/events",
+    );
+  });
+
+  it("shows unlocked J4L skins by category on the overview", async () => {
+    window.history.replaceState(null, "", "/players/42?source=j4l");
+    const apiClient = createProfileApi({
+      playerSkins: vi.fn().mockResolvedValue([
+        skin,
+        {
+          ...skin,
+          active: false,
+          category: "outfit",
+          display_name: "Coat",
+          image: null,
+          skin_id: 7,
+        },
+      ]),
+    });
+
+    renderProfile(apiClient);
+
+    const skins = await screen.findByRole("region", { name: "Skins" });
+    expect(screen.getByRole("link", { name: "Events" })).toBeInTheDocument();
+    expect(apiClient.playerEvents).not.toHaveBeenCalled();
+    expect(screen.queryByRole("heading", { name: "Weekly events" })).not.toBeInTheDocument();
+    expect(
+      within(skins)
+        .getAllByRole("table")
+        .map((table) => table.querySelector("caption")?.textContent),
+    ).toEqual(["Outfits", "Hats"]);
+    const hats = within(skins).getByRole("table", { name: "Hats" });
+    const outfits = within(skins).getByRole("table", { name: "Outfits" });
+    expect(within(hats).getByText("Equipped")).toBeInTheDocument();
+    expect(hats.querySelector("img")).toHaveAttribute(
+      "src",
+      "https://example.test/skins/test-hat.png",
+    );
+    expect(within(outfits).queryByText("Equipped")).not.toBeInTheDocument();
+    expect(outfits.querySelector("img")).toBeNull();
+    expect(within(outfits).getByText("Member")).toBeInTheDocument();
+  });
+
+  it("hides skins and explains missing weekly events while their J4L tables are unavailable (503)", async () => {
+    window.history.replaceState(null, "", "/players/42?source=j4l");
+    const unavailable = (path: string) =>
+      vi
+        .fn()
+        .mockRejectedValue(
+          new ApiError({ kind: "http", message: "API request failed (503)", path, status: 503 }),
+        );
+    const apiClient = createProfileApi({
+      playerEvents: unavailable("/api/v1/player/events"),
+      playerSkins: unavailable("/api/v1/player/skins"),
+    });
+
+    const { unmount } = renderProfile(apiClient);
+
+    expect(await screen.findByRole("heading", { name: "Time on Jump4Life" })).toBeInTheDocument();
+    await waitFor(() => expect(apiClient.playerSkins).toHaveBeenCalled());
+    await waitFor(() =>
+      expect(screen.queryByRole("heading", { name: "Skins" })).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
+    unmount();
+
+    window.history.replaceState(null, "", "/players/42?source=j4l&view=events");
+    renderProfile(apiClient);
+
+    expect(
+      await screen.findByRole("heading", { name: "Weekly events are not available yet" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Profile unavailable" })).not.toBeInTheDocument();
+  });
+
+  it("shows empty weekly event and skin states for a J4L player without either", async () => {
+    window.history.replaceState(null, "", "/players/42?source=j4l");
+    const apiClient = createProfileApi({
+      playerEvents: vi.fn().mockResolvedValue({ player_id: 42, weeks: [], seasons: [] }),
+      // A category this page does not know yet counts as nothing to show.
+      playerSkins: vi.fn().mockResolvedValue([{ ...skin, category: "boots" }]),
+    });
+
+    const { unmount } = renderProfile(apiClient);
+
+    expect(
+      await screen.findByRole("heading", { name: "No skins unlocked yet" }),
+    ).toBeInTheDocument();
+    unmount();
+
+    window.history.replaceState(null, "", "/players/42?source=j4l&view=events");
+    renderProfile(apiClient);
+
+    expect(
+      await screen.findByRole("heading", { name: "No weekly events yet" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
   });
 
   it("recovers JH identity from the directory and treats no placement as empty", async () => {
@@ -639,6 +782,8 @@ function createProfileApi(overrides: Partial<PlayerProfileApi> = {}): PlayerProf
   return {
     maps: vi.fn().mockResolvedValue(routeMaps),
     playerActivitySummary: vi.fn().mockResolvedValue(activity),
+    playerEvents: vi.fn().mockResolvedValue(events),
+    playerSkins: vi.fn().mockResolvedValue([skin]),
     playerJumpScores: vi.fn().mockResolvedValue(jumpScores),
     playerLeaderboardPositions: vi.fn().mockResolvedValue([position]),
     playerMapRuns: vi.fn().mockResolvedValue(mapRuns),
@@ -883,6 +1028,46 @@ const activity: PlayerActivitySummary = {
   spectating_afk_ms: 40_000,
   spectating_ms: 500_000,
   updated_at: "2026-08-01T00:00:00Z",
+};
+
+const events: PlayerEvents = {
+  player_id: 42,
+  weeks: [
+    {
+      ends_at: "2026-11-02T01:00:00Z",
+      event_id: 3,
+      fps: 125,
+      maps_finished: 5,
+      participants: 14,
+      points: 431,
+      rank: 1,
+      season_id: 1,
+      week_no: 3,
+    },
+  ],
+  seasons: [
+    {
+      fps: 125,
+      participants: 20,
+      points: 1_200,
+      rank: 2,
+      season_id: 1,
+      status: "active",
+      weekly_wins: 2,
+    },
+  ],
+};
+
+const skin: PlayerSkin = {
+  active: true,
+  category: "hat",
+  display_name: "Test hat",
+  image: "https://example.test/skins/test-hat.png",
+  item: "test_hat",
+  skin_id: 4,
+  source: "member",
+  unlock_type: "member",
+  unlocked_at: "2026-10-27T18:03:11Z",
 };
 
 function createStorage(): Storage {

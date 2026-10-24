@@ -11,10 +11,10 @@ const mapViewerEntryKey = "src/features/mapViewer/MapViewerCanvas.tsx";
 const budgets = {
   initialJavaScriptGzip: 75 * 1024,
   initialCssGzip: 8 * 1024,
-  // 37 KiB since PR #33 (3D replay viewer); measured at 36.0 KiB.
-  routeIncrementGzip: 37 * 1024,
-  // 161 KiB since the in-browser v12 replay decoder; measured at 160.5 KiB (157.7 before it).
-  totalJavaScriptGzip: 161 * 1024,
+  // 39 KiB since the J4L profile weekly events and skins sections; measured at 38.2 KiB (36.3 before).
+  routeIncrementGzip: 39 * 1024,
+  // 163 KiB since the J4L profile weekly events and skins sections; measured at 162.2 KiB (160.6 before).
+  totalJavaScriptGzip: 163 * 1024,
   // 23 KiB since PR #33 (3D replay viewer); measured at 22.7 KiB.
   totalCssGzip: 23 * 1024,
   mapViewerGzip: 170 * 1024,
