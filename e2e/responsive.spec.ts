@@ -140,7 +140,6 @@ test("J4L lifetime activity leads the overview and keeps metric values below lab
   const metricCards = lifetimeActivity.locator(".cjs-player-profile__activity-grid > div");
   const recentActivity = page.locator(".cjs-player-profile__overview-column--recent");
   await expect(page.getByRole("heading", { level: 2, name: "Time on Jump4Life" })).toBeVisible();
-  await expect(page.getByRole("table", { name: "Season placements" })).toBeVisible();
   await expect(page.getByRole("table", { name: "Hats" })).toBeVisible();
   await expect(lifetimeActivity.locator(".cjs-player-profile__time-split-bar")).toBeVisible();
   await expect(
@@ -160,6 +159,14 @@ test("J4L lifetime activity leads the overview and keeps metric values below lab
   expect(await valuesFollowLabels(metricCards)).toBe(true);
   await expectNoPageOverflow(page);
   await page.screenshot({ path: "/tmp/cjs-j4l-activity-mobile.png", fullPage: true });
+
+  await page
+    .getByRole("navigation", { name: "Player profile sections" })
+    .getByRole("link", { name: "Events" })
+    .click();
+  await expect(page.getByRole("table", { name: "Season placements" })).toBeVisible();
+  await expect(page.getByRole("table", { name: "Weeks" })).toBeVisible();
+  await expectNoPageOverflow(page);
 });
 
 async function horizontalPositions(locator: Locator): Promise<number[]> {

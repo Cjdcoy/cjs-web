@@ -38,7 +38,7 @@ export type PlayerProfileApi = Pick<
   | "players"
 >;
 
-// A 503 here means the J4L weekly-event or shop tables are not migrated yet: hide, don't fail.
+// A 503 here means the J4L weekly-event or shop tables are not migrated yet: mark unsupported, don't fail.
 const HIDDEN_WHEN_UNAVAILABLE = new Set<string>(["events", "skins"]);
 
 // Matches the backend live cache's per-route history limit, so this returns every personal best.
@@ -198,7 +198,7 @@ export function usePlayerProfile({
   const events = useProfileResource(
     "events",
     `${baseKey}:events`,
-    source === "j4l" && view === "overview",
+    source === "j4l" && view === "events",
     apiClient,
     options,
     reloadVersion,
