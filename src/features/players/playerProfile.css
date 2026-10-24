@@ -191,7 +191,9 @@
 
 .cjs-player-profile__tabs {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* One equal column per tab: JH has four, J4L adds Events. */
+  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-flow: column;
   gap: var(--cjs-space-1);
   padding: var(--cjs-space-1);
   border: var(--cjs-border-width) solid var(--cjs-color-border);

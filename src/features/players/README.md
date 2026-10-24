@@ -24,6 +24,10 @@ keeps `source`, `fps`, selected `map`, and profile `view` in the URL and never r
 for JH. Best runs use the jump-skill response's per-map score, difficulty, and rank, linking its
 normal map IDs to map details. Route completion uses the same normal map-detail lookup.
 
+Weekly events have their own `view=events` tab, shown and fetched only for J4L; a JH
+`view=events` URL shows the overview. The tab lists every returned week. A `503` from the events
+endpoint shows a "not available yet" notice; a `503` from skins hides the overview's Skins section.
+
 Run analytics uses the selected jump-score map ID as the map-runs `cpid`, then orders the
 returned finishes by `time_created`. Its authored chart has an equivalent chronological table and
 selectable details for loads, saves, nade activity, run ID, and run type. The live endpoint's

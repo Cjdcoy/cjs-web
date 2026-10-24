@@ -133,7 +133,10 @@ function PlayerProfile({
   playerId: number;
 }) {
   const { source } = useSourceContext();
-  const [queryState, setQueryState] = useQueryState(playerProfileQuerySchema);
+  const [query, setQueryState] = useQueryState(playerProfileQuerySchema);
+  // Weekly events exist only in J4L; elsewhere view=events shows the overview.
+  const queryState =
+    query.view === "events" && source !== "j4l" ? { ...query, view: "overview" as const } : query;
   const resources = usePlayerProfile({
     apiClient,
     fps: queryState.fps,
@@ -159,14 +162,16 @@ function PlayerProfile({
         ? [resources.scores, ...(queryState.map > 0 ? [resources.mapRuns] : [])]
         : queryState.view === "routes"
           ? [resources.routes, resources.maps]
-          : [
-              resources.performance,
-              resources.positions,
-              // JH, and events/skins before their J4L tables exist, are "unsupported".
-              ...[resources.rank, resources.activity, resources.events, resources.skins].filter(
-                (resource) => resource.status !== "unsupported",
-              ),
-            ];
+          : queryState.view === "events"
+            ? [resources.events]
+            : [
+                resources.performance,
+                resources.positions,
+                // JH, and skins before its J4L tables exist, are "unsupported".
+                ...[resources.rank, resources.activity, resources.skins].filter(
+                  (resource) => resource.status !== "unsupported",
+                ),
+              ];
   const isSettling = [resources.directory, ...supportedResources].some(
     (resource) => resource.status === "loading" || resource.status === "refreshing",
   );
@@ -333,9 +338,6 @@ function PlayerProfile({
                       resource={resources.performance}
                       onRetry={resources.reload}
                     />
-                    {resources.events.status !== "unsupported" && (
-                      <WeeklyEventsSection resource={resources.events} onRetry={resources.reload} />
-                    )}
                     {resources.skins.status !== "unsupported" && (
                       <SkinsSection resource={resources.skins} onRetry={resources.reload} />
                     )}
@@ -394,6 +396,9 @@ function PlayerProfile({
                 runs={resources.mapRuns}
                 tops={resources.tops}
               />
+            )}
+            {queryState.view === "events" && (
+              <WeeklyEventsSection resource={resources.events} onRetry={resources.reload} />
             )}
             {queryState.view === "routes" && (
               <RouteCompletionSection
@@ -487,6 +492,7 @@ function ProfileNavigation({
     { label: "Best runs", value: "runs" },
     { label: "Run analytics", value: "progress" },
     { label: "Route completion", value: "routes" },
+    ...(source === "j4l" ? [{ label: "Events", value: "events" } as const] : []),
   ];
 
   return (
@@ -1458,8 +1464,6 @@ function ActivitySection({
 }
 
 const J4L_EVENTS_URL = "https://jump4life.org/events";
-// One season of weeks; the events site has the full history.
-const RECENT_EVENT_WEEKS = 12;
 
 const SEASON_STATUS_LABELS: Record<string, string> = {
   active: "In progress",
@@ -1596,35 +1600,43 @@ function WeeklyEventsSection({
       id="player-events"
       title="Weekly events"
     >
-      <ResourceState resource={resource} label="weekly events" onRetry={onRetry}>
-        {(events) =>
-          events.weeks.length || events.seasons.length ? (
-            <div className="cjs-player-profile__table-stack">
-              <DataTable
-                caption="Season placements"
-                captionVisible
-                columns={EVENT_SEASON_COLUMNS}
-                emptyMessage="No season placements yet."
-                getRowKey={(season) => `${season.season_id}-${season.fps}`}
-                rows={events.seasons}
+      {resource.status === "unsupported" ? (
+        // 503: the J4L weekly-event tables are not migrated yet.
+        <EmptyState
+          description="Results appear here once Jump4Life weekly events go live."
+          title="Weekly events are not available yet"
+        />
+      ) : (
+        <ResourceState resource={resource} label="weekly events" onRetry={onRetry}>
+          {(events) =>
+            events.weeks.length || events.seasons.length ? (
+              <div className="cjs-player-profile__table-stack">
+                <DataTable
+                  caption="Season placements"
+                  captionVisible
+                  columns={EVENT_SEASON_COLUMNS}
+                  emptyMessage="No season placements yet."
+                  getRowKey={(season) => `${season.season_id}-${season.fps}`}
+                  rows={events.seasons}
+                />
+                <DataTable
+                  caption="Weeks"
+                  captionVisible
+                  columns={EVENT_WEEK_COLUMNS}
+                  emptyMessage="No finished weeks yet."
+                  getRowKey={(week) => `${week.event_id}-${week.fps}`}
+                  rows={events.weeks}
+                />
+              </div>
+            ) : (
+              <EmptyState
+                description="This player has not placed in a finished weekly event yet. Results appear once a week closes."
+                title="No weekly events yet"
               />
-              <DataTable
-                caption="Recent weeks"
-                captionVisible
-                columns={EVENT_WEEK_COLUMNS}
-                emptyMessage="No finished weeks yet."
-                getRowKey={(week) => `${week.event_id}-${week.fps}`}
-                rows={events.weeks.slice(0, RECENT_EVENT_WEEKS)}
-              />
-            </div>
-          ) : (
-            <EmptyState
-              description="This player has not placed in a finished weekly event yet. Results appear once a week closes."
-              title="No weekly events yet"
-            />
-          )
-        }
-      </ResourceState>
+            )
+          }
+        </ResourceState>
+      )}
     </ProfileSection>
   );
 }

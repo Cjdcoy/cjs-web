@@ -187,11 +187,15 @@ describe("PlayerDetailPage", () => {
   });
 
   it("gates J4L-only requests while keeping the source capability visible", async () => {
+    // JH has no weekly events, so view=events shows the overview.
+    window.history.replaceState(null, "", "/players/42?source=jh&view=events");
     const apiClient = createProfileApi();
 
     renderProfile(apiClient);
 
     expect(await screen.findByRole("heading", { level: 1, name: "RunnerOne" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByRole("link", { name: "Events" })).not.toBeInTheDocument();
     expect(apiClient.playerRank).not.toHaveBeenCalled();
     expect(apiClient.playerActivitySummary).not.toHaveBeenCalled();
     expect(apiClient.playerEvents).not.toHaveBeenCalled();
@@ -209,7 +213,40 @@ describe("PlayerDetailPage", () => {
     expect(screen.queryByRole("heading", { name: "Jump4Life rank" })).not.toBeInTheDocument();
   });
 
-  it("shows J4L weekly event placements and unlocked skins by category", async () => {
+  it("shows every J4L weekly event placement in the Events tab", async () => {
+    window.history.replaceState(null, "", "/players/42?source=j4l&view=events");
+    const weeks = Array.from({ length: 13 }, (_, index) => ({
+      ...events.weeks[0],
+      event_id: 3 + index,
+      week_no: 3 + index,
+    }));
+    const apiClient = createProfileApi({
+      playerEvents: vi.fn().mockResolvedValue({ ...events, weeks }),
+    });
+
+    renderProfile(apiClient);
+
+    const tab = await screen.findByRole("link", { name: "Events" });
+    expect(tab).toHaveAttribute("aria-current", "page");
+    const section = await screen.findByRole("region", { name: "Weekly events" });
+    expect(apiClient.playerEvents).toHaveBeenCalledWith(
+      expect.objectContaining({ playerId: 42, source: "j4l" }),
+    );
+    expect(apiClient.playerSkins).not.toHaveBeenCalled();
+    const seasons = await within(section).findByRole("table", { name: "Season placements" });
+    expect(within(seasons).getAllByRole("row")[1]).toHaveTextContent(
+      "Season 1125#2 of 201,2002In progress",
+    );
+    const weekTable = within(section).getByRole("table", { name: "Weeks" });
+    expect(within(weekTable).getAllByRole("row")).toHaveLength(14);
+    expect(weekTable).toHaveTextContent("Week 3 · Season 1125#1 of 144315");
+    expect(within(section).getByRole("link", { name: /All events/ })).toHaveAttribute(
+      "href",
+      "https://jump4life.org/events",
+    );
+  });
+
+  it("shows unlocked J4L skins by category on the overview", async () => {
     window.history.replaceState(null, "", "/players/42?source=j4l");
     const apiClient = createProfileApi({
       playerSkins: vi.fn().mockResolvedValue([
@@ -227,23 +264,10 @@ describe("PlayerDetailPage", () => {
 
     renderProfile(apiClient);
 
-    const events = await screen.findByRole("region", { name: "Weekly events" });
-    expect(apiClient.playerEvents).toHaveBeenCalledWith(
-      expect.objectContaining({ playerId: 42, source: "j4l" }),
-    );
-    const seasons = await within(events).findByRole("table", { name: "Season placements" });
-    expect(within(seasons).getAllByRole("row")[1]).toHaveTextContent(
-      "Season 1125#2 of 201,2002In progress",
-    );
-    expect(within(events).getByRole("table", { name: "Recent weeks" })).toHaveTextContent(
-      "Week 3 · Season 1125#1 of 144315",
-    );
-    expect(within(events).getByRole("link", { name: /All events/ })).toHaveAttribute(
-      "href",
-      "https://jump4life.org/events",
-    );
-
-    const skins = screen.getByRole("region", { name: "Skins" });
+    const skins = await screen.findByRole("region", { name: "Skins" });
+    expect(screen.getByRole("link", { name: "Events" })).toBeInTheDocument();
+    expect(apiClient.playerEvents).not.toHaveBeenCalled();
+    expect(screen.queryByRole("heading", { name: "Weekly events" })).not.toBeInTheDocument();
     expect(
       within(skins)
         .getAllByRole("table")
@@ -261,7 +285,7 @@ describe("PlayerDetailPage", () => {
     expect(within(outfits).getByText("Member")).toBeInTheDocument();
   });
 
-  it("hides weekly events and skins while their J4L tables are unavailable (503)", async () => {
+  it("hides skins and explains missing weekly events while their J4L tables are unavailable (503)", async () => {
     window.history.replaceState(null, "", "/players/42?source=j4l");
     const unavailable = (path: string) =>
       vi
@@ -274,15 +298,24 @@ describe("PlayerDetailPage", () => {
       playerSkins: unavailable("/api/v1/player/skins"),
     });
 
-    renderProfile(apiClient);
+    const { unmount } = renderProfile(apiClient);
 
     expect(await screen.findByRole("heading", { name: "Time on Jump4Life" })).toBeInTheDocument();
     await waitFor(() => expect(apiClient.playerSkins).toHaveBeenCalled());
     await waitFor(() =>
-      expect(screen.queryByRole("heading", { name: "Weekly events" })).not.toBeInTheDocument(),
+      expect(screen.queryByRole("heading", { name: "Skins" })).not.toBeInTheDocument(),
     );
-    expect(screen.queryByRole("heading", { name: "Skins" })).not.toBeInTheDocument();
     expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
+    unmount();
+
+    window.history.replaceState(null, "", "/players/42?source=j4l&view=events");
+    renderProfile(apiClient);
+
+    expect(
+      await screen.findByRole("heading", { name: "Weekly events are not available yet" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Profile unavailable" })).not.toBeInTheDocument();
   });
 
   it("shows empty weekly event and skin states for a J4L player without either", async () => {
@@ -293,12 +326,19 @@ describe("PlayerDetailPage", () => {
       playerSkins: vi.fn().mockResolvedValue([{ ...skin, category: "boots" }]),
     });
 
+    const { unmount } = renderProfile(apiClient);
+
+    expect(
+      await screen.findByRole("heading", { name: "No skins unlocked yet" }),
+    ).toBeInTheDocument();
+    unmount();
+
+    window.history.replaceState(null, "", "/players/42?source=j4l&view=events");
     renderProfile(apiClient);
 
     expect(
       await screen.findByRole("heading", { name: "No weekly events yet" }),
     ).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "No skins unlocked yet" })).toBeInTheDocument();
     expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
   });
 
