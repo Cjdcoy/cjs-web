@@ -222,10 +222,14 @@ describe("PlayerDetailPage", () => {
     }));
     const apiClient = createProfileApi({
       playerEvents: vi.fn().mockResolvedValue({ ...events, weeks }),
+      // Without a directory entry, the rank response names the player.
+      players: vi.fn().mockResolvedValue([]),
     });
 
     renderProfile(apiClient);
 
+    expect(await screen.findByRole("heading", { level: 1, name: "RunnerOne" })).toBeInTheDocument();
+    expect(apiClient.playerPerformance).not.toHaveBeenCalled();
     const tab = await screen.findByRole("link", { name: "Events" });
     expect(tab).toHaveAttribute("aria-current", "page");
     const section = await screen.findByRole("region", { name: "Weekly events" });

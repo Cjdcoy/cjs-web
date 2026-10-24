@@ -182,7 +182,8 @@ export function usePlayerProfile({
   const rank = useProfileResource(
     "rank",
     `${baseKey}:rank`,
-    source === "j4l" && view === "overview",
+    // The events view loads nothing else that names the player.
+    source === "j4l" && (view === "overview" || view === "events"),
     apiClient,
     options,
     reloadVersion,

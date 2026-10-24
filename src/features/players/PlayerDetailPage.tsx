@@ -15,7 +15,7 @@ import {
   Shirt,
   Trophy,
 } from "lucide-react";
-import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Page } from "../../components";
 import { ReplayLink } from "../../components/ReplayLink";
 import {
@@ -494,9 +494,17 @@ function ProfileNavigation({
     { label: "Route completion", value: "routes" },
     ...(source === "j4l" ? [{ label: "Events", value: "events" } as const] : []),
   ];
+  const navRef = useRef<HTMLElement>(null);
+
+  // On phones the strip scrolls sideways; keep the active tab visible without moving the page.
+  useEffect(() => {
+    navRef.current
+      ?.querySelector("[data-active]")
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [view]);
 
   return (
-    <nav className="cjs-player-profile__tabs" aria-label="Player profile sections">
+    <nav ref={navRef} className="cjs-player-profile__tabs" aria-label="Player profile sections">
       {views.map((option) => (
         <a
           key={option.value}
