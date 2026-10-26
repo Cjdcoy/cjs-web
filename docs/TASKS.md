@@ -2539,14 +2539,41 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
 - **Primary boundary:** `src/features/replayPlayer` (`replayPlayback.ts` `stepSampleTime`,
   `ReplayPlayer.tsx` transport and keys, `ShortcutsDialog.tsx`)
 - **Outcome:**
-  - Previous frame and Next frame buttons sit after Play/Pause; `,` and `.` do the same and repeat
-    while held. A step pauses playback and seeks to the neighbouring recorded sample (one per
-    client frame in v12, one per 50 ms before), clamped to the first and last sample.
-  - The shortcuts dialog lists both keys.
+  - For v12+ replays (one sample per client frame), Previous frame and Next frame buttons sit
+    after Play/Pause; `,` and `.` do the same and repeat while held. A step pauses playback and
+    seeks to the neighbouring recorded sample, clamped to the first and last sample.
+  - The shortcuts dialog lists both keys. Older formats (one sample per 50 ms) hide the buttons,
+    ignore the keys, and leave the row out of the dialog.
 - **Validation:** `npm run verify`. Unit tests cover stepping on and between samples and at both
-  ends; a component test covers both buttons and keys pausing playback and moving the clock, seek
-  bar, and camera pose by one sample. The transport row was measured in Chromium at 390 and
-  1440 px: no overflow or page scroll, and the 390 px row wraps exactly as it did before.
+  ends; component tests cover a v12 replay's buttons and keys pausing playback and moving the
+  clock, seek bar, and camera pose by one sample, and a v11 replay showing neither. The transport
+  row was measured in Chromium at 390 and 1440 px: no overflow or page scroll, and the 390 px row
+  wraps exactly as it did before.
+
+### CJS-076 — Share a replay at a time
+
+- **Status:** done
+- **Owner/handoff:** Claude / replay player worker
+- **Dependencies:** CJS-067, CJS-074
+- **Primary boundary:** `src/features/replayPlayer` (`replayShare.ts`, `ShareDialog.tsx`,
+  `ReplayPlayer.tsx` options row, `useReplayPlayback.ts` initial time, `replayPlayer.css`)
+- **Outcome:**
+  - `?t=<ms>` is a whole number of milliseconds from the replay start (the clock's 00:00), so a
+    v12 frame round-trips exactly. With a valid `t` the player opens paused at that time, clamped
+    to the replay; a missing, negative or non-integer `t` opens at the start as before. Works for
+    every format. Other query parameters are kept.
+  - A Share button in the options row opens a native dialog styled like the shortcuts one: the
+    link in a read-only field, a "Start at mm:ss.mmm" checkbox (unchecked on every open, time
+    captured on open), and Copy link. Copying uses the clipboard and announces "Link copied"; if
+    the clipboard is missing or refuses, the link is selected to copy by hand.
+  - A shared start counts as a seek, so auto-skip does not jump off the moment on Play.
+- **Validation:** `npm run verify`. Unit tests cover parsing and building `t`. Component tests
+  cover opening paused at `t` (valid, past the end, negative, non-numeric), the checkbox changing
+  the link, and copy success and failure. Chromium at 390 and 1440 px: no row overflow or page
+  scroll; Esc closes the dialog and focus returns to Share; it opens inside full screen. Total
+  JavaScript budget raised narrowly from 161 to 161.5 KiB (161.4 KiB with CJS-074 and this).
+- **Remaining work/risks:** while the modal dialog is open, the player's live region outside it is
+  inert and left out of the accessibility tree, so "Link copied" may not be read by screen readers.
 
 ## Agent handoff template
 

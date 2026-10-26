@@ -445,6 +445,13 @@ export function formatReplayClock(ms: number): string {
   return `${pad(minutes)}:${pad(seconds)}.${pad(centiseconds % 100)}`;
 }
 
+/** Formats elapsed replay time as mm:ss.mmm, precise enough to name a single frame. */
+export function formatReplayClockMs(ms: number): string {
+  const whole = Math.max(0, Math.round(ms));
+  const seconds = Math.floor(whole / 1000);
+  return `${pad(Math.floor(seconds / 60))}:${pad(seconds % 60)}.${String(whole % 1000).padStart(3, "0")}`;
+}
+
 /** Sample `index` at or before `time`, and how far toward the next (null: hold, do not blend). */
 function segmentAt(
   timeline: ReplayTimeline,

@@ -8,6 +8,7 @@ import {
   findMarker,
   findSampleIndex,
   formatReplayClock,
+  formatReplayClockMs,
   hermite,
   leanAt,
   leanStep,
@@ -292,5 +293,7 @@ describe("replay markers and clock", () => {
     expect(formatReplayClock(0)).toBe("00:00.00");
     expect(formatReplayClock(83_456)).toBe("01:23.45");
     expect(formatReplayClock(3_725_000)).toBe("62:05.00");
+    expect(formatReplayClockMs(83_456.4)).toBe("01:23.456");
+    expect(formatReplayClockMs(3_725_007)).toBe("62:05.007");
   });
 });

@@ -6,6 +6,7 @@ import {
   Pause,
   Play,
   RectangleHorizontal,
+  Share,
   SkipBack,
   SkipForward,
   StepBack,
@@ -19,6 +20,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, IconButton, Select, VisuallyHidden } from "../../components/ui";
 import type { ReplayMarkerKind, ReplaySamples } from "../../lib/api";
 import { getViewmodelUrl } from "../../lib/mapModels";
+import { useBrowserLocation } from "../../lib/routing";
 import { MapViewer, type CodPose, type ViewerFrame, type ViewmodelOptions } from "../mapViewer";
 import {
   DEFAULT_HUD_PREFERENCES,
@@ -52,7 +54,9 @@ import {
   stepSampleTime,
   type ReplayTimeline,
 } from "./replayPlayback";
+import { readReplayStartOffset } from "./replayShare";
 import { createWeaponTrack, weaponAt } from "./replayWeapon";
+import { ShareDialog } from "./ShareDialog";
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { ReplayHeatStrip } from "./ReplayWebViews";
 import { PLAYBACK_SPEEDS, useReplayPlayback, type PlaybackObserver } from "./useReplayPlayback";
@@ -82,7 +86,16 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     [preferences.autoSkip, samples.markers, samples.skips],
   );
   const playbackObserver = useRef<PlaybackObserver | null>(null);
-  const playback = useReplayPlayback(start, end, autoSkipOptions, playbackObserver);
+  const { search } = useBrowserLocation();
+  const playback = useReplayPlayback(
+    start,
+    end,
+    autoSkipOptions,
+    playbackObserver,
+    Math.min(end, start + readReplayStartOffset(search)),
+  );
+  // Older formats record one sample per 50 ms, not per frame, so frame steps would mean nothing.
+  const frameStep = samples.format_version >= 12;
   const { executedSkips, flushSegment, getTime, playing, seek, setPlaying, setSpeed, speed, time } =
     playback;
   const sound = useReplaySound({
@@ -131,6 +144,8 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
   const [follow, setFollow] = useState(true);
   const playerRef = useRef<HTMLElement>(null);
   const shortcutsRef = useRef<HTMLDialogElement>(null);
+  const shareRef = useRef<HTMLDialogElement>(null);
+  const [shareOffset, setShareOffset] = useState(0);
   const { controlsHidden, mode, setMode } = useViewMode(playerRef);
   const totalSkippedFails = useMemo(
     () => [...executedSkips.values()].reduce((total, fails) => total + fails, 0),
@@ -327,10 +342,9 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
           jump(-1);
           break;
         case ",":
-          stepFrame(-1);
-          break;
         case ".":
-          stepFrame(1);
+          if (!frameStep) return;
+          stepFrame(event.key === "." ? 1 : -1);
           break;
         default:
           handled = false;
@@ -341,6 +355,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [
     changeSpeed,
+    frameStep,
     getTime,
     jump,
     mode,
@@ -403,22 +418,26 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
                   <Play size={18} aria-hidden="true" />
                 )}
               </IconButton>
-              <IconButton
-                label="Previous frame"
-                aria-keyshortcuts=","
-                variant="ghost"
-                onClick={() => stepFrame(-1)}
-              >
-                <StepBack size={18} aria-hidden="true" />
-              </IconButton>
-              <IconButton
-                label="Next frame"
-                aria-keyshortcuts="."
-                variant="ghost"
-                onClick={() => stepFrame(1)}
-              >
-                <StepForward size={18} aria-hidden="true" />
-              </IconButton>
+              {frameStep && (
+                <>
+                  <IconButton
+                    label="Previous frame"
+                    aria-keyshortcuts=","
+                    variant="ghost"
+                    onClick={() => stepFrame(-1)}
+                  >
+                    <StepBack size={18} aria-hidden="true" />
+                  </IconButton>
+                  <IconButton
+                    label="Next frame"
+                    aria-keyshortcuts="."
+                    variant="ghost"
+                    onClick={() => stepFrame(1)}
+                  >
+                    <StepForward size={18} aria-hidden="true" />
+                  </IconButton>
+                </>
+              )}
               <IconButton
                 label="Previous save or load"
                 aria-keyshortcuts="P"
@@ -496,6 +515,18 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
               </IconButton>
               {tools}
               <IconButton
+                label="Share"
+                aria-haspopup="dialog"
+                size="small"
+                variant="secondary"
+                onClick={() => {
+                  setShareOffset(getTime() - start);
+                  shareRef.current?.showModal();
+                }}
+              >
+                <Share size={16} aria-hidden="true" />
+              </IconButton>
+              <IconButton
                 label="Keyboard shortcuts"
                 aria-keyshortcuts="Shift+?"
                 aria-haspopup="dialog"
@@ -565,7 +596,14 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
         )}
       </MapViewer>
 
-      <ShortcutsDialog ref={shortcutsRef} />
+      <ShortcutsDialog frameStep={frameStep} ref={shortcutsRef} />
+      <ShareDialog
+        announce={setAnnouncement}
+        offsetMs={shareOffset}
+        ref={shareRef}
+        runId={samples.run_id}
+        search={search}
+      />
 
       <VisuallyHidden role="status" aria-live="polite">
         {announcement}

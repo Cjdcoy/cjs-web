@@ -170,6 +170,10 @@ describe("ReplayPage", () => {
     expect(screen.getByRole("dialog", { name: "Keyboard shortcuts" })).toHaveTextContent(
       /CFree camera on or off.*FFull screen on or off.*TCinema mode on or off/,
     );
+    // A v11 replay has no per-frame samples, so no frame step keys.
+    expect(screen.getByRole("dialog", { name: "Keyboard shortcuts" })).not.toHaveTextContent(
+      "Previous or next frame",
+    );
     act(() => screen.getByRole("dialog", { name: "Keyboard shortcuts" }).removeAttribute("open"));
     await user.keyboard("?");
     expect(showModal).toHaveBeenCalledTimes(2);
@@ -452,9 +456,10 @@ describe("ReplayPage", () => {
     expect(within(hud).getByRole("checkbox", { name: /Watch heat/ })).toBeDisabled();
   });
 
-  it("steps one frame with the buttons or , and ., pausing playback", async () => {
+  it("steps one frame of a v12 replay with the buttons or , and ., pausing playback", async () => {
     const user = userEvent.setup();
-    render(<ReplayPage apiClient={apiReturning(Promise.resolve(samples))} runId="7001" />);
+    const frames = { ...samples, format_version: 12 };
+    render(<ReplayPage apiClient={apiReturning(Promise.resolve(frames))} runId="7001" />);
     const slider = await screen.findByRole("slider", { name: "Replay position" });
     const play = () => user.click(screen.getByRole("button", { name: "Play" }));
     const expectPausedAt = (clock: string, x: number) => {
@@ -479,6 +484,70 @@ describe("ReplayPage", () => {
     await play();
     await user.keyboard(".");
     expectPausedAt("00:10.00", 5);
+  });
+
+  it("offers no frame step for an older replay", async () => {
+    const user = userEvent.setup();
+    render(<ReplayPage apiClient={apiReturning(Promise.resolve(samples))} runId="7001" />);
+    const slider = await screen.findByRole("slider", { name: "Replay position" });
+
+    expect(screen.queryByRole("button", { name: "Next frame" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Previous frame" })).not.toBeInTheDocument();
+    await user.keyboard("{ArrowRight}.");
+    expect(slider).toHaveAttribute("aria-valuetext", "00:05.00 of 00:20.00");
+    await user.keyboard(",");
+    expect(slider).toHaveAttribute("aria-valuetext", "00:05.00 of 00:20.00");
+  });
+
+  it.each([
+    ["?t=10000", "00:10.00"],
+    ["?t=99999", "00:20.00"],
+    ["?t=-5", "00:00.00"],
+    ["?t=soon", "00:00.00"],
+  ])("opens a shared link %s paused at %s", async (search, clock) => {
+    window.history.replaceState(null, "", `/replays/7001${search}`);
+    render(<ReplayPage apiClient={apiReturning(Promise.resolve(samples))} runId="7001" />);
+
+    expect(await screen.findByRole("slider", { name: "Replay position" })).toHaveAttribute(
+      "aria-valuetext",
+      `${clock} of 00:20.00`,
+    );
+    expect(screen.getByRole("button", { name: "Play" })).toBeVisible();
+  });
+
+  it("shares a link, optionally at the time it opened, and copies it", async () => {
+    HTMLDialogElement.prototype.showModal = vi.fn(function (this: HTMLDialogElement) {
+      this.setAttribute("open", "");
+    });
+    window.history.replaceState(null, "", "/replays/7001?view=cinema");
+    const user = userEvent.setup();
+    render(<ReplayPage apiClient={apiReturning(Promise.resolve(samples))} runId="7001" />);
+    await screen.findByRole("slider", { name: "Replay position" });
+    await user.keyboard("n");
+
+    await user.click(screen.getByRole("button", { name: "Share" }));
+    const dialog = screen.getByRole("dialog", { name: "Share replay" });
+    const field = within(dialog).getByRole("textbox", { name: "Link" });
+    const base = `${window.location.origin}/replays/7001?view=cinema`;
+    expect(field).toHaveValue(base);
+    const startAt = within(dialog).getByRole("checkbox", { name: "Start at 00:06.000" });
+    expect(startAt).not.toBeChecked();
+    await user.click(startAt);
+    expect(field).toHaveValue(`${base}&t=6000`);
+
+    const writeText = vi.spyOn(navigator.clipboard, "writeText");
+    await user.click(within(dialog).getByRole("button", { name: "Copy link" }));
+    expect(writeText).toHaveBeenCalledWith(`${base}&t=6000`);
+    expect(screen.getByRole("status")).toHaveTextContent("Link copied");
+
+    // A refused clipboard leaves the link selected to copy by hand.
+    writeText.mockRejectedValueOnce(new Error("denied"));
+    act(() => field.blur());
+    await user.click(within(dialog).getByRole("button", { name: "Copy link" }));
+    expect(field).toHaveFocus();
+    expect((field as HTMLInputElement).selectionStart).toBe(0);
+    expect((field as HTMLInputElement).selectionEnd).toBe(`${base}&t=6000`.length);
+    act(() => dialog.removeAttribute("open"));
   });
 
   it("plays to the end and stops", async () => {

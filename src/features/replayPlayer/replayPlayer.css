@@ -310,6 +310,28 @@
   color: var(--cjs-color-text-muted);
 }
 
+.cjs-replay-share {
+  --cjs-stack-space: var(--cjs-space-3);
+  align-items: flex-start;
+  margin-block-start: var(--cjs-space-3);
+}
+
+.cjs-replay-share > .cjs-field {
+  align-self: stretch;
+}
+
+.cjs-replay-share > label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--cjs-space-2);
+  min-height: var(--cjs-control-height-sm);
+  cursor: pointer;
+}
+
+.cjs-replay-share > label input {
+  accent-color: var(--cjs-color-accent);
+}
+
 .cjs-replay-player__hud {
   display: flex;
   flex-basis: 100%;
