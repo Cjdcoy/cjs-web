@@ -2533,7 +2533,7 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
 
 ### CJS-077 — Survive a crawling Azure apt mirror in the Playwright install
 
-- **Status:** done
+- **Status:** done (superseded by CJS-078, which removes the install step)
 - **Owner/handoff:** Claude (Fable supervisor, Opus worker) / CI reliability
 - **Dependencies:** CJS-064
 - **Primary boundary:** `.github/workflows/ci.yml`
@@ -2551,6 +2551,26 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   sources fallback rewrites Azure. Without the `pkill`, the first attempt's `apt-get` survived.
 - **Remaining work/risks:** the real runner mirror file and mirror speed are only testable on
   GitHub Actions.
+
+### CJS-078 — Run the browser flows in the Playwright Docker image
+
+- **Status:** done
+- **Owner/handoff:** Claude (Fable supervisor, Opus worker) / CI speed
+- **Dependencies:** CJS-077
+- **Primary boundary:** `.github/workflows/ci.yml`
+- **Goal:** CI no longer installs Playwright's system packages through apt on every run, so a slow
+  Azure apt mirror cannot stall it.
+- **Outcome:** the browser cache and `install --with-deps` steps (with CJS-077's retry) are gone,
+  and the job limit is back to 15 minutes. `Run critical browser flows` runs `npm run test:e2e` in
+  `mcr.microsoft.com/playwright:v<installed @playwright/test version>-noble`, so the browser builds
+  always match the lockfile. The container runs as the runner user with the workspace mounted at
+  the same path, and the runner's Node 26 mounted read-only on `PATH` (the image's Node is older).
+  The job itself stays on the runner, so the `node_modules` and `dist/` caches the deploy workflow
+  restores are unchanged.
+- **Validation:** the workflow parses and passes `prettier --check`. Locally, the exact step
+  command (plus `--memory 6g`) passed all 33 flows, 11 each in Chromium, Firefox and WebKit, in
+  32 s; the cold image pull (3.5 GB) took 16 s. The run left no root-owned files.
+- **Remaining work/risks:** the image pull time on GitHub-hosted runners is only measurable there.
 
 ## Agent handoff template
 
