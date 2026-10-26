@@ -2547,6 +2547,8 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   - A 0.1× playback speed joins the list. View analytics keep the API's 5 `speed_ms` columns and
     count 0.1× in the 0.25× one (a `shortcut:` in `replayViewTracker.ts`). Sound needs no change:
     its cursor carries sub-frame remainders, so slow playback neither drops nor backs up events.
+  - The keys display moves Ctrl and C (owner's layout) to a row under Space, Ctrl below A and C
+    below D (`REPLAY_KEYS` in `replayHudModel.ts`).
 - **Validation:** `npm run verify`. Unit tests cover stepping on and between samples and at both
   ends; component tests cover a v12 replay's buttons and keys pausing playback and moving the
   clock, seek bar, and camera pose by one sample, and a v11 replay showing neither. The transport
