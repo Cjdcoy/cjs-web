@@ -2544,6 +2544,9 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
     seeks to the neighbouring recorded sample, clamped to the first and last sample.
   - The shortcuts dialog lists both keys. Older formats (one sample per 50 ms) hide the buttons,
     ignore the keys, and leave the row out of the dialog.
+  - A 0.1× playback speed joins the list. View analytics keep the API's 5 `speed_ms` columns and
+    count 0.1× in the 0.25× one (a `shortcut:` in `replayViewTracker.ts`). Sound needs no change:
+    its cursor carries sub-frame remainders, so slow playback neither drops nor backs up events.
 - **Validation:** `npm run verify`. Unit tests cover stepping on and between samples and at both
   ends; component tests cover a v12 replay's buttons and keys pausing playback and moving the
   clock, seek bar, and camera pose by one sample, and a v11 replay showing neither. The transport

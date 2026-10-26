@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import type { ReplayMarker, ReplaySkip } from "../../lib/api";
 import { findAutoSkip, recordSkip, skippedLoadCount } from "./replayHudModel";
 
-export const PLAYBACK_SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
+export const PLAYBACK_SPEEDS = [0.1, 0.25, 0.5, 1, 2, 4] as const;
 
 interface PlaybackClock {
   anchorTime: number;

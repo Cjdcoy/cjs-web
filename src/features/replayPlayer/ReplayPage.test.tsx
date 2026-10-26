@@ -405,6 +405,12 @@ describe("ReplayPage", () => {
     await user.keyboard("c");
     expect(freeCamera).toHaveAttribute("aria-pressed", "false");
     act(() => (document.activeElement as HTMLElement | null)?.blur());
+    // 0.1× is the slowest speed ("[[" is user-event's escaped "[").
+    await user.keyboard("[[");
+    expect(screen.getByRole("combobox", { name: "Speed" })).toHaveValue("0.1");
+    expect(screen.getByRole("option", { name: "0.1×" })).toBeInTheDocument();
+    await user.keyboard("[[");
+    expect(screen.getByRole("combobox", { name: "Speed" })).toHaveValue("0.1");
     await user.keyboard("c");
     expect(freeCamera).toHaveAttribute("aria-pressed", "true");
     expect(viewerProps.current?.getFrame?.()?.follow).toBe(false);

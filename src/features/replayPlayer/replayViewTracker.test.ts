@@ -145,6 +145,16 @@ describe("replay view tracker", () => {
     });
   });
 
+  it("counts 0.1× in the 0.25× column of the API's 5 and still records its ranges", () => {
+    let state = recordSegment(view(), 0, 1_000, 10_000, 0.1);
+    state = recordSegment(state, 1_000, 2_000, 4_000, 0.25);
+    expect(takeFlush(state)?.payload).toMatchObject({
+      speed_ms: [14_000, 0, 0, 0, 0],
+      watched: [[0, 2_000]],
+      max_pos_ms: 2_000,
+    });
+  });
+
   it("counts a slider drag as one seek and keeps the 10 largest", () => {
     let state = play(view(), 0, 5_000);
     state = recordSeek(state, 5_000, 6_000, 1_000);
