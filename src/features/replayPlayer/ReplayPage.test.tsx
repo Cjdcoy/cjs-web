@@ -134,7 +134,7 @@ describe("ReplayPage", () => {
     expect(container.querySelector(".cjs-replay-hud__jump-timer")).toHaveTextContent(/^0$/);
     expect(within(hud).getByText("Auto-skip: ON")).toBeInTheDocument();
     expect(viewerProps.current?.viewmodel).toMatchObject({
-      url: "https://models.example.test/maps/viewmodel/luger_mp2.glb",
+      url: "https://models.example.test/maps/viewmodel/luger_mp2_anims.glb",
       visible: false,
     });
 
@@ -384,7 +384,7 @@ describe("ReplayPage", () => {
     expect(viewerProps.current?.getFrame?.()).toEqual({
       follow: true,
       pose: { x: 0, y: 0, z: 60, pitch: 0, yaw: 90 },
-      weapon: expect.objectContaining({ lean: 0, meleeMs: null, raiseMs: null }),
+      weapon: expect.objectContaining({ lean: 0, ads: 0, flash: null }),
     });
 
     await user.keyboard("n");

@@ -19,7 +19,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, IconButton, Select, VisuallyHidden } from "../../components/ui";
 import type { ReplayMarkerKind, ReplaySamples } from "../../lib/api";
-import { getViewmodelUrl } from "../../lib/mapModels";
+import { getViewmodelUrl, modelAssetUrl } from "../../lib/mapModels";
 import { useBrowserLocation } from "../../lib/routing";
 import { MapViewer, type CodPose, type ViewerFrame, type ViewmodelOptions } from "../mapViewer";
 import {
@@ -41,13 +41,13 @@ import {
 } from "./replayHudModel";
 import {
   addLean,
+  adsAt,
   createTimeline,
   eyeHeight,
   findMarker,
   findSampleIndex,
   formatReplayClock,
   leanAt,
-  meleeElapsed,
   pathSegments,
   sampleMotion,
   samplePose,
@@ -55,7 +55,7 @@ import {
   type ReplayTimeline,
 } from "./replayPlayback";
 import { readReplayStartOffset } from "./replayShare";
-import { createWeaponTrack, weaponAt } from "./replayWeapon";
+import { createWeaponTrack, muzzleFlash, viewmodelAnims, weaponAt } from "./replayWeapon";
 import { ShareDialog } from "./ShareDialog";
 import { ShortcutsDialog } from "./ShortcutsDialog";
 import { ReplayHeatStrip } from "./ReplayWebViews";
@@ -115,12 +115,15 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
       viewmodelUrl
         ? {
             url: viewmodelUrl,
+            flashUrl: modelAssetUrl("fx/exp_fireball_atlas.webp") ?? "",
             visible: preferences.viewmodel && !viewmodelMissing && !holstered,
             onUnavailable: () => setViewmodelMissing(true),
           }
         : undefined,
     [holstered, preferences.viewmodel, viewmodelMissing, viewmodelUrl],
   );
+  // CG_DrawCrosshair hides it at fWeaponPosFrac 1 while the gun is drawn (mac:347079).
+  const aimed = viewmodel?.visible === true && adsAt(timeline, time).frac === 1;
   const heat = useReplayHeat(samples.run_id);
   const heatReady = heat.data?.view_count.some((count) => count > 0) === true;
   const available = useMemo(
@@ -174,7 +177,8 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     const time = getTime();
     const lean = leanAt(timeline, time);
     const eye = samplePose(timeline, time);
-    const gun = weaponAt(weaponTrack, time, eye.pitch);
+    const ads = adsAt(timeline, time);
+    const gun = weaponAt(weaponTrack, time, eye.pitch, ads.frac);
     const pose = addLean({ ...eye, z: eye.z + gun.dip }, lean);
     // CG_CalcViewValues keeps the eye at least 8 units above the feet (mac:349292-349294).
     const feet = eye.z - eyeHeight(timeline, time);
@@ -183,10 +187,11 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
       follow: followRef.current,
       weapon: {
         lean,
-        meleeMs: meleeElapsed(timeline, time),
-        raiseMs: gun.raiseMs,
+        ads: ads.frac,
         offset: gun.offset,
         angles: gun.angles,
+        anims: viewmodelAnims(timeline, time, ads),
+        flash: muzzleFlash(timeline, time),
       },
     };
   }, [getTime, timeline, weaponTrack]);
@@ -379,7 +384,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     >
       <MapViewer
         brightness={preferences.brightness}
-        crosshair={preferences.crosshair}
+        crosshair={preferences.crosshair && !aimed}
         getFrame={getFrame}
         mapName={samples.mapname}
         modelUrl={modelUrl}

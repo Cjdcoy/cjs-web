@@ -77,21 +77,48 @@ export interface ReplayTimeline {
   stanceStart: Int32Array;
   /** PM_UpdateLean's leanf at each sample's time, see leanAt. */
   lean: Float64Array;
-  /** Start times (ms) of melee swings, ascending, see meleeElapsed. */
+  /** Start times (ms) of melee swings, ascending. */
   meleeStarts: number[];
+  /** Weapon raise (pullout) start times, ascending. */
+  raises: number[];
+  /** fWeaponPosFrac (0 hip to 1 aimed down sights) at each sample's time, see adsAt. */
+  ads: Float64Array;
+  /** ads_up's share of the ADS anim pair at each sample's time (ads_down has the rest). */
+  adsUp: Float64Array;
+  /** How fWeaponPosFrac moves after each sample: AIM_OUT, AIM_IN or AIM_NONE. */
+  aim: Uint8Array;
+  /** Shot times (ms), ascending, and fWeaponPosFrac at each. */
+  fireStarts: number[];
+  fireFrac: number[];
 }
 
 /** Recorder input_mask bits (_replay_record.gsc build_input_mask). */
+const INPUT_ATTACK = 1;
 const INPUT_MELEE = 16;
+const INPUT_MOVE = 32 | 64 | 128 | 256;
+const INPUT_ADS = 1024;
 const INPUT_LEAN_LEFT = 2048;
 const INPUT_LEAN_RIGHT = 4096;
 const INPUT_IN_AIR = 32768;
+/** Recorder aux bits 1 (ladder) and 8 (mantle): the weapon is put away. */
+const AUX_CLIMBING = 1 | 8;
 /**
  * meleeTime of the viewer's weapon, luger_mp2 (zzz weapons/mp/luger_mp2: 0.7 s), which PM_Weapon
  * (CoD2 1.3 mac:149005) sets as weaponTime on the press. PM_Weapon_CheckForMelee ignores a
  * press while a swing runs and needs a release first (PMF_MELEE).
  */
 const MELEE_TIME_MS = 700;
+/** luger_mp2's fireTime, raiseTime, adsTransInTime and adsTransOutTime (semiAuto 1, fireDelay 0). */
+const FIRE_TIME_MS = 135;
+const RAISE_TIME_MS = 250;
+const ADS_IN_MS = 250;
+const ADS_OUT_MS = 400;
+/** CG_PlayADSAnim's goal time (mac:353097-353113): ads_up and ads_down cross-fade over 0.5 s. */
+const ADS_BLEND_MS = 500;
+/** aim values: lerp out, lerp in (PMF_ADS), or no weapon that can aim (fWeaponPosFrac 0). */
+export const AIM_OUT = 0;
+export const AIM_IN = 1;
+export const AIM_NONE = 2;
 
 export function createTimeline(samples: ReplaySamples): ReplayTimeline {
   const { pos, t, vel } = samples;
@@ -138,6 +165,8 @@ export function createTimeline(samples: ReplaySamples): ReplayTimeline {
     );
   }
 
+  const melee = meleeStarts(samples);
+  const raises = weaponRaises(samples);
   return {
     samples,
     start: t[0] ?? 0,
@@ -146,7 +175,130 @@ export function createTimeline(samples: ReplaySamples): ReplayTimeline {
     stance,
     stanceStart,
     lean,
-    meleeStarts: meleeStarts(samples),
+    meleeStarts: melee,
+    raises,
+    ...weaponStates(samples, stance, raises, melee),
+  };
+}
+
+/**
+ * PM_FinishWeaponChange starts WEAP_RAISE for a new weapon after a putaway or none (ladder,
+ * mantle). ponytail: from the grenade slot is skipped; an offhand end is a quickRaise (10 ms).
+ */
+function weaponRaises(samples: ReplaySamples): number[] {
+  const raises: number[] = [];
+  const { aux, t } = samples;
+  if (!aux) return raises;
+  for (let index = 1; index < t.length; index += 1) {
+    const from = (aux[index - 1] >> 1) & 3;
+    const into = (aux[index] >> 1) & 3;
+    if (into !== from && into <= 1 && from !== 2) raises.push(t[index]);
+  }
+  return raises;
+}
+
+/**
+ * PM_Weapon for luger_mp2, one pmove frame per sample (CoD2rev bg_weapons.cpp PM_Weapon and
+ * PM_Weapon_WeaponTimeAdjust; mac:148281). weaponTime counts down; a raise sets raiseTime, a melee
+ * meleeTime, a shot fireTime. semiAuto: weaponTime running out with attack held stays at 1 until
+ * a release, so every shot needs a press after fireTime is over. A shot needs weaponTime 0, attack
+ * held and a weapon out (no offhand, none, ladder or mantle). PM_UpdateAimDownSightFlag
+ * (mac:149727) sets PMF_ADS for the ADS button unless the weapon is raising or meleeing
+ * (PM_IsAdsAllowed) or a prone player keeps it held while moving; ground or air does not matter.
+ * PM_UpdateAimDownSightLerp (mac:147981) then moves fWeaponPosFrac by msec / adsTransInTime
+ * toward 1, or msec / adsTransOutTime toward 0; a weapon without aimDownSight (none, the offhand
+ * grenade) sets it to 0.
+ * shortcut: ammo is not recorded, so the clip never empties (no lastShotAnim, no reloads); needs
+ * recorded ammo to upgrade.
+ */
+function weaponStates(
+  samples: ReplaySamples,
+  stance: Uint8Array,
+  raises: readonly number[],
+  melees: readonly number[],
+): Pick<ReplayTimeline, "ads" | "adsUp" | "aim" | "fireStarts" | "fireFrac"> {
+  const { aux, input, t } = samples;
+  const count = t.length;
+  const ads = new Float64Array(count);
+  const adsUp = new Float64Array(count);
+  const aim = new Uint8Array(count);
+  const fireStarts: number[] = [];
+  const fireFrac: number[] = [];
+  let weaponTime = 0;
+  let state: "ready" | "raise" | "melee" = "ready";
+  let raise = 0;
+  let melee = 0;
+  for (let index = 0; index < count; index += 1) {
+    const msec = index > 0 ? Math.max(0, t[index] - t[index - 1]) : 0;
+    if (index > 0) {
+      ads[index] = aimStep(ads[index - 1], msec, aim[index - 1]);
+      adsUp[index] = blendStep(adsUp[index - 1], msec, aim[index - 1]);
+    }
+    const buttons = input?.[index] ?? 0;
+    const held = (buttons & INPUT_ATTACK) !== 0;
+    if (weaponTime > 0) {
+      weaponTime -= msec;
+      if (weaponTime <= 0) {
+        weaponTime = held ? 1 : 0;
+        // The held lock ends a melee (READY) but keeps WEAPON_RAISING until the release.
+        if (held && state === "melee") state = "ready";
+      }
+      if (weaponTime === 0) state = "ready";
+    }
+    if (raise < raises.length && raises[raise] <= t[index]) {
+      raise += 1;
+      weaponTime = RAISE_TIME_MS;
+      state = "raise";
+    }
+    if (melee < melees.length && melees[melee] <= t[index]) {
+      melee += 1;
+      weaponTime = MELEE_TIME_MS;
+      state = "melee";
+    }
+    const weapon = aux?.[index] ?? 0;
+    const armed = ((weapon >> 1) & 3) <= 1 && (weapon & AUX_CLIMBING) === 0;
+    if (weaponTime === 0 && held && armed) {
+      weaponTime = FIRE_TIME_MS;
+      fireStarts.push(t[index]);
+      fireFrac.push(ads[index]);
+    }
+    const proneMoving =
+      stance[index] === 2 &&
+      ((input?.[index - 1] ?? 0) & INPUT_ADS) !== 0 &&
+      (buttons & INPUT_MOVE) !== 0;
+    const aiming = (buttons & INPUT_ADS) !== 0 && state === "ready" && !proneMoving;
+    aim[index] = !armed ? AIM_NONE : aiming ? AIM_IN : AIM_OUT;
+  }
+  return { ads, adsUp, aim, fireStarts, fireFrac };
+}
+
+function aimStep(frac: number, msec: number, aim: number): number {
+  if (aim === AIM_NONE) return 0;
+  return aim === AIM_IN
+    ? Math.min(1, frac + msec / ADS_IN_MS)
+    : Math.max(0, frac - msec / ADS_OUT_MS);
+}
+
+/**
+ * The ADS anim pair's weights: XAnimSetGoalWeight eases the requested one to 1 over the goal time.
+ * shortcut: the outgoing one falls at the same 2/s; XAnim fades it over 0.5 s from its weight at the
+ * switch, which differs only when ADS reverses mid-blend.
+ */
+function blendStep(up: number, msec: number, aim: number): number {
+  return aim === AIM_IN
+    ? Math.min(1, up + msec / ADS_BLEND_MS)
+    : Math.max(0, up - msec / ADS_BLEND_MS);
+}
+
+/** fWeaponPosFrac and ads_up's weight at `time`, stepped from the sample at or before it. */
+export function adsAt(timeline: ReplayTimeline, time: number): { frac: number; up: number } {
+  const index = findSampleIndex(timeline.samples.t, time);
+  if (index < 0) return { frac: 0, up: 0 };
+  const msec = Math.max(0, time - timeline.samples.t[index]);
+  const aim = timeline.aim[index];
+  return {
+    frac: aimStep(timeline.ads[index], msec, aim),
+    up: blendStep(timeline.adsUp[index], msec, aim),
   };
 }
 
@@ -220,13 +372,6 @@ function meleeStarts(samples: ReplaySamples): number[] {
     held = pressed;
   }
   return starts;
-}
-
-/** Milliseconds since the latest melee swing started at or before `time`, or null. */
-export function meleeElapsed(timeline: ReplayTimeline, time: number): number | null {
-  const starts = timeline.meleeStarts;
-  const index = findSampleIndex(starts, time);
-  return index < 0 || starts[index] > time ? null : time - starts[index];
 }
 
 /**

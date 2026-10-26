@@ -120,7 +120,14 @@ export function useReplaySound({
       const name = surfaceName(manifest, flags);
       if (name) names.add(name);
     }
-    const tables = ["gearRattleRun", "gearRattleWalk", "ladder", "raise.0", "raiseSecondary.0"];
+    const tables = [
+      "gearRattleRun",
+      "gearRattleWalk",
+      "ladder",
+      "raise.0",
+      "raiseSecondary.0",
+      "fire",
+    ];
     for (const name of names)
       tables.push(`footstep.${name}`, `footstepWalk.${name}`, `land.${name}`);
     for (const table of tables) {

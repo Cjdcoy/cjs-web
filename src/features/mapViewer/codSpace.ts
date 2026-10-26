@@ -24,14 +24,31 @@ export interface ViewerFrame {
 export interface WeaponMotion {
   /** CoD2 playerState leanf: -0.5 (full left) to 0.5 (full right), ±0.25 prone. */
   lean: number;
-  /** Milliseconds since the current melee swing started, or null. */
-  meleeMs: number | null;
-  /** Milliseconds since the weapon raise (pullout) started, or null. */
-  raiseMs?: number | null;
+  /** fWeaponPosFrac: 0 at the hip to 1 aimed down the sights. */
+  ads?: number;
   /** Gun offset from the eye along the view's forward, left and up axes, CoD units. */
   offset?: readonly [number, number, number];
   /** Gun pitch (down), yaw (left) and roll relative to the view, degrees, before the lean roll. */
   angles?: readonly [number, number, number];
+  /** The viewmodel's animation clips to pose; clips left out get weight 0. */
+  anims?: readonly ViewmodelAnim[];
+  /** The muzzle flash on the viewmodel's tag_flash, or null. */
+  flash?: ViewmodelFlash | null;
+}
+
+/** A muzzle flash at one moment, in tag_flash's axes (x along the barrel) and CoD units. */
+export interface ViewmodelFlash {
+  /** Additive camera-facing sprites: atlas frame, radius, roll in degrees, grey colour level. */
+  sprites: readonly { frame: number; radius: number; roll: number; color: number }[];
+  /** A point light `offset` units down the barrel, with its radius and RGB colour. */
+  light: { offset: number; radius: number; color: readonly [number, number, number] };
+}
+
+/** One clip of the viewmodel GLB at a time (seconds into the clip) and blend weight. */
+export interface ViewmodelAnim {
+  clip: string;
+  time: number;
+  weight: number;
 }
 
 /** GetLeanFraction (q_shared): eases leanf, (2 - |f|) * f. */

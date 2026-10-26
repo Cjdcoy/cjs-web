@@ -2531,6 +2531,44 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   the breakdowns are not consumed; only `heat`, the aggregate, rankings, and view counts are.
   Turn the flag on only after the backend is deployed with writes enabled.
 
+### CJS-075 — Replay weapon fire and aim down sights
+
+- **Status:** done (needs the new viewmodel asset on the model host before merge)
+- **Owner/handoff:** Claude / replay weapon fire worker
+- **Dependencies:** CJS-070, the 3D replay viewer, the model host assets
+  `viewmodel/luger_mp2_anims.glb`, `fx/exp_fireball_atlas.webp` and the `weapon.luger_mp2.fire`
+  entry in `sounds/sounds.json` (built in `model-src/viewmodel-anims`)
+- **Primary boundary:** `src/features/replayPlayer` (`replayPlayback.ts` weapon states and
+  `adsAt`, `replayWeapon.ts` ADS motion, gun kick, anim tree and muzzle flash, `replaySound.ts`
+  shot sounds, `ReplayPlayer.tsx`), `src/features/mapViewer` (`codSpace.ts`, `viewmodelMotion.ts`,
+  `MapViewerCanvas.tsx` mixer and flash), `src/lib/mapModels.ts`
+- **Outcome:**
+  - The recorded attack and ADS buttons drive CoD2 1.3's luger_mp2 rules as pure functions of
+    replay time, so seeks, frame steps and speed changes show the same state: semi-auto shots
+    (one per press, fireTime 135 ms, blocked while raising, meleeing or without a weapon),
+    fWeaponPosFrac (250 ms in, 400 ms out, not while raising or meleeing, dropped without a
+    weapon), the gun kick, the ADS fade of the move offset and angles, ADS sway values, the lean
+    shift, and no crosshair at full ADS.
+  - The skinned viewmodel plays the real xanims through an AnimationMixer posed at a zero time
+    step: fire or fire_ads per shot, melee1, pullout, idle, and the ads_up/ads_down pair
+    (CG_WeaponRunXModelAnims, CG_PlayADSAnim). The rigid melee/raise key tables are gone.
+  - pistolflash_view's sprites and light draw on tag_flash for 100 ms per shot; each shot plays
+    the luger fire sound under the existing sound rules.
+  - Not drawn: the camera view kick (the recorded usercmd angles already carry it), an ADS FOV
+    change (adsZoomFov equals cg_fov 80), the world-space smoke puff, shell ejects, lastfire and
+    reloads (ammo is not recorded), and the hip idle sway and bob (the viewer draws neither).
+- **Validation:** `npm run verify`. Unit tests cover shot gating (press vs hold, fireTime, the
+  expiry-frame lock, raise, melee, no weapon), fWeaponPosFrac by hand-computed frames, the prone
+  rule, the gun kick integrator, ADS move and sway, the anim tree times and weights, the flash, and
+  shot sounds across a teleport and without flags. Checked in Chrome against mp_toujane with a
+  mocked replay. Total JavaScript budget raised from 161 to 163 KiB (162.3 KiB) and the map viewer
+  chunk from 170 to 173 KiB (172.8 KiB).
+- **Remaining work/risks:** upload `viewmodel/luger_mp2_anims.glb`, `fx/exp_fireball_atlas.webp`,
+  the updated `sounds/sounds.json` and its fire WAV to the model host before merging; without the
+  GLB the weapon toggle turns itself off (no fallback to the rigid `viewmodel/luger_mp2.glb`, which
+  stays for deployed builds). The kick and flash randomness is a per-shot hash, the ADS anim
+  pair's outgoing weight falls at a fixed 2/s, and the flash light rides the tag.
+
 ### CJS-074 — Replay frame step
 
 - **Status:** done

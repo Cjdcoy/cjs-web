@@ -1,8 +1,10 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import {
+  AnimationMixer,
   Box3,
   BufferGeometry,
   Color,
+  CustomBlending,
   DirectionalLight,
   DoubleSide,
   Euler,
@@ -14,14 +16,21 @@ import {
   Mesh,
   MeshBasicMaterial,
   MeshLambertMaterial,
+  OneFactor,
   PerspectiveCamera,
+  PointLight,
   Quaternion,
   Raycaster,
   Scene,
   SphereGeometry,
+  Sprite,
+  SpriteMaterial,
+  SRGBColorSpace,
   Texture,
+  TextureLoader,
   Vector3,
   WebGLRenderer,
+  type AnimationAction,
   type Material,
   type Object3D,
 } from "three";
@@ -90,6 +99,8 @@ export interface CollisionProbe {
 
 export interface ViewmodelOptions {
   url: string;
+  /** The muzzle flash sprites' 4 × 4 atlas (fx/exp_fireball_atlas). */
+  flashUrl: string;
   visible: boolean;
   /** Called once when the model cannot be loaded. */
   onUnavailable: () => void;
@@ -279,18 +290,57 @@ export default function MapViewerCanvas({
     weapon.add(weaponMotion);
     weaponScene.add(weapon);
     let weaponState: "idle" | "loading" | "ready" | "failed" = "idle";
+    // The viewmodel's xanim clips, posed each frame from the frame's anims (time and weight).
+    let weaponMixer: AnimationMixer | null = null;
+    const weaponActions = new Map<string, AnimationAction>();
+    // The frame's muzzle flash, moved onto tag_flash once the model loads. The light is there from
+    // the start, so lighting it never recompiles the gun's shaders.
+    const flashSprites = Array.from({ length: 4 }, () => {
+      const sprite = new Sprite(
+        // effect_add: ONE + ONE, with the colour already faded by alpha.
+        new SpriteMaterial({
+          blending: CustomBlending,
+          blendSrc: OneFactor,
+          blendDst: OneFactor,
+          depthWrite: false,
+          transparent: true,
+        }),
+      );
+      sprite.visible = false;
+      return sprite;
+    });
+    // decay 0: a light bounded by its radius, like the game's dynamic lights.
+    // shortcut: it rides tag_flash, while the game leaves it where it spawned for its 100 ms life.
+    const flashLight = new PointLight(0xffffff, 0, 0, 0);
+    weaponScene.add(flashLight, ...flashSprites);
+    let flashAtlas: Texture | null = null;
+    const flashFrames = new Map<number, Texture>();
+    const flashFrame = (atlas: Texture, frame: number) => {
+      let texture = flashFrames.get(frame);
+      if (!texture) {
+        // Frames run left to right from the top row; three.js puts v = 0 at the bottom.
+        texture = atlas.clone();
+        texture.repeat.set(0.25, 0.25);
+        texture.offset.set((frame % 4) / 4, 0.75 - Math.floor(frame / 4) / 4);
+        flashFrames.set(frame, texture);
+      }
+      return texture;
+    };
     renderer.autoClear = false;
 
-    const loadWeapon = async (url: string) => {
+    const loadWeapon = async ({ flashUrl, url }: ViewmodelOptions) => {
       weaponState = "loading";
+      const atlas = new TextureLoader().loadAsync(flashUrl).catch(() => null);
       try {
         const data = await fetchModel(url, controller.signal, () => undefined);
         const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
         const gltf = await loader.parseAsync(data, "");
         const weaponSurfaces = createSurfaceMaterials(await loadSurfaceLighting(gltf));
+        const loadedAtlas = await atlas;
         if (controller.signal.aborted) {
           disposeObject(gltf.scene);
           weaponSurfaces.dispose();
+          loadedAtlas?.dispose();
           return;
         }
         surfaces.push(weaponSurfaces);
@@ -300,6 +350,13 @@ export default function MapViewerCanvas({
           mesh.material = weaponSurfaces.material(object as Mesh);
         });
         weaponMotion.add(gltf.scene);
+        weaponMixer = new AnimationMixer(gltf.scene);
+        for (const clip of gltf.animations) {
+          weaponActions.set(clip.name, weaponMixer.clipAction(clip).play());
+        }
+        gltf.scene.getObjectByName("tag_flash")?.add(flashLight, ...flashSprites);
+        flashAtlas = loadedAtlas;
+        if (flashAtlas) flashAtlas.colorSpace = SRGBColorSpace;
         weaponScene.updateMatrixWorld(true);
         weaponState = "ready";
       } catch {
@@ -396,6 +453,7 @@ export default function MapViewerCanvas({
     let drawnWeapon = false;
     const drawnWeaponPosition = new Vector3();
     const drawnWeaponQuaternion = new Quaternion();
+    let drawnPoseKey = "";
     needsRenderRef.current = true;
     // What the free-camera readout last showed; it is rewritten at most every 100 ms on a change.
     const shownPosition = new Vector3(Number.NaN, 0, 0);
@@ -473,10 +531,15 @@ export default function MapViewerCanvas({
         updateReadout(now);
       }
       const weaponOptions = frame && !isFree ? viewmodelRef.current : undefined;
-      if (weaponOptions?.visible && weaponState === "idle") void loadWeapon(weaponOptions.url);
+      if (weaponOptions?.visible && weaponState === "idle") void loadWeapon(weaponOptions);
       // The weapon lives in camera space: whether it is drawn and its swing/lean offset are its state.
       const drawWeapon = Boolean(weaponOptions?.visible) && weaponState === "ready";
       viewmodelMotion(frame?.weapon, weaponMotion.position, weaponMotion.quaternion);
+      const anims = drawWeapon ? (frame?.weapon?.anims ?? []) : [];
+      const flash = drawWeapon ? frame?.weapon?.flash : null;
+      const poseKey =
+        anims.map((anim) => `${anim.clip}@${anim.time}*${anim.weight}`).join() +
+        (flash ? JSON.stringify(flash) : "");
       if (
         !needsRenderRef.current &&
         drawnPosition.equals(camera.position) &&
@@ -484,6 +547,7 @@ export default function MapViewerCanvas({
         drawnMarker.equals(marker.position) &&
         drawnRunner === runner.visible &&
         drawnWeapon === drawWeapon &&
+        drawnPoseKey === poseKey &&
         (!drawWeapon ||
           (drawnWeaponPosition.equals(weaponMotion.position) &&
             drawnWeaponQuaternion.equals(weaponMotion.quaternion)))
@@ -498,6 +562,38 @@ export default function MapViewerCanvas({
       drawnWeapon = drawWeapon;
       drawnWeaponPosition.copy(weaponMotion.position);
       drawnWeaponQuaternion.copy(weaponMotion.quaternion);
+      drawnPoseKey = poseKey;
+      if (drawWeapon && weaponMixer) {
+        // Set every clip's time and weight, then evaluate with no time step: a pure pose.
+        for (const [clip, action] of weaponActions) {
+          const anim = anims.find((entry) => entry.clip === clip);
+          action.time = anim?.time ?? 0;
+          action.weight = anim?.weight ?? 0;
+        }
+        weaponMixer.update(0);
+      }
+      flashSprites.forEach((sprite, index) => {
+        const spec = flash?.sprites[index];
+        sprite.visible = Boolean(spec && flashAtlas);
+        if (!spec || !flashAtlas) return;
+        const { material } = sprite;
+        const map = flashFrame(flashAtlas, spec.frame);
+        if (material.map !== map) {
+          material.map = map;
+          material.needsUpdate = true;
+        }
+        material.rotation = (spec.roll * Math.PI) / 180;
+        // Colour × alpha in display values, as the game blends.
+        material.color.setRGB(spec.color, spec.color, spec.color, SRGBColorSpace);
+        sprite.scale.setScalar(2 * spec.radius * METRES_PER_COD_UNIT);
+      });
+      // Unit irradiance at the light: Lambert divides by π.
+      flashLight.intensity = flash ? Math.PI : 0;
+      if (flash) {
+        flashLight.color.setRGB(...flash.light.color);
+        flashLight.distance = flash.light.radius * METRES_PER_COD_UNIT;
+        flashLight.position.set(flash.light.offset * METRES_PER_COD_UNIT, 0, 0);
+      }
       renderer.clear();
       renderer.render(scene, camera);
       if (drawWeapon) {
@@ -591,7 +687,11 @@ export default function MapViewerCanvas({
       controls.dispose();
       onCollisionRef.current?.(null);
       disposeObject(scene);
+      weaponMixer?.stopAllAction();
+      weaponMixer?.uncacheRoot(weaponMixer.getRoot());
       disposeObject(weaponScene);
+      flashFrames.forEach((texture) => texture.dispose());
+      flashAtlas?.dispose();
       materials.dispose();
       surfaces.forEach((entry) => entry.dispose());
       if (scene.background instanceof Texture) scene.background.dispose();
