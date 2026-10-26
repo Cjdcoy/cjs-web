@@ -162,7 +162,7 @@ test("J4L lifetime activity leads the overview and keeps metric values below lab
 
   await page
     .getByRole("navigation", { name: "Player profile sections" })
-    .getByRole("link", { name: "Events" })
+    .getByRole("link", { name: "Weekly Cup" })
     .click();
   await expect(page.getByRole("table", { name: "Season placements" })).toBeVisible();
   await expect(page.getByRole("table", { name: "Weeks" })).toBeVisible();

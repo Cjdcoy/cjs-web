@@ -492,7 +492,7 @@ function ProfileNavigation({
     { label: "Best runs", value: "runs" },
     { label: "Run analytics", value: "progress" },
     { label: "Route completion", value: "routes" },
-    ...(source === "j4l" ? [{ label: "Events", value: "events" } as const] : []),
+    ...(source === "j4l" ? [{ label: "Weekly Cup", value: "events" } as const] : []),
   ];
   const navRef = useRef<HTMLElement>(null);
 
@@ -1597,25 +1597,25 @@ function WeeklyEventsSection({
     <ProfileSection
       actions={
         <Link href={J4L_EVENTS_URL} target="_blank" rel="noreferrer" variant="standalone">
-          All events
+          All Weekly Cup results
           <ExternalLink aria-hidden="true" size={14} />
           <VisuallyHidden> (opens in a new tab)</VisuallyHidden>
         </Link>
       }
       className="cjs-player-profile__section--events"
-      description="Season placements and finished weeks of the Jump4Life weekly events."
+      description="Season placements and finished weeks of the Jump4Life Weekly Cup."
       icon={<Trophy size={19} />}
       id="player-events"
-      title="Weekly events"
+      title="Weekly Cup"
     >
       {resource.status === "unsupported" ? (
         // 503: the J4L weekly-event tables are not migrated yet.
         <EmptyState
-          description="Results appear here once Jump4Life weekly events go live."
-          title="Weekly events are not available yet"
+          description="Results appear here once the Jump4Life Weekly Cup goes live."
+          title="The Weekly Cup is not available yet"
         />
       ) : (
-        <ResourceState resource={resource} label="weekly events" onRetry={onRetry}>
+        <ResourceState resource={resource} label="Weekly Cup results" onRetry={onRetry}>
           {(events) =>
             events.weeks.length || events.seasons.length ? (
               <div className="cjs-player-profile__table-stack">
@@ -1638,8 +1638,8 @@ function WeeklyEventsSection({
               </div>
             ) : (
               <EmptyState
-                description="This player has not placed in a finished weekly event yet. Results appear once a week closes."
-                title="No weekly events yet"
+                description="This player has not placed in a finished Weekly Cup week yet. Results appear once a week closes."
+                title="No Weekly Cup results yet"
               />
             )
           }

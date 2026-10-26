@@ -195,7 +195,7 @@ describe("PlayerDetailPage", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "RunnerOne" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Overview" })).toHaveAttribute("aria-current", "page");
-    expect(screen.queryByRole("link", { name: "Events" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "Weekly Cup" })).not.toBeInTheDocument();
     expect(apiClient.playerRank).not.toHaveBeenCalled();
     expect(apiClient.playerActivitySummary).not.toHaveBeenCalled();
     expect(apiClient.playerEvents).not.toHaveBeenCalled();
@@ -203,7 +203,7 @@ describe("PlayerDetailPage", () => {
     expect(apiClient.replayWatchAggregate).not.toHaveBeenCalled();
     expect(apiClient.replayWatchRankings).not.toHaveBeenCalled();
     expect(screen.queryByRole("heading", { name: "Time on Jump4Life" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Weekly events" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Weekly Cup" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Skins" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("Player highlights")).not.toHaveTextContent("Jump4Life rank");
     expect(screen.getByRole("link", { name: "Find this player in Jump4Life" })).toHaveAttribute(
@@ -230,9 +230,9 @@ describe("PlayerDetailPage", () => {
 
     expect(await screen.findByRole("heading", { level: 1, name: "RunnerOne" })).toBeInTheDocument();
     expect(apiClient.playerPerformance).not.toHaveBeenCalled();
-    const tab = await screen.findByRole("link", { name: "Events" });
+    const tab = await screen.findByRole("link", { name: "Weekly Cup" });
     expect(tab).toHaveAttribute("aria-current", "page");
-    const section = await screen.findByRole("region", { name: "Weekly events" });
+    const section = await screen.findByRole("region", { name: "Weekly Cup" });
     expect(apiClient.playerEvents).toHaveBeenCalledWith(
       expect.objectContaining({ playerId: 42, source: "j4l" }),
     );
@@ -244,7 +244,7 @@ describe("PlayerDetailPage", () => {
     const weekTable = within(section).getByRole("table", { name: "Weeks" });
     expect(within(weekTable).getAllByRole("row")).toHaveLength(14);
     expect(weekTable).toHaveTextContent("Week 3 · Season 1125#1 of 144315");
-    expect(within(section).getByRole("link", { name: /All events/ })).toHaveAttribute(
+    expect(within(section).getByRole("link", { name: /All Weekly Cup results/ })).toHaveAttribute(
       "href",
       "https://jump4life.org/events",
     );
@@ -269,9 +269,9 @@ describe("PlayerDetailPage", () => {
     renderProfile(apiClient);
 
     const skins = await screen.findByRole("region", { name: "Skins" });
-    expect(screen.getByRole("link", { name: "Events" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Weekly Cup" })).toBeInTheDocument();
     expect(apiClient.playerEvents).not.toHaveBeenCalled();
-    expect(screen.queryByRole("heading", { name: "Weekly events" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Weekly Cup" })).not.toBeInTheDocument();
     expect(
       within(skins)
         .getAllByRole("table")
@@ -316,7 +316,7 @@ describe("PlayerDetailPage", () => {
     renderProfile(apiClient);
 
     expect(
-      await screen.findByRole("heading", { name: "Weekly events are not available yet" }),
+      await screen.findByRole("heading", { name: "The Weekly Cup is not available yet" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Profile unavailable" })).not.toBeInTheDocument();
@@ -341,7 +341,7 @@ describe("PlayerDetailPage", () => {
     renderProfile(apiClient);
 
     expect(
-      await screen.findByRole("heading", { name: "No weekly events yet" }),
+      await screen.findByRole("heading", { name: "No Weekly Cup results yet" }),
     ).toBeInTheDocument();
     expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
   });

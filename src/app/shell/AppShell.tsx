@@ -156,7 +156,7 @@ export function AppShell({ children, route }: { children: ReactNode; route: Rout
               <VisuallyHidden> (opens in a new tab)</VisuallyHidden>
             </a>
             <a href="https://jump4life.org/events" target="_blank" rel="noreferrer">
-              Events
+              Weekly Cup
               <VisuallyHidden> (opens in a new tab)</VisuallyHidden>
             </a>
           </nav>
