@@ -597,13 +597,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
       </MapViewer>
 
       <ShortcutsDialog frameStep={frameStep} ref={shortcutsRef} />
-      <ShareDialog
-        announce={setAnnouncement}
-        offsetMs={shareOffset}
-        ref={shareRef}
-        runId={samples.run_id}
-        search={search}
-      />
+      <ShareDialog offsetMs={shareOffset} ref={shareRef} runId={samples.run_id} search={search} />
 
       <VisuallyHidden role="status" aria-live="polite">
         {announcement}

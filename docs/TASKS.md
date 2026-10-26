@@ -2564,16 +2564,16 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
     every format. Other query parameters are kept.
   - A Share button in the options row opens a native dialog styled like the shortcuts one: the
     link in a read-only field, a "Start at mm:ss.mmm" checkbox (unchecked on every open, time
-    captured on open), and Copy link. Copying uses the clipboard and announces "Link copied"; if
-    the clipboard is missing or refuses, the link is selected to copy by hand.
+    captured on open), and Copy link. Copying uses the clipboard and announces "Link copied" from
+    a status region inside the dialog (the modal makes the player's own live region inert),
+    cleared on close; if the clipboard is missing or refuses, the link is selected to copy by hand.
   - A shared start counts as a seek, so auto-skip does not jump off the moment on Play.
 - **Validation:** `npm run verify`. Unit tests cover parsing and building `t`. Component tests
   cover opening paused at `t` (valid, past the end, negative, non-numeric), the checkbox changing
-  the link, and copy success and failure. Chromium at 390 and 1440 px: no row overflow or page
-  scroll; Esc closes the dialog and focus returns to Share; it opens inside full screen. Total
-  JavaScript budget raised narrowly from 161 to 161.5 KiB (161.4 KiB with CJS-074 and this).
-- **Remaining work/risks:** while the modal dialog is open, the player's live region outside it is
-  inert and left out of the accessibility tree, so "Link copied" may not be read by screen readers.
+  the link, copy success and failure, and the reset on close. Chromium at 390 and 1440 px: no row
+  overflow or page scroll; Esc closes the dialog and focus returns to Share; it opens inside full
+  screen. Total JavaScript budget raised narrowly from 161 to 161.5 KiB (161.4 KiB with CJS-074
+  and this).
 
 ## Agent handoff template
 

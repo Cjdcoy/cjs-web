@@ -538,7 +538,8 @@ describe("ReplayPage", () => {
     const writeText = vi.spyOn(navigator.clipboard, "writeText");
     await user.click(within(dialog).getByRole("button", { name: "Copy link" }));
     expect(writeText).toHaveBeenCalledWith(`${base}&t=6000`);
-    expect(screen.getByRole("status")).toHaveTextContent("Link copied");
+    // The modal makes the player's live region inert, so the dialog announces it itself.
+    expect(within(dialog).getByRole("status")).toHaveTextContent("Link copied");
 
     // A refused clipboard leaves the link selected to copy by hand.
     writeText.mockRejectedValueOnce(new Error("denied"));
@@ -547,7 +548,14 @@ describe("ReplayPage", () => {
     expect(field).toHaveFocus();
     expect((field as HTMLInputElement).selectionStart).toBe(0);
     expect((field as HTMLInputElement).selectionEnd).toBe(`${base}&t=6000`.length);
-    act(() => dialog.removeAttribute("open"));
+
+    // Closing resets the checkbox and clears the status, so a later copy announces again.
+    act(() => {
+      dialog.removeAttribute("open");
+      dialog.dispatchEvent(new Event("close"));
+    });
+    expect(within(dialog).getByRole("status", { hidden: true })).toBeEmptyDOMElement();
+    expect(within(dialog).getByRole("checkbox", { hidden: true })).not.toBeChecked();
   });
 
   it("plays to the end and stops", async () => {

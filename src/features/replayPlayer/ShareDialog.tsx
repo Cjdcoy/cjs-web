@@ -1,6 +1,6 @@
 import { X } from "lucide-react";
 import { useRef, useState, type Ref } from "react";
-import { Button, IconButton, Input } from "../../components/ui";
+import { Button, IconButton, Input, VisuallyHidden } from "../../components/ui";
 import { formatReplayClockMs } from "./replayPlayback";
 import { replaySharePath } from "./replayShare";
 
@@ -9,19 +9,18 @@ import { replaySharePath } from "./replayShare";
  * native dialog like ShortcutsDialog, whose look it shares.
  */
 export function ShareDialog({
-  announce,
   offsetMs,
   ref,
   runId,
   search,
 }: {
-  announce: (message: string) => void;
   offsetMs: number;
   ref: Ref<HTMLDialogElement>;
   runId: number;
   search: string;
 }) {
   const [atTime, setAtTime] = useState(false);
+  const [status, setStatus] = useState("");
   const field = useRef<HTMLInputElement>(null);
   const link = new URL(
     replaySharePath(runId, search, atTime ? offsetMs : 0),
@@ -31,7 +30,7 @@ export function ShareDialog({
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(link);
-      announce("Link copied");
+      setStatus("Link copied");
     } catch {
       // No clipboard (insecure context, denied permission): leave the link selected to copy by hand.
       field.current?.focus();
@@ -44,7 +43,10 @@ export function ShareDialog({
       ref={ref}
       className="cjs-replay-shortcuts"
       aria-labelledby="replay-share-title"
-      onClose={() => setAtTime(false)}
+      onClose={() => {
+        setAtTime(false);
+        setStatus("");
+      }}
     >
       <div className="cjs-replay-shortcuts__header">
         <h2 id="replay-share-title">Share replay</h2>
@@ -68,6 +70,10 @@ export function ShareDialog({
           Copy link
         </Button>
       </div>
+      {/* The modal makes the player's live region inert, so the dialog announces its own status. */}
+      <VisuallyHidden role="status" aria-live="polite">
+        {status}
+      </VisuallyHidden>
     </dialog>
   );
 }
