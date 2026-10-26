@@ -452,6 +452,35 @@ describe("ReplayPage", () => {
     expect(within(hud).getByRole("checkbox", { name: /Watch heat/ })).toBeDisabled();
   });
 
+  it("steps one frame with the buttons or , and ., pausing playback", async () => {
+    const user = userEvent.setup();
+    render(<ReplayPage apiClient={apiReturning(Promise.resolve(samples))} runId="7001" />);
+    const slider = await screen.findByRole("slider", { name: "Replay position" });
+    const play = () => user.click(screen.getByRole("button", { name: "Play" }));
+    const expectPausedAt = (clock: string, x: number) => {
+      expect(screen.getByRole("button", { name: "Play" })).toBeVisible();
+      expect(slider).toHaveAttribute("aria-valuetext", `${clock} of 00:20.00`);
+      expect(viewerProps.current?.getFrame?.()?.pose.x).toBe(x);
+    };
+
+    await play();
+    await user.click(screen.getByRole("button", { name: "Next frame" }));
+    expectPausedAt("00:10.00", 5);
+    await user.keyboard(".");
+    expectPausedAt("00:20.00", 10);
+    await user.keyboard(",");
+    expectPausedAt("00:10.00", 5);
+    // A few ms into playback, the previous frame is the sample playback started from.
+    await play();
+    await user.keyboard(",");
+    expectPausedAt("00:10.00", 5);
+    await user.click(screen.getByRole("button", { name: "Previous frame" }));
+    expectPausedAt("00:00.00", 0);
+    await play();
+    await user.keyboard(".");
+    expectPausedAt("00:10.00", 5);
+  });
+
   it("plays to the end and stops", async () => {
     const short = { ...samples, t: [0, 50, 100] };
     render(<ReplayPage apiClient={apiReturning(Promise.resolve(short))} runId="7001" />);

@@ -8,6 +8,8 @@ import {
   RectangleHorizontal,
   SkipBack,
   SkipForward,
+  StepBack,
+  StepForward,
   Sun,
   Volume1,
   Volume2,
@@ -47,6 +49,7 @@ import {
   pathSegments,
   sampleMotion,
   samplePose,
+  stepSampleTime,
   type ReplayTimeline,
 } from "./replayPlayback";
 import { createWeaponTrack, weaponAt } from "./replayWeapon";
@@ -248,6 +251,18 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     [getTime, samples.markers, seek, start],
   );
 
+  const stepFrame = useCallback(
+    (direction: 1 | -1) => {
+      const from = getTime();
+      if (playing) {
+        setPlaying(false);
+        setAnnouncement("Paused");
+      }
+      seek(stepSampleTime(timeline, from, direction));
+    },
+    [getTime, playing, seek, setPlaying, timeline],
+  );
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return;
@@ -311,6 +326,12 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
         case "P":
           jump(-1);
           break;
+        case ",":
+          stepFrame(-1);
+          break;
+        case ".":
+          stepFrame(1);
+          break;
         default:
           handled = false;
       }
@@ -326,6 +347,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     seek,
     setMode,
     speed,
+    stepFrame,
     toggleFollow,
     toggleMode,
     toggleMute,
@@ -380,6 +402,22 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
                 ) : (
                   <Play size={18} aria-hidden="true" />
                 )}
+              </IconButton>
+              <IconButton
+                label="Previous frame"
+                aria-keyshortcuts=","
+                variant="ghost"
+                onClick={() => stepFrame(-1)}
+              >
+                <StepBack size={18} aria-hidden="true" />
+              </IconButton>
+              <IconButton
+                label="Next frame"
+                aria-keyshortcuts="."
+                variant="ghost"
+                onClick={() => stepFrame(1)}
+              >
+                <StepForward size={18} aria-hidden="true" />
               </IconButton>
               <IconButton
                 label="Previous save or load"

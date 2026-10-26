@@ -6,6 +6,7 @@ const SHORTCUTS: readonly [keys: string, action: string][] = [
   ["K or Space", "Play or pause"],
   ["Left and Right arrows", "Seek 5 seconds"],
   ["P and N", "Previous or next save or load"],
+  [", and .", "Previous or next frame"],
   ["[ and ]", "Slower or faster"],
   ["C", "Free camera on or off"],
   ["F", "Full screen on or off"],

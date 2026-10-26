@@ -2531,6 +2531,23 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   the breakdowns are not consumed; only `heat`, the aggregate, rankings, and view counts are.
   Turn the flag on only after the backend is deployed with writes enabled.
 
+### CJS-074 — Replay frame step
+
+- **Status:** done
+- **Owner/handoff:** Claude / replay player worker
+- **Dependencies:** CJS-067
+- **Primary boundary:** `src/features/replayPlayer` (`replayPlayback.ts` `stepSampleTime`,
+  `ReplayPlayer.tsx` transport and keys, `ShortcutsDialog.tsx`)
+- **Outcome:**
+  - Previous frame and Next frame buttons sit after Play/Pause; `,` and `.` do the same and repeat
+    while held. A step pauses playback and seeks to the neighbouring recorded sample (one per
+    client frame in v12, one per 50 ms before), clamped to the first and last sample.
+  - The shortcuts dialog lists both keys.
+- **Validation:** `npm run verify`. Unit tests cover stepping on and between samples and at both
+  ends; a component test covers both buttons and keys pausing playback and moving the clock, seek
+  bar, and camera pose by one sample. The transport row was measured in Chromium at 390 and
+  1440 px: no overflow or page scroll, and the 390 px row wraps exactly as it did before.
+
 ## Agent handoff template
 
 ```md
