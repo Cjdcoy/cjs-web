@@ -18,7 +18,7 @@ jobs:
   build:
     name: Build and validate
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20 # room for the Playwright install retry when the Azure apt mirror crawls
 
     steps:
       - name: Check out repository
@@ -73,8 +73,21 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
 
+      # The Azure apt mirror can crawl at ~40 KB/s and apt only falls back on errors: retry once without it.
       - name: Install browsers for compatibility tests
-        run: npx playwright install --with-deps chromium firefox webkit
+        timeout-minutes: 10
+        run: |
+          if ! timeout 240 npx playwright install --with-deps chromium firefox webkit; then
+            echo "::warning::Playwright install failed or took over 240 s; retrying without the Azure apt mirror"
+            # timeout cannot signal the root apt-get that sudo started, and it would keep the apt lock.
+            sudo pkill -x apt-get || true
+            if [ -f /etc/apt/apt-mirrors.txt ]; then
+              sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
+            else
+              sudo sed -i 's/azure\.archive\.ubuntu\.com/archive.ubuntu.com/g' /etc/apt/sources.list.d/*.sources /etc/apt/sources.list || true
+            fi
+            timeout 300 npx playwright install --with-deps chromium firefox webkit
+          fi
 
       - name: Run critical browser flows
         run: npm run test:e2e

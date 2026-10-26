@@ -2580,6 +2580,27 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   screen. Total JavaScript budget raised narrowly from 161 to 161.5 KiB (161.4 KiB with CJS-074
   and this).
 
+### CJS-077 — Survive a crawling Azure apt mirror in the Playwright install
+
+- **Status:** done
+- **Owner/handoff:** Claude (Fable supervisor, Opus worker) / CI reliability
+- **Dependencies:** CJS-064
+- **Primary boundary:** `.github/workflows/ci.yml`
+- **Goal:** the Playwright `install --with-deps` step (normally 24–40 s) hung twice until the
+  15-minute job timeout canceled the run: apt downloads from `azure.archive.ubuntu.com` crawled at
+  about 40 KB/s, and apt only falls back to the next mirror on errors, not on slowness.
+- **Outcome:** the first attempt runs under `timeout 240`. On failure or timeout the step prints a
+  warning, kills the leftover root `apt-get` (`timeout` cannot signal it through `sudo`, and it
+  would keep the apt lock), removes the Azure line from `/etc/apt/apt-mirrors.txt` (or rewrites
+  Azure to `archive.ubuntu.com` in the apt sources when that file is missing), and retries once
+  under `timeout 300`. The step has a 10-minute limit; the job limit is now 20 minutes.
+- **Validation:** the workflow parses; the step script passes `bash -n` and `shellcheck`. In an
+  `ubuntu:24.04` container with real `sudo` and GNU `timeout`, a fake `npx` showed: a hung first
+  attempt plus a good retry exits 0 with the Azure line removed; two failures exit non-zero; the
+  sources fallback rewrites Azure. Without the `pkill`, the first attempt's `apt-get` survived.
+- **Remaining work/risks:** the real runner mirror file and mirror speed are only testable on
+  GitHub Actions.
+
 ## Agent handoff template
 
 ```md
