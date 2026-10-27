@@ -18,7 +18,7 @@ jobs:
   build:
     name: Build and validate
     runs-on: ubuntu-latest
-    timeout-minutes: 20 # room for the Playwright install retry when the Azure apt mirror crawls
+    timeout-minutes: 15
 
     steps:
       - name: Check out repository
@@ -67,27 +67,12 @@ jobs:
           path: dist
           key: dist-${{ github.sha }}-${{ vars.VITE_API_FORMAT || 'legacy' }}
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
-
-      # The Azure apt mirror can crawl at ~40 KB/s and apt only falls back on errors: retry once without it.
-      - name: Install browsers for compatibility tests
-        timeout-minutes: 10
-        run: |
-          if ! timeout 240 npx playwright install --with-deps chromium firefox webkit; then
-            echo "::warning::Playwright install failed or took over 240 s; retrying without the Azure apt mirror"
-            # timeout cannot signal the root apt-get that sudo started, and it would keep the apt lock.
-            sudo pkill -x apt-get || true
-            if [ -f /etc/apt/apt-mirrors.txt ]; then
-              sudo sed -i '/azure\.archive\.ubuntu\.com/d' /etc/apt/apt-mirrors.txt
-            else
-              sudo sed -i 's/azure\.archive\.ubuntu\.com/archive.ubuntu.com/g' /etc/apt/sources.list.d/*.sources /etc/apt/sources.list || true
-            fi
-            timeout 300 npx playwright install --with-deps chromium firefox webkit
-          fi
-
+      # The official image ships the browsers and their system libraries (no apt); the runner's Node 26 is mounted over its older Node.
       - name: Run critical browser flows
-        run: npm run test:e2e
+        run: |
+          PW_VERSION=$(node -p "require('@playwright/test/package.json').version")
+          docker run --rm --init --ipc=host \
+            -u "$(id -u):$(id -g)" -e HOME=/tmp -e CI=true \
+            -v "$PWD:$PWD" -w "$PWD" \
+            -v "$(dirname "$(dirname "$(command -v node)")"):/opt/node:ro" -e PATH=/opt/node/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin \
+            "mcr.microsoft.com/playwright:v${PW_VERSION}-noble" npm run test:e2e
