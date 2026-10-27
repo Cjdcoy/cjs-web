@@ -1,3 +1,4 @@
+import { VIEWMODEL_WEAPON } from "../../lib/mapModels";
 import { fpsAt } from "./replayHudModel";
 import { findSampleIndex, sampleVelocity, type ReplayTimeline } from "./replayPlayback";
 
@@ -26,6 +27,8 @@ export interface SoundManifest {
   /** Raise sounds by weapon slot (0 primary, 1 primaryb). */
   raise: Readonly<Record<string, SoundVariant[]>>;
   raiseSecondary: Readonly<Record<string, SoundVariant[]>>;
+  /** The drawn weapon's fire sound (weapon.<VIEWMODEL_WEAPON>.fire). */
+  fire: SoundVariant[];
   rules: FootstepRules;
 }
 
@@ -38,7 +41,7 @@ export interface FootstepRules {
   skipLadderAfterJumpMs: number;
 }
 
-export type SoundEventKind = "land" | "step" | "jump" | "ladder" | "raise";
+export type SoundEventKind = "land" | "step" | "jump" | "ladder" | "raise" | "fire";
 
 /** One sound moment: the variant tables to play together, e.g. ["footstep.wood", "gearRattleRun"]. */
 export interface SoundEvent {
@@ -86,7 +89,8 @@ export function startCursor(time: number): SoundCursor {
  * Events in (cursor.time, to], simulated one pmove frame at a time like the client: msec is the
  * configured fps's frame time, and the bob cycle advances by trunc(cycle + bobmove * msec) & 255,
  * stepping when it crosses 64 or 192. Sample transitions add landings, jumps, and weapon raises;
- * nothing fires across a load or teleport. Replays without flags produce no movement sounds.
+ * nothing fires across a load or teleport. Replays without flags produce no movement sounds. Shots
+ * play in any replay, by time alone.
  */
 export function soundEvents(
   context: SoundContext,
@@ -97,7 +101,10 @@ export function soundEvents(
   const { samples } = timeline;
   const events: SoundEvent[] = [];
   let { cycle, lastJumpTime, time } = cursor;
-  if (!samples.flags) return { events, cursor: { ...cursor, time: Math.max(time, to) } };
+  if (!samples.flags) {
+    const end = Math.max(time, to);
+    return { events: shotEvents(timeline, time, end), cursor: { ...cursor, time: end } };
+  }
   const { flags } = samples;
   let previousIndex = findSampleIndex(samples.t, time);
   // The frame time follows the configured fps, which only changes at fps markers.
@@ -163,7 +170,24 @@ export function soundEvents(
     }
   }
 
+  events.push(...shotEvents(timeline, cursor.time, time));
   return { events, cursor: { time, cycle, lastJumpTime } };
+}
+
+/** CG_FireWeapon plays fireSound with each EV_FIRE_WEAPON (mac:351760): the shots in (from, to]. */
+function shotEvents(timeline: ReplayTimeline, from: number, to: number): SoundEvent[] {
+  const { fireStarts } = timeline;
+  const events: SoundEvent[] = [];
+  for (
+    let shot = Math.max(0, findSampleIndex(fireStarts, from));
+    shot < fireStarts.length;
+    shot += 1
+  ) {
+    if (fireStarts[shot] > to) break;
+    if (fireStarts[shot] > from)
+      events.push({ t: fireStarts[shot], kind: "fire", tables: ["fire"] });
+  }
+  return events;
 }
 
 /** Landing, jump, and weapon-raise events between sample - 1 and sample. */
@@ -308,6 +332,7 @@ export function variantsFor(manifest: SoundManifest, id: string): SoundVariant[]
     case "gearRattleRun":
     case "gearRattleWalk":
     case "ladder":
+    case "fire":
       return manifest[table];
     default:
       return [];
@@ -352,6 +377,7 @@ export function parseSoundManifest(value: unknown): SoundManifest | null {
     raise[slot] = variantList(entry.raise);
     raiseSecondary[slot] = variantList(entry.raiseSecondary);
   }
+  const drawn = weapon[VIEWMODEL_WEAPON];
   const gSpeed = isRecord(footsteps.gSpeed) ? footsteps.gSpeed.codjumper : undefined;
   const surfaceTypes = Array.isArray(value.surfaceTypes)
     ? value.surfaceTypes.map((name) => (typeof name === "string" ? name : ""))
@@ -368,6 +394,7 @@ export function parseSoundManifest(value: unknown): SoundManifest | null {
     ladder: variantList(value.ladder),
     raise,
     raiseSecondary,
+    fire: variantList(isRecord(drawn) ? drawn.fire : undefined),
     rules: {
       assumedMsec: positive(footsteps.assumedMsec, 8),
       gSpeed: positive(gSpeed, 190),

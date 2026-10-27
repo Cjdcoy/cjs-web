@@ -13,11 +13,14 @@ const budgets = {
   initialCssGzip: 8 * 1024,
   // 37 KiB since PR #33 (3D replay viewer); measured at 36.0 KiB.
   routeIncrementGzip: 37 * 1024,
-  // 161.5 KiB since replay frame step and share links; measured at 161.4 KiB (160.5 before them).
-  totalJavaScriptGzip: 161.5 * 1024,
+  // 163.5 KiB since replay weapon fire and ADS (CJS-075) plus frame step and share links
+  // (CJS-074/076); measured at 163.2 KiB (160.6 before them).
+  totalJavaScriptGzip: 163.5 * 1024,
   // 23 KiB since PR #33 (3D replay viewer); measured at 22.7 KiB.
   totalCssGzip: 23 * 1024,
-  mapViewerGzip: 170 * 1024,
+  // 173 KiB since the animated viewmodel and muzzle flash (CJS-075); measured at 172.8 KiB (169.0
+  // before it).
+  mapViewerGzip: 173 * 1024,
 };
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));

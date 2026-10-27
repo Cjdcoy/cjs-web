@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { ReplayMarker, ReplaySamples } from "../../lib/api";
 import {
   addLean,
+  adsAt,
   createTimeline,
   effectiveStance,
   eyeHeight,
@@ -13,7 +14,6 @@ import {
   leanAt,
   leanStep,
   lerpAngle,
-  meleeElapsed,
   pathSegments,
   sampleMotion,
   samplePose,
@@ -268,9 +268,102 @@ describe("lean and melee", () => {
     const timeline = createTimeline(held(input, aux));
     // Pressed at 50 ms; held, then re-pressed at 200 ms mid-swing (ignored); again at 800 ms.
     expect(timeline.meleeStarts).toEqual([50, 800]);
-    expect(meleeElapsed(timeline, 40)).toBeNull();
-    expect(meleeElapsed(timeline, 300)).toBe(250);
-    expect(meleeElapsed(timeline, 950)).toBe(150);
+  });
+});
+
+describe("weapon fire and aim down sights", () => {
+  const ATTACK = 1;
+  const MELEE = 16;
+  const FORWARD = 32;
+  const ADS = 1024;
+  // Frames every `ms` milliseconds standing still, with these input and aux masks.
+  function frames(input: number[], ms: number, aux: number[] = input.map(() => 0), stance = 0) {
+    return createTimeline({
+      ...samples(
+        input.map((_, index) => ({ t: index * ms, pos: [0, 0, 0] })),
+        [],
+        input.map(() => stance),
+      ),
+      flags: input.map(() => (stance ? 1 : 0)),
+      input,
+      aux,
+    });
+  }
+
+  it("fires one semi-auto shot per press, holding fireTime between shots", () => {
+    // 10 ms frames. Pressed at 0 and held to 300: fireTime 135 runs out held, so it waits for the
+    // release at 300; pressed again at 320.
+    const held = frames([...Array<number>(30).fill(ATTACK), 0, 0, ATTACK, ATTACK], 10);
+    expect(held.fireStarts).toEqual([0, 320]);
+    // Re-pressed at 100, inside fireTime, and held past 135: locked until released at 200.
+    const early = frames(
+      [ATTACK, 0, 0, 0, 0, 0, 0, 0, 0, 0, ...Array<number>(10).fill(ATTACK), 0, ATTACK],
+      10,
+    );
+    expect(early.fireStarts).toEqual([0, 210]);
+    // Released before fireTime ends: the next press fires, unless it is down on the frame where
+    // weaponTime runs out (140 ms), which locks it like a hold.
+    const tapped = (press: number) =>
+      frames([ATTACK, ATTACK, ...Array<number>(press - 2).fill(0), ATTACK], 10).fireStarts;
+    expect(tapped(15)).toEqual([0, 150]);
+    expect(tapped(14)).toEqual([0]);
+  });
+
+  it("does not fire without a weapon out, while raising or meleeing", () => {
+    const none = 3 << 1;
+    expect(frames([ATTACK], 50, [none]).fireStarts).toEqual([]);
+    expect(frames([ATTACK], 50, [2 << 1]).fireStarts).toEqual([]);
+    expect(frames([ATTACK], 50, [1]).fireStarts).toEqual([]);
+    expect(frames([ATTACK], 50, [8]).fireStarts).toEqual([]);
+    // Raised at 50 ms (raiseTime 250): a press at 100 waits; pressed again at 350 it fires.
+    const raised = frames([0, 0, ATTACK, 0, 0, 0, 0, ATTACK], 50, [none, 0, 0, 0, 0, 0, 0, 0]);
+    expect(raised.fireStarts).toEqual([350]);
+    // A melee at 0 holds weaponTime for meleeTime 700.
+    const melee = frames([MELEE, 0, ATTACK, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ATTACK], 50);
+    expect(melee.fireStarts).toEqual([750]);
+  });
+
+  it("moves fWeaponPosFrac 250 ms in and 400 ms out, stepped from the samples", () => {
+    // ADS from 0 to 300 ms at 50 ms samples.
+    const aimed = frames([ADS, ADS, ADS, ADS, ADS, ADS, 0, 0, 0, 0, 0, 0, 0, 0, 0], 50);
+    expect(adsAt(aimed, 0).frac).toBe(0);
+    expect(aimed.ads[1]).toBeCloseTo(0.2);
+    expect(adsAt(aimed, 125).frac).toBeCloseTo(0.5);
+    expect(adsAt(aimed, 250).frac).toBe(1);
+    expect(adsAt(aimed, 400).frac).toBeCloseTo(0.75);
+    expect(adsAt(aimed, 500).frac).toBeCloseTo(0.5);
+    expect(adsAt(aimed, 700).frac).toBe(0);
+    // ads_up's weight blends in over 0.5 s and back out.
+    expect(adsAt(aimed, 250).up).toBeCloseTo(0.5);
+    expect(adsAt(aimed, 400).up).toBeCloseTo(0.4);
+  });
+
+  it("allows ADS in the air but not while raising, meleeing or without a weapon", () => {
+    const inAir = frames([ADS | 32768, ADS | 32768, ADS | 32768], 50);
+    expect(adsAt(inAir, 100).frac).toBeCloseTo(0.4);
+    // Raised at 50 ms: aiming waits until raiseTime is over at 300 ms.
+    const raised = frames(Array<number>(10).fill(ADS), 50, [6, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+    expect(adsAt(raised, 300).frac).toBe(0);
+    expect(adsAt(raised, 400).frac).toBeCloseTo(0.4);
+    const melee = frames([ADS | MELEE, ADS, ADS, ADS], 50);
+    expect(adsAt(melee, 150).frac).toBe(0);
+    // Losing the weapon drops fWeaponPosFrac to 0 at once (no aimDownSight).
+    const holstered = frames([ADS, ADS, ADS, ADS, ADS, ADS, ADS], 50, [0, 0, 0, 0, 0, 0, 6]);
+    expect(adsAt(holstered, 290).frac).toBe(1);
+    expect(adsAt(holstered, 300).frac).toBe(0);
+  });
+
+  it("drops ADS for a prone player holding it while moving, but takes a fresh press", () => {
+    const crawling = frames([ADS | FORWARD, ADS | FORWARD, ADS | FORWARD], 50, [0, 0, 0], 2);
+    expect(crawling.aim[0]).toBe(1);
+    expect(crawling.aim[1]).toBe(0);
+  });
+
+  it("records fWeaponPosFrac at each shot", () => {
+    // Fully aimed at 250 ms; released at 350, so 100 ms out by the second shot at 450.
+    const shots = frames([ADS, ADS, ADS, ADS, ADS, ADS | ATTACK, ADS, 0, 0, ATTACK], 50);
+    expect(shots.fireStarts).toEqual([250, 450]);
+    expect(shots.fireFrac).toEqual([1, 0.75]);
   });
 });
 

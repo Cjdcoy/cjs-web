@@ -18,9 +18,12 @@ export function hasMapModels(): boolean {
  */
 export const VIEWMODEL_WEAPON = "luger_mp2";
 
-/** First-person weapon model served beside the map models. */
+/**
+ * First-person weapon model served beside the map models: the skinned viewmodel with its xanims as
+ * glTF clips. The rigid `viewmodel/luger_mp2.glb` stays on the host for older deployed builds.
+ */
 export function getViewmodelUrl(): string | null {
-  return modelAssetUrl(`viewmodel/${VIEWMODEL_WEAPON}.glb`);
+  return modelAssetUrl(`viewmodel/${VIEWMODEL_WEAPON}_anims.glb`);
 }
 
 /** An asset served beside the map models (a path relative to the model base, as in sounds.json). */

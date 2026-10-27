@@ -71,8 +71,13 @@ function context(samples: ReplaySamples, surface: string | null = "wood"): Sound
   return { timeline: createTimeline(samples), rules, surfaceAt: () => surface };
 }
 
-function run(samples: ReplaySamples, to: number, surface: string | null = "wood") {
-  return soundEvents(context(samples, surface), startCursor(samples.t[0]), to).events;
+function run(
+  samples: ReplaySamples,
+  to: number,
+  surface: string | null = "wood",
+  from = samples.t[0],
+) {
+  return soundEvents(context(samples, surface), startCursor(from), to).events;
 }
 
 describe("landing (PM_CrashLand)", () => {
@@ -238,6 +243,39 @@ describe("jumps, ladders, and weapon raises", () => {
       { t: 100, kind: "raise", tables: ["raise.1", "raiseSecondary.1"] },
     ]);
   });
+
+  it("plays the fire sound with each shot, not for a held trigger", () => {
+    // Pressed at 50 ms and held: one shot; released at 250, pressed again at 300: a second one.
+    const shooting = replay(
+      [0, 1, 1, 1, 1, 0, 1, 1].map((input, index) => ({ t: index * 50, input })),
+    );
+    expect(run(shooting, 400).filter((event) => event.kind === "fire")).toEqual([
+      { t: 50, kind: "fire", tables: ["fire"] },
+      { t: 300, kind: "fire", tables: ["fire"] },
+    ]);
+  });
+
+  it("plays shots by time: right after a teleport, from the first sample, and without flags", () => {
+    // A 1000-unit jump between 150 and 200 ms is a teleport; the second shot lands on its far side.
+    const teleported = replay([
+      { t: 0, input: 1 },
+      { t: 50, input: 0 },
+      { t: 150, input: 0 },
+      { t: 200, x: 1000, input: 1 },
+    ]);
+    expect(createTimeline(teleported).snap[2]).toBe(1);
+    expect(run(teleported, 250, null, -1).filter((event) => event.kind === "fire")).toEqual([
+      { t: 0, kind: "fire", tables: ["fire"] },
+      { t: 200, kind: "fire", tables: ["fire"] },
+    ]);
+    const flagless = { ...teleported, flags: undefined };
+    expect(run(flagless, 250, null, -1).map((event) => event.t)).toEqual([0, 200]);
+    // Resuming from the cursor neither drops nor repeats a shot.
+    const shots = context(teleported);
+    const first = soundEvents(shots, startCursor(-1), 100);
+    const second = soundEvents(shots, first.cursor, 250);
+    expect([...first.events, ...second.events].map((event) => event.t)).toEqual([0, 200]);
+  });
 });
 
 describe("variants and manifest", () => {
@@ -267,7 +305,10 @@ describe("variants and manifest", () => {
       gearRattleRun: [{ file: null, volume: [0.1, 0.1], pitch: [0.9, 0.9], weight: 6 }],
       weapon: {
         slots: { 0: "luger_mp2" },
-        luger_mp2: { raise: [{ file: "r.wav", volume: [0.4, 0.5], pitch: [0.9, 1.2] }] },
+        luger_mp2: {
+          raise: [{ file: "r.wav", volume: [0.4, 0.5], pitch: [0.9, 1.2] }],
+          fire: [{ file: "f.wav", volume: [0.9, 1], pitch: [1, 1] }],
+        },
       },
       rules: { footsteps: { assumedMsec: 8, gSpeed: { codjumper: 190 } }, ladder: {} },
     });
@@ -277,6 +318,7 @@ describe("variants and manifest", () => {
     expect(variantsFor(manifest, "land.wood")[0].file).toBe("w.wav");
     expect(variantsFor(manifest, "gearRattleRun")[0]).toMatchObject({ file: null, weight: 6 });
     expect(variantsFor(manifest, "raise.0")[0].file).toBe("r.wav");
+    expect(variantsFor(manifest, "fire")[0].file).toBe("f.wav");
     expect(surfaceName(manifest, 2 << 20)).toBe("wood");
     expect(surfaceName(manifest, (2 << 20) | 0x2000)).toBeNull();
     expect(surfaceName(manifest, 0)).toBeNull();
