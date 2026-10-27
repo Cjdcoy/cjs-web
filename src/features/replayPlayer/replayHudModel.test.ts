@@ -199,7 +199,7 @@ describe("key display", () => {
     expect(keysAt(samples(), 0)).toBeNull();
   });
 
-  it("lays Space exactly under A–D with C and Ctrl as standard cells beside it", () => {
+  it("lays Space exactly under A–D with Ctrl and C as standard cells under it", () => {
     const cells = Object.fromEntries(REPLAY_KEYS.map((entry) => [entry.id, entry]));
     const edges = (id: string) => [
       cells[id].x - cells[id].width / 2,
@@ -208,9 +208,10 @@ describe("key display", () => {
     const key = (id: string) => cells[id];
     expect(edges("jump")).toEqual([edges("left")[0], edges("right")[1]]);
     expect([key("crouch").width, key("prone").width]).toEqual([20, 20]);
-    // The same 2-unit gap as between A, S and D.
-    expect(edges("jump")[0] - edges("crouch")[1]).toBe(edges("back")[0] - edges("left")[1]);
-    expect(edges("prone")[0] - edges("jump")[1]).toBe(2);
+    // Ctrl under A and C under D, one row (22 units, the A–Space step) below Space.
+    expect([key("prone").x, key("crouch").x]).toEqual([key("left").x, key("right").x]);
+    expect(key("prone").y - key("jump").y).toBe(key("jump").y - key("left").y);
+    expect(key("crouch").y).toBe(key("prone").y);
   });
 });
 

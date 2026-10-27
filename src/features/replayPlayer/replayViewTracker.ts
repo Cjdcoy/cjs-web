@@ -3,7 +3,9 @@
  * first Play. Times are replay positions in ms from the start of the replay (0..durationMs).
  */
 import type { AppRouteId } from "../../lib/routing";
-import { PLAYBACK_SPEEDS } from "./useReplayPlayback";
+
+/** The API's `speed_ms` columns, slowest first; cj-stats requires exactly these 5 entries. */
+const API_SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
 
 export type ReplayViewEntry = "map" | "recent" | "player" | "direct" | "other";
 export type ReplayViewDevice = "mobile" | "desktop";
@@ -86,7 +88,7 @@ export function createReplayView(init: {
     ...init,
     durationMs: Math.max(1, Math.round(init.durationMs)),
     seq: 0,
-    speedMs: PLAYBACK_SPEEDS.map(() => 0),
+    speedMs: API_SPEEDS.map(() => 0),
     watched: [],
     played: [],
     maxPosMs: 0,
@@ -109,7 +111,8 @@ export function recordSegment(
   wallMs: number,
   speed: number,
 ): ReplayViewState {
-  const speedIndex = PLAYBACK_SPEEDS.findIndex((value) => value === speed);
+  // shortcut: 0.1× counts as 0.25× because the API has 5 speed columns (cj-stats replay_views.go:159); add a column if slow-motion share matters.
+  const speedIndex = speed === 0.1 ? 0 : API_SPEEDS.findIndex((value) => value === speed);
   const wall = Math.max(0, Math.round(wallMs));
   const range = clampRange(state, fromT, toT);
   if (speedIndex < 0 || (wall === 0 && !range)) return state;

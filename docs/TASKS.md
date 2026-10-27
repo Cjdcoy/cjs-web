@@ -2531,6 +2531,55 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   the breakdowns are not consumed; only `heat`, the aggregate, rankings, and view counts are.
   Turn the flag on only after the backend is deployed with writes enabled.
 
+### CJS-074 — Replay frame step
+
+- **Status:** done
+- **Owner/handoff:** Claude / replay player worker
+- **Dependencies:** CJS-067
+- **Primary boundary:** `src/features/replayPlayer` (`replayPlayback.ts` `stepSampleTime`,
+  `ReplayPlayer.tsx` transport and keys, `ShortcutsDialog.tsx`)
+- **Outcome:**
+  - For v12+ replays (one sample per client frame), Previous frame and Next frame buttons sit
+    after Play/Pause; `,` and `.` do the same and repeat while held. A step pauses playback and
+    seeks to the neighbouring recorded sample, clamped to the first and last sample.
+  - The shortcuts dialog lists both keys. Older formats (one sample per 50 ms) hide the buttons,
+    ignore the keys, and leave the row out of the dialog.
+  - A 0.1× playback speed joins the list. View analytics keep the API's 5 `speed_ms` columns and
+    count 0.1× in the 0.25× one (a `shortcut:` in `replayViewTracker.ts`). Sound needs no change:
+    its cursor carries sub-frame remainders, so slow playback neither drops nor backs up events.
+  - The keys display moves Ctrl and C (owner's layout) to a row under Space, Ctrl below A and C
+    below D (`REPLAY_KEYS` in `replayHudModel.ts`).
+- **Validation:** `npm run verify`. Unit tests cover stepping on and between samples and at both
+  ends; component tests cover a v12 replay's buttons and keys pausing playback and moving the
+  clock, seek bar, and camera pose by one sample, and a v11 replay showing neither. The transport
+  row was measured in Chromium at 390 and 1440 px: no overflow or page scroll, and the 390 px row
+  wraps exactly as it did before.
+
+### CJS-076 — Share a replay at a time
+
+- **Status:** done
+- **Owner/handoff:** Claude / replay player worker
+- **Dependencies:** CJS-067, CJS-074
+- **Primary boundary:** `src/features/replayPlayer` (`replayShare.ts`, `ShareDialog.tsx`,
+  `ReplayPlayer.tsx` options row, `useReplayPlayback.ts` initial time, `replayPlayer.css`)
+- **Outcome:**
+  - `?t=<ms>` is a whole number of milliseconds from the replay start (the clock's 00:00), so a
+    v12 frame round-trips exactly. With a valid `t` the player opens paused at that time, clamped
+    to the replay; a missing, negative or non-integer `t` opens at the start as before. Works for
+    every format. Other query parameters are kept.
+  - A Share button in the options row opens a native dialog styled like the shortcuts one: the
+    link in a read-only field, a "Start at mm:ss.mmm" checkbox (unchecked on every open, time
+    captured on open), and Copy link. Copying uses the clipboard and announces "Link copied" from
+    a status region inside the dialog (the modal makes the player's own live region inert),
+    cleared on close; if the clipboard is missing or refuses, the link is selected to copy by hand.
+  - A shared start counts as a seek, so auto-skip does not jump off the moment on Play.
+- **Validation:** `npm run verify`. Unit tests cover parsing and building `t`. Component tests
+  cover opening paused at `t` (valid, past the end, negative, non-numeric), the checkbox changing
+  the link, copy success and failure, and the reset on close. Chromium at 390 and 1440 px: no row
+  overflow or page scroll; Esc closes the dialog and focus returns to Share; it opens inside full
+  screen. Total JavaScript budget raised narrowly from 161 to 161.5 KiB (161.4 KiB with CJS-074
+  and this).
+
 ### CJS-077 — Survive a crawling Azure apt mirror in the Playwright install
 
 - **Status:** done (superseded by CJS-078, which removes the install step)

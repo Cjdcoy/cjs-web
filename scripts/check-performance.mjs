@@ -13,8 +13,8 @@ const budgets = {
   initialCssGzip: 8 * 1024,
   // 37 KiB since PR #33 (3D replay viewer); measured at 36.0 KiB.
   routeIncrementGzip: 37 * 1024,
-  // 161 KiB since the in-browser v12 replay decoder; measured at 160.5 KiB (157.7 before it).
-  totalJavaScriptGzip: 161 * 1024,
+  // 161.5 KiB since replay frame step and share links; measured at 161.4 KiB (160.5 before them).
+  totalJavaScriptGzip: 161.5 * 1024,
   // 23 KiB since PR #33 (3D replay viewer); measured at 22.7 KiB.
   totalCssGzip: 23 * 1024,
   mapViewerGzip: 170 * 1024,
