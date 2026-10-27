@@ -339,6 +339,20 @@ export function findSampleIndex(t: ArrayLike<number>, time: number): number {
   return low;
 }
 
+/**
+ * Time of the first sample strictly after (direction 1) or the last strictly before (direction -1)
+ * `time`, clamped to the first and last sample. One sample is one recorded frame.
+ */
+export function stepSampleTime(timeline: ReplayTimeline, time: number, direction: 1 | -1): number {
+  const { t } = timeline.samples;
+  if (t.length === 0) return time;
+  // A time on a sample, give or take float noise, steps to its neighbour rather than to itself.
+  const epsilon = 1e-3;
+  if (direction === -1) return t[findSampleIndex(t, time - epsilon)];
+  if (time + epsilon < t[0]) return t[0];
+  return t[Math.min(t.length - 1, findSampleIndex(t, time + epsilon) + 1)];
+}
+
 /** Cubic Hermite between p0 and p1 with velocity tangents (units/s) over a span of `seconds`. */
 export function hermite(
   p0: number,
@@ -429,6 +443,13 @@ export function formatReplayClock(ms: number): string {
   const minutes = Math.floor(centiseconds / 6000);
   const seconds = Math.floor(centiseconds / 100) % 60;
   return `${pad(minutes)}:${pad(seconds)}.${pad(centiseconds % 100)}`;
+}
+
+/** Formats elapsed replay time as mm:ss.mmm, precise enough to name a single frame. */
+export function formatReplayClockMs(ms: number): string {
+  const whole = Math.max(0, Math.round(ms));
+  const seconds = Math.floor(whole / 1000);
+  return `${pad(Math.floor(seconds / 60))}:${pad(seconds % 60)}.${String(whole % 1000).padStart(3, "0")}`;
 }
 
 /** Sample `index` at or before `time`, and how far toward the next (null: hold, do not blend). */

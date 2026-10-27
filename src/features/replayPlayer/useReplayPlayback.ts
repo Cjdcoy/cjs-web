@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type RefObject } from "react"
 import type { ReplayMarker, ReplaySkip } from "../../lib/api";
 import { findAutoSkip, recordSkip, skippedLoadCount } from "./replayHudModel";
 
-export const PLAYBACK_SPEEDS = [0.25, 0.5, 1, 2, 4] as const;
+export const PLAYBACK_SPEEDS = [0.1, 0.25, 0.5, 1, 2, 4] as const;
 
 interface PlaybackClock {
   anchorTime: number;
@@ -30,24 +30,27 @@ export interface PlaybackObserver {
  * Wall-clock driven playback between `start` and `end` (ms). `getTime` is stable and cheap, so the
  * 3D view can read it every frame; `time` is React state for the controls. While playing with
  * auto-skip on, `getTime` jumps over failed attempts and records them in `executedSkips`.
+ * Playback opens paused at `initialTime` (read on mount only).
  */
 export function useReplayPlayback(
   start: number,
   end: number,
   autoSkip?: AutoSkipOptions,
   observer?: RefObject<PlaybackObserver | null>,
+  initialTime = start,
 ) {
   const clock = useRef<PlaybackClock>({
-    anchorTime: start,
+    anchorTime: initialTime,
     anchorWall: 0,
     playing: false,
     speed: 1,
-    seekTime: null,
+    // A shared start counts as a seek, so auto-skip does not jump off the moment it points at.
+    seekTime: initialTime === start ? null : initialTime,
   });
   const autoSkipRef = useRef(autoSkip);
   /** Segments are reported only while the tab is visible; hidden time is never counted. */
   const reportSegments = useRef(true);
-  const [time, setTime] = useState(start);
+  const [time, setTime] = useState(initialTime);
   const [playing, setPlayingState] = useState(false);
   const [speed, setSpeedState] = useState(1);
   const [executedSkips, setExecutedSkips] = useState<ReadonlyMap<number, number>>(new Map());

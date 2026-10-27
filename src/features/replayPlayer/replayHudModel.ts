@@ -138,18 +138,18 @@ export function angleHelperAt(
 
 /**
  * Replay key display on hud.menu's replay_key_* grid: 20×20 cells with 2-unit gaps centred at
- * y = 105/127/149 below the screen centre, laid out like a keyboard. Space spans A–D exactly; C and
- * Ctrl take one cell each beside it. Pressed keys draw bright (alpha 0.9), released ones dim (0.2),
- * like the menu's forecolors.
+ * y = 105/127/149 below the screen centre, laid out like a keyboard. Space spans A–D exactly; Ctrl
+ * and C (owner's layout) take one cell each in a row under it, below A and D. Pressed keys draw
+ * bright (alpha 0.9), released ones dim (0.2), like the menu's forecolors.
  */
 export const REPLAY_KEYS = [
   { id: "forward", label: "W", bit: 32, x: 0, y: 105, width: 20 },
   { id: "left", label: "A", bit: 128, x: -22, y: 127, width: 20 },
   { id: "back", label: "S", bit: 64, x: 0, y: 127, width: 20 },
   { id: "right", label: "D", bit: 256, x: 22, y: 127, width: 20 },
-  { id: "crouch", label: "C", bit: 8192, x: -44, y: 149, width: 20 },
+  { id: "crouch", label: "C", bit: 8192, x: 22, y: 171, width: 20 },
   { id: "jump", label: "Space", bit: 2, x: 0, y: 149, width: 64 },
-  { id: "prone", label: "Ctrl", bit: 16384, x: 44, y: 149, width: 20 },
+  { id: "prone", label: "Ctrl", bit: 16384, x: -22, y: 171, width: 20 },
 ] as const;
 
 /** True while sample `index` has no active weapon (aux weapon state 3), as when climbing ladders. */

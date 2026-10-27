@@ -8,6 +8,7 @@ import {
   findMarker,
   findSampleIndex,
   formatReplayClock,
+  formatReplayClockMs,
   hermite,
   leanAt,
   leanStep,
@@ -16,6 +17,7 @@ import {
   pathSegments,
   sampleMotion,
   samplePose,
+  stepSampleTime,
 } from "./replayPlayback";
 
 function samples(
@@ -178,6 +180,30 @@ describe("replay interpolation", () => {
     expect(findSampleIndex(t, 9_000)).toBe(4);
     expect(findSampleIndex([], 10)).toBe(-1);
   });
+
+  it("steps one sample forward or back and clamps at both ends", () => {
+    const timeline = createTimeline(
+      samples([
+        { t: 0, pos: [0, 0, 0] },
+        { t: 50, pos: [0, 0, 0] },
+        { t: 50, pos: [0, 0, 0] },
+        { t: 100, pos: [0, 0, 0] },
+      ]),
+    );
+    // On a sample.
+    expect(stepSampleTime(timeline, 50, 1)).toBe(100);
+    expect(stepSampleTime(timeline, 50, -1)).toBe(0);
+    // Between samples.
+    expect(stepSampleTime(timeline, 70, 1)).toBe(100);
+    expect(stepSampleTime(timeline, 70, -1)).toBe(50);
+    // At and beyond the ends.
+    expect(stepSampleTime(timeline, 0, -1)).toBe(0);
+    expect(stepSampleTime(timeline, -20, 1)).toBe(0);
+    expect(stepSampleTime(timeline, 0, 1)).toBe(50);
+    expect(stepSampleTime(timeline, 100, 1)).toBe(100);
+    expect(stepSampleTime(timeline, 100, -1)).toBe(50);
+    expect(stepSampleTime(timeline, 900, -1)).toBe(100);
+  });
 });
 
 describe("lean and melee", () => {
@@ -267,5 +293,7 @@ describe("replay markers and clock", () => {
     expect(formatReplayClock(0)).toBe("00:00.00");
     expect(formatReplayClock(83_456)).toBe("01:23.45");
     expect(formatReplayClock(3_725_000)).toBe("62:05.00");
+    expect(formatReplayClockMs(83_456.4)).toBe("01:23.456");
+    expect(formatReplayClockMs(3_725_007)).toBe("62:05.007");
   });
 });

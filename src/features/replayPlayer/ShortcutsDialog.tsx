@@ -2,10 +2,13 @@ import { X } from "lucide-react";
 import type { Ref } from "react";
 import { IconButton } from "../../components/ui";
 
+const FRAME_STEP_KEYS: [keys: string, action: string] = [", and .", "Previous or next frame"];
+
 const SHORTCUTS: readonly [keys: string, action: string][] = [
   ["K or Space", "Play or pause"],
   ["Left and Right arrows", "Seek 5 seconds"],
   ["P and N", "Previous or next save or load"],
+  FRAME_STEP_KEYS,
   ["[ and ]", "Slower or faster"],
   ["C", "Free camera on or off"],
   ["F", "Full screen on or off"],
@@ -22,8 +25,18 @@ const FREE_CAMERA_KEYS: readonly [keys: string, action: string][] = [
   ["Shift", "Move faster"],
 ];
 
-/** Modal list of replay shortcuts. A native dialog keeps focus inside and restores it on close. */
-export function ShortcutsDialog({ ref }: { ref: Ref<HTMLDialogElement> }) {
+/**
+ * Modal list of replay shortcuts. A native dialog keeps focus inside and restores it on close.
+ * Frame step keys are listed only for replays that record every frame (`frameStep`).
+ */
+export function ShortcutsDialog({
+  frameStep,
+  ref,
+}: {
+  frameStep: boolean;
+  ref: Ref<HTMLDialogElement>;
+}) {
+  const shortcuts = frameStep ? SHORTCUTS : SHORTCUTS.filter((item) => item !== FRAME_STEP_KEYS);
   return (
     <dialog ref={ref} className="cjs-replay-shortcuts" aria-labelledby="replay-shortcuts-title">
       <div className="cjs-replay-shortcuts__header">
@@ -34,7 +47,7 @@ export function ShortcutsDialog({ ref }: { ref: Ref<HTMLDialogElement> }) {
           </IconButton>
         </form>
       </div>
-      <ShortcutList items={SHORTCUTS} />
+      <ShortcutList items={shortcuts} />
       <h3>Free camera (with the view focused)</h3>
       <ShortcutList items={FREE_CAMERA_KEYS} />
     </dialog>
