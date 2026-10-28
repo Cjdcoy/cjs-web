@@ -38,7 +38,7 @@ export type PlayerProfileApi = Pick<
   | "players"
 >;
 
-// A 503 here means the J4L weekly-event or shop tables are not migrated yet: mark unsupported, don't fail.
+// A 404 (route not deployed yet) or 503 (J4L weekly-event or shop tables not migrated) marks these unsupported, not failed.
 const HIDDEN_WHEN_UNAVAILABLE = new Set<string>(["events", "skins"]);
 
 // Matches the backend live cache's per-route history limit, so this returns every personal best.
@@ -278,7 +278,7 @@ function useProfileResource<Kind extends ResourceKind>(
         if (
           HIDDEN_WHEN_UNAVAILABLE.has(kind) &&
           reason instanceof ApiError &&
-          reason.status === 503
+          (reason.status === 404 || reason.status === 503)
         ) {
           setState({ data: null, error: null, requestKey, status: "unsupported" });
           return;

@@ -1553,6 +1553,8 @@ const SKIN_SOURCE_LABELS: Record<string, string> = {
   member: "Member",
   prestige: "Prestige",
   donator: "Donator",
+  free: "Free",
+  allroutes: "Secret",
 };
 
 const SKIN_COLUMNS: readonly DataTableColumn<PlayerSkin>[] = [

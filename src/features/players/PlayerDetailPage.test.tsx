@@ -263,6 +263,24 @@ describe("PlayerDetailPage", () => {
           image: null,
           skin_id: 7,
         },
+        {
+          ...skin,
+          active: false,
+          category: "outfit",
+          display_name: "Default",
+          image: null,
+          skin_id: 8,
+          source: "free",
+          unlock_type: "free",
+        },
+        {
+          ...skin,
+          active: false,
+          display_name: "Hidden hat",
+          skin_id: 9,
+          source: "allroutes",
+          unlock_type: "allroutes",
+        },
       ]),
     });
 
@@ -287,40 +305,48 @@ describe("PlayerDetailPage", () => {
     expect(within(outfits).queryByText("Equipped")).not.toBeInTheDocument();
     expect(outfits.querySelector("img")).toBeNull();
     expect(within(outfits).getByText("Member")).toBeInTheDocument();
+    expect(within(outfits).getByText("Free")).toBeInTheDocument();
+    expect(within(hats).getByText("Secret")).toBeInTheDocument();
   });
 
-  it("hides skins and explains missing weekly events while their J4L tables are unavailable (503)", async () => {
-    window.history.replaceState(null, "", "/players/42?source=j4l");
-    const unavailable = (path: string) =>
-      vi
-        .fn()
-        .mockRejectedValue(
-          new ApiError({ kind: "http", message: "API request failed (503)", path, status: 503 }),
-        );
-    const apiClient = createProfileApi({
-      playerEvents: unavailable("/api/v1/player/events"),
-      playerSkins: unavailable("/api/v1/player/skins"),
-    });
+  // 404: the backend routes are not deployed yet; 503: the J4L tables are not migrated yet.
+  it.each([404, 503])(
+    "hides skins and explains missing weekly events while their J4L routes are unavailable (%i)",
+    async (status) => {
+      window.history.replaceState(null, "", "/players/42?source=j4l");
+      const unavailable = (path: string) =>
+        vi
+          .fn()
+          .mockRejectedValue(
+            new ApiError({ kind: "http", message: `API request failed (${status})`, path, status }),
+          );
+      const apiClient = createProfileApi({
+        playerEvents: unavailable("/api/v1/player/events"),
+        playerSkins: unavailable("/api/v1/player/skins"),
+      });
 
-    const { unmount } = renderProfile(apiClient);
+      const { unmount } = renderProfile(apiClient);
 
-    expect(await screen.findByRole("heading", { name: "Time on Jump4Life" })).toBeInTheDocument();
-    await waitFor(() => expect(apiClient.playerSkins).toHaveBeenCalled());
-    await waitFor(() =>
-      expect(screen.queryByRole("heading", { name: "Skins" })).not.toBeInTheDocument(),
-    );
-    expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
-    unmount();
+      expect(await screen.findByRole("heading", { name: "Time on Jump4Life" })).toBeInTheDocument();
+      await waitFor(() => expect(apiClient.playerSkins).toHaveBeenCalled());
+      await waitFor(() =>
+        expect(screen.queryByRole("heading", { name: "Skins" })).not.toBeInTheDocument(),
+      );
+      expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
+      unmount();
 
-    window.history.replaceState(null, "", "/players/42?source=j4l&view=events");
-    renderProfile(apiClient);
+      window.history.replaceState(null, "", "/players/42?source=j4l&view=events");
+      renderProfile(apiClient);
 
-    expect(
-      await screen.findByRole("heading", { name: "The Weekly Cup is not available yet" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Profile unavailable" })).not.toBeInTheDocument();
-  });
+      expect(
+        await screen.findByRole("heading", { name: "The Weekly Cup is not available yet" }),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Some profile data is unavailable.")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("heading", { name: "Profile unavailable" }),
+      ).not.toBeInTheDocument();
+    },
+  );
 
   it("shows empty weekly event and skin states for a J4L player without either", async () => {
     window.history.replaceState(null, "", "/players/42?source=j4l");

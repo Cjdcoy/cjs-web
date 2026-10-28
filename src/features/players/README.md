@@ -25,8 +25,9 @@ for JH. Best runs use the jump-skill response's per-map score, difficulty, and r
 normal map IDs to map details. Route completion uses the same normal map-detail lookup.
 
 Weekly events have their own `view=events` tab, shown and fetched only for J4L; a JH
-`view=events` URL shows the overview. The tab lists every returned week. A `503` from the events
-endpoint shows a "not available yet" notice; a `503` from skins hides the overview's Skins section.
+`view=events` URL shows the overview. The tab lists every returned week. A `404` (route not
+deployed yet) or `503` (tables not migrated yet) from the events endpoint shows a "not available
+yet" notice; the same from skins hides the overview's Skins section.
 
 Run analytics uses the selected jump-score map ID as the map-runs `cpid`, then orders the
 returned finishes by `time_created`. Its authored chart has an equivalent chronological table and
