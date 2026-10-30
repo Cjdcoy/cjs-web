@@ -77,6 +77,8 @@ hiding a transient upstream failure.
 | Tracker, leaderboards, maps, players | Yes | Yes | COD2 |
 | Player rank and rank-XP leaderboard  | No  | Yes | COD2 |
 | Player activity summary              | No  | Yes | COD2 |
+| Player weekly events                 | No  | Yes | COD2 |
+| Player skins                         | No  | Yes | COD2 |
 
 COD4 is intentionally absent until the backend documents a source/game contract
 and representative payloads exist. Unsupported combinations throw
