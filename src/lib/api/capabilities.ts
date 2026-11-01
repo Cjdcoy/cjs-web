@@ -21,6 +21,8 @@ export const CAPABILITIES = [
   "players",
   "player-rank",
   "player-activity",
+  "player-events",
+  "player-skins",
   "replay-analytics",
   "replay-playback",
 ] as const;
@@ -30,6 +32,8 @@ export type Capability = (typeof CAPABILITIES)[number];
 const J4L_ONLY = new Set<Capability>([
   "player-rank",
   "player-activity",
+  "player-events",
+  "player-skins",
   "replay-analytics",
   "replay-playback",
 ]);

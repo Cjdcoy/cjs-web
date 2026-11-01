@@ -20,7 +20,7 @@ import {
   stringQueryParam,
 } from "../../lib/routing";
 
-export const PLAYER_PROFILE_VIEWS = ["overview", "runs", "progress", "routes"] as const;
+export const PLAYER_PROFILE_VIEWS = ["overview", "runs", "progress", "routes", "events"] as const;
 export type PlayerProfileView = (typeof PLAYER_PROFILE_VIEWS)[number];
 
 export const BEST_RUN_SORTS = ["rank", "points", "date"] as const;

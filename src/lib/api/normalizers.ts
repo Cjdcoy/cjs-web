@@ -10,12 +10,14 @@ import {
   type MapPlayerPlaytime,
   type Player,
   type PlayerActivitySummary,
+  type PlayerEvents,
   type PlayerLeaderboard,
   type PlayerLeaderboardPosition,
   type PlayerJumpScores,
   type PlayerPerformanceStats,
   type PlayerRankInfo,
   type PlayerRouteCompletion,
+  type PlayerSkin,
   type RankLeaderboardEntry,
   type RecentRunsPage,
   type ReplayMarker,
@@ -301,6 +303,59 @@ export function normalizeRankLeaderboard(value: unknown, path: string): RankLead
 
 export function normalizePlayerActivity(value: unknown, path: string): PlayerActivitySummary {
   return normalizePlayerActivityAt(value, path, "$response");
+}
+
+export function normalizePlayerEvents(value: unknown, path: string): PlayerEvents {
+  const object = wireStruct(value, path, "$response", 3);
+  return {
+    player_id: requiredNumber(object, "player_id", path, "$response", 0),
+    weeks: array(field(object, "weeks", 1), path, "$response.weeks").map((entry, index) => {
+      const at = `$response.weeks[${index}]`;
+      const week = wireStruct(entry, path, at, 9);
+      return {
+        event_id: requiredNumber(week, "event_id", path, at, 0),
+        season_id: requiredNumber(week, "season_id", path, at, 1),
+        week_no: requiredNumber(week, "week_no", path, at, 2),
+        ends_at: requiredString(week, "ends_at", path, at, 3),
+        fps: requiredNumber(week, "fps", path, at, 4),
+        rank: requiredNumber(week, "rank", path, at, 5),
+        points: requiredNumber(week, "points", path, at, 6),
+        maps_finished: requiredNumber(week, "maps_finished", path, at, 7),
+        participants: requiredNumber(week, "participants", path, at, 8),
+      };
+    }),
+    seasons: array(field(object, "seasons", 2), path, "$response.seasons").map((entry, index) => {
+      const at = `$response.seasons[${index}]`;
+      const season = wireStruct(entry, path, at, 7);
+      return {
+        season_id: requiredNumber(season, "season_id", path, at, 0),
+        status: requiredString(season, "status", path, at, 1),
+        fps: requiredNumber(season, "fps", path, at, 2),
+        rank: requiredNumber(season, "rank", path, at, 3),
+        points: requiredNumber(season, "points", path, at, 4),
+        weekly_wins: requiredNumber(season, "weekly_wins", path, at, 5),
+        participants: requiredNumber(season, "participants", path, at, 6),
+      };
+    }),
+  };
+}
+
+export function normalizePlayerSkins(value: unknown, path: string): PlayerSkin[] {
+  return array(value, path, "$response").map((entry, index) => {
+    const at = `$response[${index}]`;
+    const skin = wireStruct(entry, path, at, 9);
+    return {
+      skin_id: requiredNumber(skin, "skin_id", path, at, 0),
+      category: requiredString(skin, "category", path, at, 1),
+      item: requiredString(skin, "item", path, at, 2),
+      display_name: requiredString(skin, "display_name", path, at, 3),
+      unlock_type: requiredString(skin, "unlock_type", path, at, 4),
+      image: nullableString(skin, "image", path, 5),
+      source: requiredString(skin, "source", path, at, 6),
+      unlocked_at: requiredString(skin, "unlocked_at", path, at, 7),
+      active: requiredBoolean(skin, "active", path, at, 8),
+    };
+  });
 }
 
 export function normalizeReplayWatchAggregate(value: unknown, path: string): ReplayWatchAggregate {

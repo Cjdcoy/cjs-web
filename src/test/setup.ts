@@ -4,6 +4,9 @@ import { afterAll, afterEach, beforeAll } from "vitest";
 
 import { server } from "./server";
 
+// jsdom does not implement scrolling.
+Element.prototype.scrollIntoView = () => {};
+
 beforeAll(() => {
   server.listen({ onUnhandledRequest: "error" });
 });

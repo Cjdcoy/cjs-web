@@ -2659,6 +2659,33 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   32 s; the cold image pull (3.5 GB) took 16 s. The run left no root-owned files.
 - **Remaining work/risks:** the image pull time on GitHub-hosted runners is only measurable there.
 
+### CJS-079 — J4L Weekly Cup and skins on player profiles
+
+- **Status:** done
+- **Owner/handoff:** Claude (Fable supervisor, Opus worker) / player profiles
+- **Dependencies:** CJS-011, cjs-backend `GET /api/v1/player/events` and `GET /api/v1/player/skins`
+  (cjs-backend PR #12)
+- **Primary boundary:** `src/lib/api` (`playerEvents`, `playerSkins`, J4L-only capabilities,
+  normalizers, fixtures), `src/features/players` (`PlayerDetailPage.tsx`, `usePlayerProfile.ts`,
+  `playerProfile.css`), `src/app/shell/AppShell.tsx`, `scripts/check-performance.mjs`
+- **Outcome:**
+  - J4L profiles get a `view=events` Weekly Cup tab (season placements and every returned week,
+    linking to jump4life.org/events), fetched only there; a JH `view=events` URL shows the
+    overview. The overview gets a Skins section grouped by category with an Equipped badge, the
+    image or a placeholder, and the unlock source (shop, member, prestige, donator, free, and
+    `allroutes` shown as "Secret"). The owner allows owned secret items, member and donator
+    sources and the free default item on public profiles.
+  - A 404 (backend routes not deployed yet) or 503 (J4L tables not migrated yet) from either
+    endpoint is not a profile error: the Weekly Cup tab shows a "not available yet" notice and
+    the Skins section is hidden.
+  - Budgets raised narrowly: route increment from 37 to 39 KiB (38.5 KiB measured), total
+    JavaScript from 163.5 to 165.5 KiB (165.2 KiB measured).
+- **Validation:** `npm run verify`, `npm run deploy:dry-run`, and `npm run test:e2e` in Chromium and
+  Firefox. Contract tests cover both endpoints in v2 JSON and positional MessagePack; component
+  tests cover the tab, the skin tables and labels, the empty states, and 404 and 503 hiding.
+- **Remaining work/risks:** WebKit e2e was not run locally. Until cjs-backend PR #12 deploys, J4L
+  profiles show no Skins section and the Weekly Cup tab shows its notice.
+
 ## Agent handoff template
 
 ```md

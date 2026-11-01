@@ -760,7 +760,9 @@
     border: 0;
   }
 
+  /* A table-caption inside the block-displayed table shrinks to its longest word. */
   .cjs-table caption {
+    display: block;
     padding-inline: 0;
   }
 

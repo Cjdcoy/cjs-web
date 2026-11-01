@@ -4,15 +4,18 @@ import {
   BarChart3,
   CalendarClock,
   Clock3,
+  ExternalLink,
   Gauge,
   Heart,
+  ImageOff,
   Medal,
   RefreshCw,
   Route,
   Search,
+  Shirt,
   Trophy,
 } from "lucide-react";
-import { Suspense, lazy, useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, lazy, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { Page } from "../../components";
 import { ReplayLink } from "../../components/ReplayLink";
 import {
@@ -31,6 +34,7 @@ import {
   SegmentedControl,
   Select,
   SkeletonGroup,
+  VisuallyHidden,
   type DataTableColumn,
   type SortOrder,
 } from "../../components/ui";
@@ -40,11 +44,15 @@ import {
   type GameMap,
   type Player,
   type PlayerActivitySummary,
+  type PlayerEvents,
+  type PlayerEventSeason,
+  type PlayerEventWeek,
   type PlayerJumpScores,
   type PlayerLeaderboardPosition,
   type PlayerPerformanceStats,
   type PlayerRankInfo,
   type PlayerRouteCompletion,
+  type PlayerSkin,
   type Source,
   type SimpleTop,
   type TopRun,
@@ -125,7 +133,10 @@ function PlayerProfile({
   playerId: number;
 }) {
   const { source } = useSourceContext();
-  const [queryState, setQueryState] = useQueryState(playerProfileQuerySchema);
+  const [query, setQueryState] = useQueryState(playerProfileQuerySchema);
+  // Weekly events exist only in J4L; elsewhere view=events shows the overview.
+  const queryState =
+    query.view === "events" && source !== "j4l" ? { ...query, view: "overview" as const } : query;
   const resources = usePlayerProfile({
     apiClient,
     fps: queryState.fps,
@@ -151,11 +162,16 @@ function PlayerProfile({
         ? [resources.scores, ...(queryState.map > 0 ? [resources.mapRuns] : [])]
         : queryState.view === "routes"
           ? [resources.routes, resources.maps]
-          : [
-              resources.performance,
-              resources.positions,
-              ...(source === "j4l" ? [resources.rank, resources.activity] : []),
-            ];
+          : queryState.view === "events"
+            ? [resources.events]
+            : [
+                resources.performance,
+                resources.positions,
+                // JH, and skins before its J4L tables exist, are "unsupported".
+                ...[resources.rank, resources.activity, resources.skins].filter(
+                  (resource) => resource.status !== "unsupported",
+                ),
+              ];
   const isSettling = [resources.directory, ...supportedResources].some(
     (resource) => resource.status === "loading" || resource.status === "refreshing",
   );
@@ -322,6 +338,9 @@ function PlayerProfile({
                       resource={resources.performance}
                       onRetry={resources.reload}
                     />
+                    {resources.skins.status !== "unsupported" && (
+                      <SkinsSection resource={resources.skins} onRetry={resources.reload} />
+                    )}
                     <Suspense
                       fallback={
                         <div className="cjs-player-profile__replay-loading" aria-hidden="true">
@@ -377,6 +396,9 @@ function PlayerProfile({
                 runs={resources.mapRuns}
                 tops={resources.tops}
               />
+            )}
+            {queryState.view === "events" && (
+              <WeeklyEventsSection resource={resources.events} onRetry={resources.reload} />
             )}
             {queryState.view === "routes" && (
               <RouteCompletionSection
@@ -470,10 +492,19 @@ function ProfileNavigation({
     { label: "Best runs", value: "runs" },
     { label: "Run analytics", value: "progress" },
     { label: "Route completion", value: "routes" },
+    ...(source === "j4l" ? [{ label: "Weekly Cup", value: "events" } as const] : []),
   ];
+  const navRef = useRef<HTMLElement>(null);
+
+  // On phones the strip scrolls sideways; keep the active tab visible without moving the page.
+  useEffect(() => {
+    navRef.current
+      ?.querySelector("[data-active]")
+      ?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [view]);
 
   return (
-    <nav className="cjs-player-profile__tabs" aria-label="Player profile sections">
+    <nav ref={navRef} className="cjs-player-profile__tabs" aria-label="Player profile sections">
       {views.map((option) => (
         <a
           key={option.value}
@@ -1435,6 +1466,236 @@ function ActivitySection({
             </details>
           </div>
         )}
+      </ResourceState>
+    </ProfileSection>
+  );
+}
+
+const J4L_EVENTS_URL = "https://jump4life.org/events";
+
+const SEASON_STATUS_LABELS: Record<string, string> = {
+  active: "In progress",
+  finished: "Finished",
+};
+
+const EVENT_SEASON_COLUMNS: readonly DataTableColumn<PlayerEventSeason>[] = [
+  {
+    id: "season",
+    header: "Season",
+    priority: "primary",
+    cell: (season) => `Season ${season.season_id}`,
+  },
+  { id: "fps", header: "FPS", cell: (season) => season.fps },
+  {
+    id: "rank",
+    header: "Rank",
+    cell: (season) => eventRank(season.rank, season.participants),
+  },
+  {
+    id: "points",
+    header: "Points",
+    align: "end",
+    cell: (season) => formatProfileNumber(season.points),
+  },
+  {
+    id: "wins",
+    header: "Weekly wins",
+    align: "end",
+    cell: (season) => formatProfileNumber(season.weekly_wins),
+  },
+  {
+    id: "status",
+    header: "Status",
+    cell: (season) => (
+      <Badge tone={season.status === "active" ? "information" : "neutral"}>
+        {SEASON_STATUS_LABELS[season.status] ?? sentenceCase(season.status)}
+      </Badge>
+    ),
+  },
+];
+
+const EVENT_WEEK_COLUMNS: readonly DataTableColumn<PlayerEventWeek>[] = [
+  {
+    id: "week",
+    header: "Week",
+    priority: "primary",
+    cell: (week) => `Week ${week.week_no} · Season ${week.season_id}`,
+  },
+  { id: "fps", header: "FPS", cell: (week) => week.fps },
+  {
+    id: "rank",
+    header: "Rank",
+    cell: (week) => eventRank(week.rank, week.participants),
+  },
+  {
+    id: "points",
+    header: "Points",
+    align: "end",
+    cell: (week) => formatProfileNumber(week.points),
+  },
+  {
+    id: "maps",
+    header: "Maps finished",
+    align: "end",
+    cell: (week) => formatProfileNumber(week.maps_finished),
+  },
+];
+
+const SKIN_CATEGORIES = [
+  ["outfit", "Outfits"],
+  ["hat", "Hats"],
+  ["cape", "Capes"],
+  ["weapon", "Weapons"],
+] as const;
+
+const SKIN_SOURCE_LABELS: Record<string, string> = {
+  buy: "Bought in the shop",
+  member: "Member",
+  prestige: "Prestige",
+  donator: "Donator",
+  free: "Free",
+  allroutes: "Secret",
+};
+
+const SKIN_COLUMNS: readonly DataTableColumn<PlayerSkin>[] = [
+  {
+    id: "preview",
+    header: "Preview",
+    cell: (skin) =>
+      skin.image ? (
+        <img className="cjs-player-profile__skin-preview" src={skin.image} alt="" loading="lazy" />
+      ) : (
+        <span className="cjs-player-profile__skin-preview" aria-hidden="true">
+          <ImageOff size={18} />
+        </span>
+      ),
+  },
+  {
+    id: "name",
+    header: "Skin",
+    priority: "primary",
+    cell: (skin) => (
+      <span className="cjs-player-profile__skin-name">
+        {skin.display_name}
+        {skin.active && <Badge tone="success">Equipped</Badge>}
+      </span>
+    ),
+  },
+  {
+    id: "source",
+    header: "Unlocked by",
+    cell: (skin) => SKIN_SOURCE_LABELS[skin.source] ?? sentenceCase(skin.source),
+  },
+];
+
+function WeeklyEventsSection({
+  onRetry,
+  resource,
+}: {
+  onRetry: () => void;
+  resource: ProfileResource<PlayerEvents>;
+}) {
+  return (
+    <ProfileSection
+      actions={
+        <Link href={J4L_EVENTS_URL} target="_blank" rel="noreferrer" variant="standalone">
+          All Weekly Cup results
+          <ExternalLink aria-hidden="true" size={14} />
+          <VisuallyHidden> (opens in a new tab)</VisuallyHidden>
+        </Link>
+      }
+      className="cjs-player-profile__section--events"
+      description="Season placements and finished weeks of the Jump4Life Weekly Cup."
+      icon={<Trophy size={19} />}
+      id="player-events"
+      title="Weekly Cup"
+    >
+      {resource.status === "unsupported" ? (
+        // 503: the J4L weekly-event tables are not migrated yet.
+        <EmptyState
+          description="Results appear here once the Jump4Life Weekly Cup goes live."
+          title="The Weekly Cup is not available yet"
+        />
+      ) : (
+        <ResourceState resource={resource} label="Weekly Cup results" onRetry={onRetry}>
+          {(events) =>
+            events.weeks.length || events.seasons.length ? (
+              <div className="cjs-player-profile__table-stack">
+                <DataTable
+                  caption="Season placements"
+                  captionVisible
+                  columns={EVENT_SEASON_COLUMNS}
+                  emptyMessage="No season placements yet."
+                  getRowKey={(season) => `${season.season_id}-${season.fps}`}
+                  rows={events.seasons}
+                />
+                <DataTable
+                  caption="Weeks"
+                  captionVisible
+                  columns={EVENT_WEEK_COLUMNS}
+                  emptyMessage="No finished weeks yet."
+                  getRowKey={(week) => `${week.event_id}-${week.fps}`}
+                  rows={events.weeks}
+                />
+              </div>
+            ) : (
+              <EmptyState
+                description="This player has not placed in a finished Weekly Cup week yet. Results appear once a week closes."
+                title="No Weekly Cup results yet"
+              />
+            )
+          }
+        </ResourceState>
+      )}
+    </ProfileSection>
+  );
+}
+
+function eventRank(rank: number, participants: number): string {
+  return `#${rank} of ${formatProfileNumber(participants)}`;
+}
+
+function SkinsSection({
+  onRetry,
+  resource,
+}: {
+  onRetry: () => void;
+  resource: ProfileResource<PlayerSkin[]>;
+}) {
+  return (
+    <ProfileSection
+      className="cjs-player-profile__section--skins"
+      description="Unlocked cosmetics; equipped ones are worn in game."
+      icon={<Shirt size={19} />}
+      id="player-skins"
+      title="Skins"
+    >
+      <ResourceState resource={resource} label="skins" onRetry={onRetry}>
+        {(skins) => {
+          const groups = SKIN_CATEGORIES.map(([category, caption]) => ({
+            caption,
+            rows: skins.filter((skin) => skin.category === category),
+          })).filter((group) => group.rows.length);
+          return groups.length ? (
+            <div className="cjs-player-profile__table-stack">
+              {groups.map(({ caption, rows }) => (
+                <DataTable
+                  key={caption}
+                  caption={caption}
+                  captionVisible
+                  columns={SKIN_COLUMNS}
+                  getRowKey={(skin) => skin.skin_id}
+                  rows={rows}
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              description="This player has not unlocked any skins yet."
+              title="No skins unlocked yet"
+            />
+          );
+        }}
       </ResourceState>
     </ProfileSection>
   );

@@ -4,8 +4,10 @@ import { describe, expect, it } from "vitest";
 import {
   normalizeLeaderboard,
   normalizeMaps,
+  normalizePlayerEvents,
   normalizePlayerJumpScores,
   normalizePlayerPerformance,
+  normalizePlayerSkins,
   normalizePlayers,
   normalizeRankLeaderboard,
   normalizeRecentRunsPage,
@@ -91,6 +93,16 @@ describe("Go positional MessagePack normalization", () => {
       "mwemanVtcGVyAcsAAAAAAAAAAKCgoKBkgQECkZUJp21wX2p1bXBky0ASAAAAAAAAAQ==",
       '{"player_id":7,"player_name":"jumper","rank":1,"rating":0,"country":"","country_code":"","region":"","last_seen":"","score":100,"top_list":{"1":2},"map_scores":[{"map_id":9,"map_name":"mp_jump","score":100,"difficulty":4.5,"rank":1}]}',
     ],
+    [
+      normalizePlayerEvents,
+      "k80B9ZGZHwIHtDIwMjYtMTEtMDJUMDE6MDA6MDBafQTNAa8FDpGXBqZhY3RpdmXM+gjNBLAJFA==",
+      '{"player_id":501,"weeks":[{"event_id":31,"season_id":2,"week_no":7,"ends_at":"2026-11-02T01:00:00Z","fps":125,"rank":4,"points":431,"maps_finished":5,"participants":14}],"seasons":[{"season_id":6,"status":"active","fps":250,"rank":8,"points":1200,"weekly_wins":9,"participants":20}]}',
+    ],
+    [
+      normalizePlayerSkins,
+      "kZkEo2hhdKh0ZXN0X2hhdKhUZXN0IGhhdKNidXm8aHR0cHM6Ly9leGFtcGxlLnRlc3QvaGF0LnBuZ6ZtZW1iZXK0MjAyNi0xMC0yN1QxODowMzoxMVrD",
+      '[{"skin_id":4,"category":"hat","item":"test_hat","display_name":"Test hat","unlock_type":"buy","image":"https://example.test/hat.png","source":"member","unlocked_at":"2026-10-27T18:03:11Z","active":true}]',
+    ],
   ] as const)("matches another supplied endpoint fixture", (normalize, msgpack, json) => {
     expect(normalize(decodeBase64(msgpack), "/api/v2/fixture")).toEqual(
       normalize(JSON.parse(json), "/api/v2/fixture"),
@@ -110,6 +122,8 @@ describe("Go positional MessagePack normalization", () => {
 
   it("rejects truncated positional structs", () => {
     expect(() => normalizeMaps([[4, "mp_jump"]], "/api/v2/maps")).toThrow();
+    expect(() => normalizePlayerEvents([501, [[3, 1, 3]], []], "/api/v2/player/events")).toThrow();
+    expect(() => normalizePlayerSkins([[4, "hat", "test_hat"]], "/api/v2/player/skins")).toThrow();
   });
 });
 

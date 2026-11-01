@@ -296,6 +296,59 @@ const playerActivityResponse = {
 
 export const playerActivityFixture: unknown = playerActivityResponse;
 
+export const playerEventsFixture: unknown = {
+  player_id: 501,
+  weeks: [
+    {
+      event_id: 3,
+      season_id: 1,
+      week_no: 3,
+      ends_at: "2026-11-02T01:00:00Z",
+      fps: 125,
+      rank: 1,
+      points: 431,
+      maps_finished: 5,
+      participants: 14,
+    },
+  ],
+  seasons: [
+    {
+      season_id: 1,
+      status: "active",
+      fps: 125,
+      rank: 2,
+      points: 1200,
+      weekly_wins: 2,
+      participants: 20,
+    },
+  ],
+};
+
+export const playerSkinsFixture: unknown = [
+  {
+    skin_id: 4,
+    category: "hat",
+    item: "test_hat",
+    display_name: "Test hat",
+    unlock_type: "buy",
+    image: null,
+    source: "buy",
+    unlocked_at: "2026-10-27T18:03:11Z",
+    active: true,
+  },
+  {
+    skin_id: 9,
+    category: "outfit",
+    item: "test_outfit",
+    display_name: "Test outfit",
+    unlock_type: "member",
+    image: null,
+    source: "member",
+    unlocked_at: "2026-10-20T08:00:00Z",
+    active: false,
+  },
+];
+
 export const j4lPlayersFixture: unknown = [
   {
     ...playerResponse,

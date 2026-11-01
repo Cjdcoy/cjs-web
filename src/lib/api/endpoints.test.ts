@@ -5,11 +5,13 @@ import {
   mapPlayersPlaytimeFixture,
   mapsFixture,
   playerActivityFixture,
+  playerEventsFixture,
   playerJumpScoresFixture,
   playerPerformanceFixture,
   playerPositionsFixture,
   playerRankFixture,
   playerRoutesFixture,
+  playerSkinsFixture,
   playersFixture,
   rankLeaderboardFixture,
   recentRunsFixture,
@@ -87,6 +89,10 @@ describe("typed CJS API endpoints", () => {
     await expect(
       api.playerActivitySummary({ source: "j4l", playerId: 501 }),
     ).resolves.toMatchObject({ jump_count: 2400 });
+    await expect(api.playerEvents({ source: "j4l", playerId: 501 })).resolves.toMatchObject({
+      weeks: [expect.objectContaining({ points: 431 })],
+    });
+    await expect(api.playerSkins({ source: "j4l", playerId: 501 })).resolves.toHaveLength(2);
     await expect(
       api.replayWatchAggregate({ source: "j4l", ownerPlayerId: 501 }),
     ).resolves.toMatchObject({ replay_count: 2, watch_count: 18 });
@@ -117,6 +123,8 @@ describe("typed CJS API endpoints", () => {
       "https://example.test/proxy/api/v1/player/routes-completion?source=jh&playerid=501",
       "https://example.test/proxy/api/v1/player/rank?source=j4l&playerid=501",
       "https://example.test/proxy/api/v1/player/activity-summary?source=j4l&playerid=501",
+      "https://example.test/proxy/api/v1/player/events?source=j4l&playerid=501",
+      "https://example.test/proxy/api/v1/player/skins?source=j4l&playerid=501",
       "https://example.test/proxy/api/v1/replay/watch-aggregate?source=j4l&owner_playerid=501",
       "https://example.test/proxy/api/v1/replay/watch-rankings?source=j4l&metric=watch_count&mapid=101&limit=5&offset=0",
     ]);
@@ -317,6 +325,12 @@ describe("typed CJS API endpoints", () => {
     await expect(api.playerActivitySummary({ source: "jh", playerId: 501 })).rejects.toBeInstanceOf(
       UnsupportedCapabilityError,
     );
+    await expect(api.playerEvents({ source: "jh", playerId: 501 })).rejects.toBeInstanceOf(
+      UnsupportedCapabilityError,
+    );
+    await expect(api.playerSkins({ source: "jh", playerId: 501 })).rejects.toBeInstanceOf(
+      UnsupportedCapabilityError,
+    );
     await expect(api.rankXpLeaderboard({ source: "jh" })).rejects.toBeInstanceOf(
       UnsupportedCapabilityError,
     );
@@ -380,6 +394,8 @@ function responseFor(pathname: string): unknown {
   if (pathname.endsWith("/player/routes-completion")) return playerRoutesFixture;
   if (pathname.endsWith("/player/rank")) return playerRankFixture;
   if (pathname.endsWith("/player/activity-summary")) return playerActivityFixture;
+  if (pathname.endsWith("/player/events")) return playerEventsFixture;
+  if (pathname.endsWith("/player/skins")) return playerSkinsFixture;
   if (pathname.endsWith("/replay/watch-aggregate")) return replayWatchAggregateFixture;
   if (pathname.endsWith("/replay/watch-rankings")) return replayWatchRankingsFixture;
   throw new Error(`Unhandled fixture path: ${pathname}`);
