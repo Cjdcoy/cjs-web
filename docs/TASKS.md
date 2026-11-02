@@ -2499,6 +2499,9 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
     without a valid extension keep the surface path.
   - Map colour and detail textures get 8× anisotropic filtering (three.js clamps it to the GPU
     maximum and skips non-mipmapped lightmaps); glTF colour textures are already trilinear.
+  - The host serves map GLBs as immutable for a year, so a GLB re-uploaded in place gets a
+    `?rev=<n>` query from `MAP_MODEL_REVISIONS` in `src/lib/mapModels.ts` (mp_12 and
+    bhop_delicesine at 1, for their per-material skies). Upload the new GLB before merging a bump.
   - The material-extras code path (lightmap, detail, blend) is removed. Collision, layers, the
     brightness filter, and the weapon pass are unchanged.
 - **Validation:** `npm run verify` on a case-sensitive copy. Unit tests cover extension parsing,

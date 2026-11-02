@@ -4,8 +4,16 @@
  */
 export function getMapModelUrl(mapName: string): string | null {
   const base = modelBase();
-  return base && mapName.trim() ? `${base}/${encodeURIComponent(mapName)}.glb` : null;
+  if (!base || !mapName.trim()) return null;
+  const rev = MAP_MODEL_REVISIONS.get(mapName);
+  return `${base}/${encodeURIComponent(mapName)}.glb${rev ? `?rev=${rev}` : ""}`;
 }
+
+// The host serves map GLBs as immutable for a year: bump a map's number when its GLB is re-uploaded.
+const MAP_MODEL_REVISIONS = new Map([
+  ["mp_12", 1],
+  ["bhop_delicesine", 1],
+]);
 
 export function hasMapModels(): boolean {
   return modelBase() !== null;
