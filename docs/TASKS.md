@@ -2492,13 +2492,25 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
     blends). Light is applied as linear colour × pow(light, 2.2).
   - Fallback colours for missing game materials take their placement's probe light, or Lambert
     under the scene lights, instead of glowing.
-  - `MAPCONV_legacy_sky` becomes the scene background as an unrotated sRGB cube texture.
+  - `MAPCONV_legacy_sky` becomes the scene background as an unrotated sRGB cube texture. Maps
+    that mix skies (mp_12) carry it on each sky material instead: those surfaces draw their own
+    cube (one per distinct face set) along the per-pixel view direction, unlit and unfogged, with
+    the background's x mirror, so a sky surface and the background are seamless. Materials
+    without a valid extension keep the surface path.
+  - Map colour and detail textures get 8× anisotropic filtering (three.js clamps it to the GPU
+    maximum and skips non-mipmapped lightmaps); glTF colour textures are already trilinear.
+  - The host serves map GLBs as immutable for a year, so a GLB re-uploaded in place gets a
+    `?rev=<n>` query from `MAP_MODEL_REVISIONS` in `src/lib/mapModels.ts` (mp_12 and
+    bhop_delicesine at 1, for their per-material skies). Upload the new GLB before merging a bump.
   - The material-extras code path (lightmap, detail, blend) is removed. Collision, layers, the
     brightness filter, and the weapon pass are unchanged.
 - **Validation:** `npm run verify` on a case-sensitive copy. Unit tests cover extension parsing,
   the CoD → scene direction, probe and ambient math, the lighting table, and the shader patches.
   Real Chrome rendered raw and optimized (meshopt, quantized, WebP) jm_pier_250, mp_toujane, and
   jm_pier_2_pro with lighting and sky, and run 28591 with the weapon. Viewer chunk 164.1/170 KiB.
+  Material-level skies: with mp_jump_hard's scene cube copied onto every material, Chrome drew
+  the same frame as with the map hidden (within 1/255), and a patched mp_12 shows each zone's
+  nebula cube. Viewer chunk 175.8/176 KiB.
 - **Remaining work/risks:** normal maps and specular are not applied (as in the converter's
   preview). Back faces reuse the front normal.
 
@@ -2557,6 +2569,11 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   - Not drawn: the camera view kick (the recorded usercmd angles already carry it), an ADS FOV
     change (adsZoomFov equals cg_fov 80), the world-space smoke puff, shell ejects, lastfire and
     reloads (ammo is not recorded), and the hip idle sway and bob (the viewer draws neither).
+  - Fix (missing pistol): three.js bounds a skinned mesh once, in the pose it is first drawn in.
+    A first draw during the raise (a share link inside it, or the model arriving while the gun
+    is holstered) left the gun's bounds below the view, so the hip-pose gun was culled while the
+    hand stayed. Viewmodel meshes, like the player's, are no longer frustum-culled
+    (`modelMeshes.ts`).
 - **Validation:** `npm run verify`. Unit tests cover shot gating (press vs hold, fireTime, the
   expiry-frame lock, raise, melee, no weapon), fWeaponPosFrac by hand-computed frames, the prone
   rule, the gun kick integrator, ADS move and sway, the anim tree times and weights, the flash, and

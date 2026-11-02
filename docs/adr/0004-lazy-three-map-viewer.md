@@ -37,8 +37,11 @@ glTF loader, and a meshopt decoder. Models are tens of megabytes and most visito
   (CJS-082).
 - Shade render materials from the converter's `MAPCONV_legacy_surface` extension (lightmaps, model
   light probes, detail maps, add and multiply blends, alpha tests) by patching three.js's unlit
-  material, and draw the `MAPCONV_legacy_sky` cube as the scene background (CJS-072). Fallback
-  colours without game light stay Lambert under the scene lights.
+  material, and draw the `MAPCONV_legacy_sky` cube as the scene background (CJS-072). Maps that
+  mix skies carry the extension on each sky material instead; those surfaces show their own cube
+  along the view direction, sampled exactly like the background. Fallback colours without game
+  light stay Lambert under the scene lights. Map colour and detail textures use 8× anisotropic
+  filtering.
 - Extend the Content Security Policy with `script-src 'wasm-unsafe-eval'` (the meshopt decoder
   compiles WebAssembly) and `blob:` in `connect-src` and `img-src` (GLB-embedded textures load
   through object URLs). `'wasm-unsafe-eval'` does not permit JavaScript `eval`.

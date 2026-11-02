@@ -50,7 +50,7 @@ import {
   type ViewerFrame,
 } from "./codSpace";
 import { cameraReadout, flySpeedAfterWheel, hipReticle } from "./viewerHud";
-import { loadLegacySky } from "./legacySky";
+import { loadLegacySky, loadMaterialSkies } from "./legacySky";
 import {
   createSurfaceMaterials,
   loadSurfaceLighting,
@@ -58,6 +58,7 @@ import {
 } from "./legacySurface";
 import { createEntityLight } from "./entityLight";
 import { instanceMeshes } from "./instancing";
+import { prepareModelMeshes } from "./modelMeshes";
 import { createPlayerRig, type PlayerRig } from "./playerRig";
 import { viewmodelMotion } from "./viewmodelMotion";
 import "./displayGamma";
@@ -160,6 +161,9 @@ const COLLISION_COLORS: Readonly<Record<string, number>> = {
 };
 const OTHER_COLLISION_COLOR = 0xffd633;
 const COLLISION_OPACITY = 0.35;
+// Floors and walls at grazing angles blur under trilinear filtering alone. three.js applies
+// anisotropy to mipmapped textures only (not lightmaps) and clamps it to the GPU's maximum.
+const MAP_ANISOTROPY = 8;
 
 /**
  * Camera-space placement of the first-person weapon model, in metres and radians (three.js camera
@@ -277,7 +281,7 @@ export default function MapViewerCanvas({
     const camera = new PerspectiveCamera(VIEW_FIELD_OF_VIEW, 1, 0.05, 2000);
     const controls = new PointerLockControls(camera, canvas);
     const materials = createMaterialCache();
-    const surfaces: SurfaceMaterials[] = [];
+    const surfaces: Pick<SurfaceMaterials, "dispose">[] = [];
 
     const runner = new Group();
     runner.visible = false;
@@ -364,18 +368,9 @@ export default function MapViewerCanvas({
         return null;
       }
       if (modelSurfaces) surfaces.push(modelSurfaces);
-      gltf.scene.traverse((object) => {
-        const mesh = object as Partial<Mesh>;
-        if (!mesh.isMesh || !mesh.material || Array.isArray(mesh.material)) return;
-        if (modelSurfaces) {
-          mesh.material = modelSurfaces.material(object as Mesh);
-          return;
-        }
-        mesh.material = entityLight.material(mesh.material);
-        // The player's skinned meshes keep their bind-pose bounds, which prone, jumps and mantles
-        // leave.
-        object.frustumCulled = false;
-      });
+      prepareModelMeshes(gltf.scene, (mesh, current) =>
+        modelSurfaces ? modelSurfaces.material(mesh) : entityLight.material(current),
+      );
       return gltf;
     };
 
@@ -692,15 +687,20 @@ export default function MapViewerCanvas({
         const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
         const gltf = await loader.parseAsync(data, "");
         const root = gltf.scene;
-        const [lighting, sky] = await Promise.all([loadSurfaceLighting(gltf), loadLegacySky(gltf)]);
+        const [lighting, sky, skies] = await Promise.all([
+          loadSurfaceLighting(gltf),
+          loadLegacySky(gltf),
+          loadMaterialSkies(gltf),
+        ]);
         const mapSurfaces = createSurfaceMaterials(lighting);
         if (controller.signal.aborted) {
           disposeObject(root);
           mapSurfaces.dispose();
+          skies.dispose();
           sky?.dispose();
           return;
         }
-        surfaces.push(mapSurfaces);
+        surfaces.push(mapSurfaces, skies);
         if (sky) scene.background = sky;
         const render = root.children.find((node) => nameOf(node) === "render");
         if (render) entityLight.setMap(render, lighting);
@@ -716,9 +716,12 @@ export default function MapViewerCanvas({
               mesh.material = materials.collision(collisionClass(object));
               return;
             }
-            mesh.material = mapSurfaces.material(object as Mesh);
+            mesh.material = skies.material(mesh.material) ?? mapSurfaces.material(object as Mesh);
+            const { map } = mesh.material as Partial<MeshBasicMaterial>;
+            if (map) map.anisotropy = MAP_ANISOTROPY;
           });
         }
+        lighting.textures.forEach((texture) => (texture.anisotropy = MAP_ANISOTROPY));
         const layerItems = listLayers(root, objects, materials);
         instanceMeshes(root, new Set(objects.values()), (mesh) => mapSurfaces.probeIndex(mesh));
         scene.add(root);
