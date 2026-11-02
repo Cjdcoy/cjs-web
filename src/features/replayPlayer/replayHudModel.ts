@@ -18,11 +18,12 @@ export const HUD_SPEED_METER_Y = 50;
 export const HUD_JUMP_TIMER_Y = -30;
 
 const RADIANS = Math.PI / 180;
-const FLAG_IN_AIR = 4;
-const INPUT_FORWARD = 32;
-const INPUT_BACK = 64;
-const INPUT_LEFT = 128;
-const INPUT_RIGHT = 256;
+/** Recorder flags bit 4 (airborne) and input_mask move bits (_replay_record.gsc). */
+export const FLAG_IN_AIR = 4;
+export const INPUT_FORWARD = 32;
+export const INPUT_BACK = 64;
+export const INPUT_LEFT = 128;
+export const INPUT_RIGHT = 256;
 
 /** 0 hidden (on ground), 1 centre marker only, 2 full helper, as anglehelper_apply. */
 export type AngleHelperDisplay = 0 | 1 | 2;
@@ -259,7 +260,7 @@ const JUMP_LAND_SLOWDOWN_MS = 1800;
 const JUMP_LAND_HIGH_SLOWDOWN_MS = 1200;
 /** Landing this far above the jump origin takes the shorter slowdown. */
 const JUMP_LAND_HIGH_Z = 18;
-const INPUT_JUMP = 2;
+export const INPUT_JUMP = 2;
 
 /**
  * Jump timer as the live J4L HUD (_nadejumps.gsc while_alive): int(getjumpslowdowntimer() / 100) / 10,

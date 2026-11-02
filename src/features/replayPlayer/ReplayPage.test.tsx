@@ -16,7 +16,9 @@ import type { ReplaySamplesApi } from "./useReplaySamples";
 
 const viewerProps = vi.hoisted(() => ({ current: null as MapViewerProps | null }));
 
-vi.mock("../mapViewer", () => ({
+vi.mock("../mapViewer", async () => ({
+  // The free camera poses the runner's body, which leans like the camera.
+  leanFraction: (await import("../mapViewer/codSpace")).leanFraction,
   VIEW_FIELD_OF_VIEW: 65,
   MapViewer: (props: MapViewerProps) => {
     viewerProps.current = props;
@@ -315,6 +317,19 @@ describe("ReplayPage", () => {
     });
   });
 
+  it("hides the free-camera path and remembers it", async () => {
+    const user = userEvent.setup();
+    render(<ReplayPage apiClient={apiReturning(Promise.resolve(hudSamples))} runId="7001" />);
+
+    const hud = await screen.findByRole("group", { name: "HUD" });
+    const path = within(hud).getByRole("checkbox", { name: "Path" });
+    expect(path).toBeChecked();
+    expect(viewerProps.current?.showPath).toBe(true);
+    await user.click(path);
+    expect(viewerProps.current?.showPath).toBe(false);
+    expect(JSON.parse(storageValues.get("cjs.replay-hud") ?? "{}")).toMatchObject({ path: false });
+  });
+
   it("sets the map brightness from a remembered percentage slider", async () => {
     render(<ReplayPage apiClient={apiReturning(Promise.resolve(hudSamples))} runId="7001" />);
 
@@ -414,6 +429,14 @@ describe("ReplayPage", () => {
     await user.keyboard("c");
     expect(freeCamera).toHaveAttribute("aria-pressed", "true");
     expect(viewerProps.current?.getFrame?.()?.follow).toBe(false);
+    // The detached camera draws the runner's body, standing on its feet origin, once idle time has
+    // prepared it.
+    await waitFor(() =>
+      expect(viewerProps.current?.getFrame?.()).toMatchObject({
+        follow: false,
+        body: { z: 0, yaw: 90, anims: [expect.objectContaining({ weight: 1 })] },
+      }),
+    );
 
     await user.click(screen.getByRole("button", { name: "Play" }));
     expect(screen.getByRole("button", { name: "Pause" })).toBeVisible();

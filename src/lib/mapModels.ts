@@ -26,6 +26,15 @@ export function getViewmodelUrl(): string | null {
   return modelAssetUrl(`viewmodel/${VIEWMODEL_WEAPON}_anims.glb`);
 }
 
+/**
+ * Third-person player model drawn for the runner from the replay free camera: the J4L body, head and
+ * Luger skinned to one skeleton with the CoD2 player xanims. Replays do not record the outfit, so
+ * every runner wears the free default outfit, gunpyeong.
+ */
+export function getPlayerModelUrl(): string | null {
+  return modelAssetUrl("player/j4l_body_gunpyeong.glb");
+}
+
 /** An asset served beside the map models (a path relative to the model base, as in sounds.json). */
 export function modelAssetUrl(path: string): string | null {
   const base = modelBase();

@@ -45,6 +45,7 @@ import {
   METRES_PER_COD_UNIT,
   sceneToCodPose,
   VIEW_FIELD_OF_VIEW,
+  type BodyPose,
   type CodPose,
   type ViewerFrame,
 } from "./codSpace";
@@ -55,7 +56,9 @@ import {
   loadSurfaceLighting,
   type SurfaceMaterials,
 } from "./legacySurface";
+import { createEntityLight } from "./entityLight";
 import { instanceMeshes } from "./instancing";
+import { createPlayerRig, type PlayerRig } from "./playerRig";
 import { viewmodelMotion } from "./viewmodelMotion";
 import "./displayGamma";
 import "./mapViewer.css";
@@ -72,6 +75,8 @@ export interface MapViewerProps {
   getFrame?: () => ViewerFrame | null;
   /** Flat CoD xyz endpoint pairs of path segments, drawn while the camera is detached. */
   path?: readonly number[];
+  /** Draws the path; on unless false. */
+  showPath?: boolean;
   /**
    * Controls rendered directly below the view. A function receives the viewer's own tools (the
    * Layers button) to place in its control bar; otherwise the tools follow in their own bar.
@@ -81,6 +86,11 @@ export interface MapViewerProps {
   overlay?: ReactNode;
   /** First-person weapon model, loaded on first show and drawn only while following. */
   viewmodel?: ViewmodelOptions;
+  /**
+   * Third-person player model URL, loaded the first time the camera is detached and drawn for a
+   * frame's body; the marker stands in until both are ready, or if the model fails.
+   */
+  playerModelUrl?: string;
   /** Receives a ground probe once the map's collision has loaded, and null on unmount. */
   onCollision?: (probe: CollisionProbe | null) => void;
   /** Display gamma of the map render (see displayGamma.ts); above 1 lifts shadows. */
@@ -176,6 +186,8 @@ export default function MapViewerCanvas({
   onCollision,
   overlay,
   path,
+  playerModelUrl,
+  showPath = true,
   viewmodel,
 }: MapViewerProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -183,7 +195,9 @@ export default function MapViewerCanvas({
   const readoutRef = useRef<HTMLSpanElement>(null);
   const getFrameRef = useRef(getFrame);
   const viewmodelRef = useRef(viewmodel);
+  const playerModelRef = useRef(playerModelUrl);
   const brightnessRef = useRef(brightness);
+  const showPathRef = useRef(showPath);
   const onCollisionRef = useRef(onCollision);
   const startRef = useRef({ initialPose, path });
   const objectsRef = useRef(new Map<number, Object3D>());
@@ -208,13 +222,15 @@ export default function MapViewerCanvas({
   useEffect(() => {
     getFrameRef.current = getFrame;
     viewmodelRef.current = viewmodel;
+    playerModelRef.current = playerModelUrl;
     onCollisionRef.current = onCollision;
-  }, [getFrame, onCollision, viewmodel]);
+  }, [getFrame, onCollision, playerModelUrl, viewmodel]);
 
   useEffect(() => {
     brightnessRef.current = brightness;
+    showPathRef.current = showPath;
     needsRenderRef.current = true;
-  }, [brightness]);
+  }, [brightness, showPath]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -273,7 +289,8 @@ export default function MapViewerCanvas({
     marker.renderOrder = 1;
     runner.add(marker);
     const { initialPose: startPose, path: startPath } = startRef.current;
-    if (startPath && startPath.length >= 6) runner.add(createPath(startPath, accent));
+    const pathLine = startPath && startPath.length >= 6 ? createPath(startPath, accent) : null;
+    if (pathLine) runner.add(pathLine);
     scene.add(runner);
     runner.updateMatrixWorld(true);
 
@@ -328,27 +345,70 @@ export default function MapViewerCanvas({
     };
     renderer.autoClear = false;
 
+    // The third-person player, posed from the frame's body while the camera is detached and lit
+    // from the map below it.
+    let playerState: "idle" | "loading" | "ready" | "failed" = "idle";
+    let player: PlayerRig | null = null;
+    const entityLight = createEntityLight();
+
+    /**
+     * A model GLB with the game's surface materials (or entity-lit ones), or null once unmounted.
+     */
+    const loadModel = async (url: string, lit = false) => {
+      const data = await fetchModel(url, controller.signal, () => undefined);
+      const gltf = await new GLTFLoader().setMeshoptDecoder(MeshoptDecoder).parseAsync(data, "");
+      const modelSurfaces = lit ? null : createSurfaceMaterials(await loadSurfaceLighting(gltf));
+      if (controller.signal.aborted) {
+        disposeObject(gltf.scene);
+        modelSurfaces?.dispose();
+        return null;
+      }
+      if (modelSurfaces) surfaces.push(modelSurfaces);
+      gltf.scene.traverse((object) => {
+        const mesh = object as Partial<Mesh>;
+        if (!mesh.isMesh || !mesh.material || Array.isArray(mesh.material)) return;
+        if (modelSurfaces) {
+          mesh.material = modelSurfaces.material(object as Mesh);
+          return;
+        }
+        mesh.material = entityLight.material(mesh.material);
+        // The player's skinned meshes keep their bind-pose bounds, which prone, jumps and mantles
+        // leave.
+        object.frustumCulled = false;
+      });
+      return gltf;
+    };
+
+    const loadPlayer = async (url: string) => {
+      playerState = "loading";
+      try {
+        const gltf = await loadModel(url, true);
+        if (!gltf) return;
+        try {
+          player = createPlayerRig(gltf);
+        } catch (error) {
+          disposeObject(gltf.scene);
+          throw error;
+        }
+        runner.add(gltf.scene);
+        gltf.scene.updateMatrixWorld(true);
+        playerState = "ready";
+      } catch {
+        if (!controller.signal.aborted) playerState = "failed";
+      }
+    };
+
     const loadWeapon = async ({ flashUrl, url }: ViewmodelOptions) => {
       weaponState = "loading";
       const atlas = new TextureLoader().loadAsync(flashUrl).catch(() => null);
       try {
-        const data = await fetchModel(url, controller.signal, () => undefined);
-        const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-        const gltf = await loader.parseAsync(data, "");
-        const weaponSurfaces = createSurfaceMaterials(await loadSurfaceLighting(gltf));
+        const gltf = await loadModel(url);
         const loadedAtlas = await atlas;
-        if (controller.signal.aborted) {
-          disposeObject(gltf.scene);
-          weaponSurfaces.dispose();
+        if (!gltf || controller.signal.aborted) {
+          if (gltf) disposeObject(gltf.scene);
           loadedAtlas?.dispose();
           return;
         }
-        surfaces.push(weaponSurfaces);
-        gltf.scene.traverse((object) => {
-          const mesh = object as Partial<Mesh>;
-          if (!mesh.isMesh || !mesh.material || Array.isArray(mesh.material)) return;
-          mesh.material = weaponSurfaces.material(object as Mesh);
-        });
         weaponMotion.add(gltf.scene);
         weaponMixer = new AnimationMixer(gltf.scene);
         for (const clip of gltf.animations) {
@@ -454,6 +514,7 @@ export default function MapViewerCanvas({
     const drawnWeaponPosition = new Vector3();
     const drawnWeaponQuaternion = new Quaternion();
     let drawnPoseKey = "";
+    let drawnBody: BodyPose | null = null;
     needsRenderRef.current = true;
     // What the free-camera readout last showed; it is rewritten at most every 100 ms on a change.
     const shownPosition = new Vector3(Number.NaN, 0, 0);
@@ -521,10 +582,20 @@ export default function MapViewerCanvas({
         setFree(isFree);
       }
       runner.visible = Boolean(frame) && isFree;
+      if (pathLine) pathLine.visible = showPathRef.current;
       if (frame && !isFree) applyPose(camera, frame.pose);
       if (frame && isFree) {
         marker.position.set(...codToScenePosition(frame.pose.x, frame.pose.y, frame.pose.z));
         marker.updateMatrixWorld(true);
+      }
+      const body = isFree ? frame?.body : undefined;
+      const playerUrl = playerModelRef.current;
+      if (frame && isFree && playerUrl && playerState === "idle") void loadPlayer(playerUrl);
+      const drawBody = body && playerState === "ready" ? body : null;
+      marker.visible = !drawBody;
+      if (player) player.root.visible = Boolean(drawBody);
+      if (drawBody && entityLight.update(drawBody.x, drawBody.y, drawBody.z)) {
+        needsRenderRef.current = true;
       }
       if (isFree) {
         fly(seconds);
@@ -548,6 +619,8 @@ export default function MapViewerCanvas({
         drawnRunner === runner.visible &&
         drawnWeapon === drawWeapon &&
         drawnPoseKey === poseKey &&
+        // The frame getter hands back the same body object while the replay time stands still.
+        drawnBody === drawBody &&
         (!drawWeapon ||
           (drawnWeaponPosition.equals(weaponMotion.position) &&
             drawnWeaponQuaternion.equals(weaponMotion.quaternion)))
@@ -563,6 +636,7 @@ export default function MapViewerCanvas({
       drawnWeaponPosition.copy(weaponMotion.position);
       drawnWeaponQuaternion.copy(weaponMotion.quaternion);
       drawnPoseKey = poseKey;
+      drawnBody = drawBody;
       if (drawWeapon && weaponMixer) {
         // Set every clip's time and weight, then evaluate with no time step: a pure pose.
         for (const [clip, action] of weaponActions) {
@@ -572,6 +646,7 @@ export default function MapViewerCanvas({
         }
         weaponMixer.update(0);
       }
+      if (drawBody) player?.pose(drawBody);
       flashSprites.forEach((sprite, index) => {
         const spec = flash?.sprites[index];
         sprite.visible = Boolean(spec && flashAtlas);
@@ -627,6 +702,8 @@ export default function MapViewerCanvas({
         }
         surfaces.push(mapSurfaces);
         if (sky) scene.background = sky;
+        const render = root.children.find((node) => nameOf(node) === "render");
+        if (render) entityLight.setMap(render, lighting);
         for (const node of root.children) {
           const isCollision = nameOf(node) === "collision";
           // Collision is a debug overlay; start with only the rendered map visible.
@@ -687,6 +764,8 @@ export default function MapViewerCanvas({
       controls.dispose();
       onCollisionRef.current?.(null);
       disposeObject(scene);
+      player?.dispose();
+      entityLight.dispose();
       weaponMixer?.stopAllAction();
       weaponMixer?.uncacheRoot(weaponMixer.getRoot());
       disposeObject(weaponScene);

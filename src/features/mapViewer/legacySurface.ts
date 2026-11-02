@@ -267,6 +267,8 @@ export function createSurfaceMaterials(lighting: SurfaceLighting): SurfaceMateri
       let material = cache.get(key);
       if (!material) {
         material = createMaterial(source, light, lighting);
+        // Entity lighting reads the lightmap of the surface below a model (entityLight.ts).
+        material.userData.litLight = light;
         cache.set(key, material);
       }
       return material;

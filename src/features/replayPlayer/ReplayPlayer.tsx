@@ -19,7 +19,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, IconButton, Select, VisuallyHidden } from "../../components/ui";
 import type { ReplayMarkerKind, ReplaySamples } from "../../lib/api";
-import { getViewmodelUrl, modelAssetUrl } from "../../lib/mapModels";
+import { getPlayerModelUrl, getViewmodelUrl, modelAssetUrl } from "../../lib/mapModels";
 import { useBrowserLocation } from "../../lib/routing";
 import { MapViewer, type CodPose, type ViewerFrame, type ViewmodelOptions } from "../mapViewer";
 import {
@@ -55,6 +55,7 @@ import {
   type ReplayTimeline,
 } from "./replayPlayback";
 import { readReplayStartOffset } from "./replayShare";
+import { bodyAt, createBodyTrack, fillBodyTrack } from "./replayBody";
 import { createWeaponTrack, muzzleFlash, viewmodelAnims, weaponAt } from "./replayWeapon";
 import { ShareDialog } from "./ShareDialog";
 import { ShortcutsDialog } from "./ShortcutsDialog";
@@ -66,6 +67,12 @@ import { useReplaySound } from "./useReplaySound";
 import { useViewMode, type ViewMode } from "./useViewMode";
 
 const SEEK_STEP_MS = 5_000;
+/**
+ * Most body-track building per idle callback (ms), and per frame (samples stepped, about 6 ms):
+ * a pose further ahead waits for the idle fill, with the marker standing in.
+ */
+const BODY_FILL_SLICE_MS = 4;
+const BODY_FRAME_SAMPLES = 20_000;
 const JUMP_KINDS: readonly ReplayMarkerKind[] = ["save", "load"];
 type TimelineKind = Exclude<ReplayMarkerKind, "fps">;
 const MARKER_LABELS: Readonly<Record<TimelineKind, string>> = {
@@ -78,6 +85,7 @@ const MARKER_LABELS: Readonly<Record<TimelineKind, string>> = {
 export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples: ReplaySamples }) {
   const timeline = useMemo(() => createTimeline(samples), [samples]);
   const weaponTrack = useMemo(() => createWeaponTrack(timeline), [timeline]);
+  const bodyTrack = useMemo(() => createBodyTrack(timeline), [timeline]);
   const path = useMemo(() => pathSegments(timeline), [timeline]);
   const { start, end } = timeline;
   const [preferences, setPreference] = useHudPreferences();
@@ -137,6 +145,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
       speed: true,
       viewmodel: viewmodelUrl !== null && !viewmodelMissing,
       crosshair: true,
+      path: true,
       heatmap: heatReady,
     }),
     [heatReady, samples, viewmodelMissing, viewmodelUrl],
@@ -173,6 +182,20 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     followRef.current = follow;
   }, [follow]);
 
+  // While the free camera shows the body, build its checkpoints in idle time, so a seek across a
+  // long replay finds them ready instead of stepping every sample in one frame.
+  useEffect(() => {
+    if (follow) return undefined;
+    const idle = typeof requestIdleCallback === "function";
+    let handle = 0;
+    const fill = () => {
+      if (fillBodyTrack(bodyTrack, BODY_FILL_SLICE_MS)) return;
+      handle = idle ? requestIdleCallback(fill, { timeout: 250 }) : window.setTimeout(fill, 16);
+    };
+    handle = idle ? requestIdleCallback(fill, { timeout: 250 }) : window.setTimeout(fill, 16);
+    return () => (idle ? cancelIdleCallback(handle) : window.clearTimeout(handle));
+  }, [bodyTrack, follow]);
+
   const getFrame = useCallback((): ViewerFrame => {
     const time = getTime();
     const lean = leanAt(timeline, time);
@@ -182,9 +205,12 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     const pose = addLean({ ...eye, z: eye.z + gun.dip }, lean);
     // CG_CalcViewValues keeps the eye at least 8 units above the feet (mac:349292-349294).
     const feet = eye.z - eyeHeight(timeline, time);
+    const follow = followRef.current;
     return {
       pose: { ...pose, z: Math.max(pose.z, feet + 8) },
-      follow: followRef.current,
+      follow,
+      // The third-person body only shows from the free camera; it is not computed while following.
+      body: follow ? undefined : bodyAt(bodyTrack, time, BODY_FRAME_SAMPLES),
       weapon: {
         lean,
         ads: ads.frac,
@@ -194,7 +220,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
         flash: muzzleFlash(timeline, time),
       },
     };
-  }, [getTime, timeline, weaponTrack]);
+  }, [bodyTrack, getTime, timeline, weaponTrack]);
 
   const timelineMarkers = useMemo(
     () => samples.markers.filter((marker) => marker.kind !== "fps"),
@@ -246,7 +272,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     setFollow((current) => !current);
     setAnnouncement(
       follow
-        ? "Free camera on. Focus the 3D view to fly; the runner is shown as a marker."
+        ? "Free camera on. Focus the 3D view to fly around the runner."
         : "Following the runner",
     );
   }, [follow]);
@@ -389,6 +415,8 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
         mapName={samples.mapname}
         modelUrl={modelUrl}
         path={path}
+        playerModelUrl={getPlayerModelUrl() ?? undefined}
+        showPath={preferences.path}
         viewmodel={viewmodel}
         onCollision={sound.setProbe}
         overlay={
@@ -624,6 +652,7 @@ const HUD_TOGGLES: readonly {
   { key: "jumpTimer", label: "Jumptimer", unavailable: "not recorded in this replay" },
   { key: "viewmodel", label: "Draw gun", unavailable: "weapon model unavailable" },
   { key: "crosshair", label: "Crosshair", unavailable: "" },
+  { key: "path", label: "Path", unavailable: "" },
   { key: "autoSkip", label: "Auto-skip fails", unavailable: "no skip plan in this replay" },
 ];
 

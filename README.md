@@ -65,7 +65,10 @@ Refresh its Jump4Life snapshot before comparing totals with production.
 
 The 3D map view and Jump4Life replay playback appear only when `VITE_MAP_MODEL_BASE_URL`
 points at a CORS-enabled host serving `<mapname>.glb` models (see
-[ADR 0004](docs/adr/0004-lazy-three-map-viewer.md)). For local work, serve a model directory and
+[ADR 0004](docs/adr/0004-lazy-three-map-viewer.md)). Replays also load, on demand, the sounds
+(`sounds/sounds.json`), the first-person Luger (`viewmodel/luger_mp2_anims.glb`,
+`fx/exp_fireball_atlas.webp`) and the third-person player (`player/j4l_body_gunpyeong.glb`) from
+the same host. For local work, serve a model directory and
 point both the models and replay samples at local services:
 
 ```sh

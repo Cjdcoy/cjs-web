@@ -93,15 +93,18 @@ export interface ReplayTimeline {
 }
 
 /** Recorder input_mask bits (_replay_record.gsc build_input_mask). */
-const INPUT_ATTACK = 1;
+export const INPUT_ATTACK = 1;
 const INPUT_MELEE = 16;
 const INPUT_MOVE = 32 | 64 | 128 | 256;
 const INPUT_ADS = 1024;
 const INPUT_LEAN_LEFT = 2048;
 const INPUT_LEAN_RIGHT = 4096;
-const INPUT_IN_AIR = 32768;
-/** Recorder aux bits 1 (ladder) and 8 (mantle): the weapon is put away. */
-const AUX_CLIMBING = 1 | 8;
+export const INPUT_IN_AIR = 32768;
+/** Recorder aux bits: on a ladder, and mantling (the engine's or J4L's scripted climb). */
+export const AUX_LADDER = 1;
+export const AUX_MANTLE = 8;
+/** Climbing puts the weapon away. */
+const AUX_CLIMBING = AUX_LADDER | AUX_MANTLE;
 /**
  * meleeTime of the viewer's weapon, luger_mp2 (zzz weapons/mp/luger_mp2: 0.7 s), which PM_Weapon
  * (CoD2 1.3 mac:149005) sets as weaponTime on the press. PM_Weapon_CheckForMelee ignores a
