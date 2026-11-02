@@ -137,6 +137,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
       speed: true,
       viewmodel: viewmodelUrl !== null && !viewmodelMissing,
       crosshair: true,
+      path: true,
       heatmap: heatReady,
     }),
     [heatReady, samples, viewmodelMissing, viewmodelUrl],
@@ -389,6 +390,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
         mapName={samples.mapname}
         modelUrl={modelUrl}
         path={path}
+        showPath={preferences.path}
         viewmodel={viewmodel}
         onCollision={sound.setProbe}
         overlay={
@@ -624,6 +626,7 @@ const HUD_TOGGLES: readonly {
   { key: "jumpTimer", label: "Jumptimer", unavailable: "not recorded in this replay" },
   { key: "viewmodel", label: "Draw gun", unavailable: "weapon model unavailable" },
   { key: "crosshair", label: "Crosshair", unavailable: "" },
+  { key: "path", label: "Path", unavailable: "" },
   { key: "autoSkip", label: "Auto-skip fails", unavailable: "no skip plan in this replay" },
 ];
 

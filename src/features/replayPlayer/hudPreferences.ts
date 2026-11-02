@@ -16,6 +16,8 @@ export interface HudPreferences {
   viewmodel: boolean;
   /** The centre mark of the 3D view. */
   crosshair: boolean;
+  /** The runner's path line, drawn while the camera is detached. */
+  path: boolean;
   /** Web watch heat on the timeline (ADR 0005). */
   heatmap: boolean;
   /** Sound volume, 0..1; 0 is muted. */
@@ -44,6 +46,7 @@ export const DEFAULT_HUD_PREFERENCES: Readonly<HudPreferences> = {
   autoSkip: true,
   viewmodel: false,
   crosshair: true,
+  path: true,
   heatmap: true,
   volume: 0.5,
   brightness: 1.3,

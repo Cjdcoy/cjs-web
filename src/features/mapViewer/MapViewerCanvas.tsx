@@ -72,6 +72,8 @@ export interface MapViewerProps {
   getFrame?: () => ViewerFrame | null;
   /** Flat CoD xyz endpoint pairs of path segments, drawn while the camera is detached. */
   path?: readonly number[];
+  /** Draws the path; on unless false. */
+  showPath?: boolean;
   /**
    * Controls rendered directly below the view. A function receives the viewer's own tools (the
    * Layers button) to place in its control bar; otherwise the tools follow in their own bar.
@@ -176,6 +178,7 @@ export default function MapViewerCanvas({
   onCollision,
   overlay,
   path,
+  showPath = true,
   viewmodel,
 }: MapViewerProps) {
   const hostRef = useRef<HTMLDivElement>(null);
@@ -184,6 +187,7 @@ export default function MapViewerCanvas({
   const getFrameRef = useRef(getFrame);
   const viewmodelRef = useRef(viewmodel);
   const brightnessRef = useRef(brightness);
+  const showPathRef = useRef(showPath);
   const onCollisionRef = useRef(onCollision);
   const startRef = useRef({ initialPose, path });
   const objectsRef = useRef(new Map<number, Object3D>());
@@ -213,8 +217,9 @@ export default function MapViewerCanvas({
 
   useEffect(() => {
     brightnessRef.current = brightness;
+    showPathRef.current = showPath;
     needsRenderRef.current = true;
-  }, [brightness]);
+  }, [brightness, showPath]);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -273,7 +278,8 @@ export default function MapViewerCanvas({
     marker.renderOrder = 1;
     runner.add(marker);
     const { initialPose: startPose, path: startPath } = startRef.current;
-    if (startPath && startPath.length >= 6) runner.add(createPath(startPath, accent));
+    const pathLine = startPath && startPath.length >= 6 ? createPath(startPath, accent) : null;
+    if (pathLine) runner.add(pathLine);
     scene.add(runner);
     runner.updateMatrixWorld(true);
 
@@ -521,6 +527,7 @@ export default function MapViewerCanvas({
         setFree(isFree);
       }
       runner.visible = Boolean(frame) && isFree;
+      if (pathLine) pathLine.visible = showPathRef.current;
       if (frame && !isFree) applyPose(camera, frame.pose);
       if (frame && isFree) {
         marker.position.set(...codToScenePosition(frame.pose.x, frame.pose.y, frame.pose.z));

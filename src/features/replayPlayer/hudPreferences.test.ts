@@ -70,6 +70,13 @@ describe("replay HUD preferences", () => {
     expect(readHudPreferences(stored(false)).crosshair).toBe(false);
   });
 
+  it("shows the path by default, also for documents stored before it existed", () => {
+    expect(DEFAULT_HUD_PREFERENCES.path).toBe(true);
+    const stored = (path?: boolean) => memoryStorage(JSON.stringify({ version: 1, path }));
+    expect(readHudPreferences(stored()).path).toBe(true);
+    expect(readHudPreferences(stored(false)).path).toBe(false);
+  });
+
   it("defaults brightness to 130% for older documents and keeps it in range", () => {
     const stored = (brightness?: unknown) =>
       memoryStorage(JSON.stringify({ version: 1, speed: true, brightness }));

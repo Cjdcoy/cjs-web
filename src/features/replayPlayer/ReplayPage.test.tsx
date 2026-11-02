@@ -315,6 +315,19 @@ describe("ReplayPage", () => {
     });
   });
 
+  it("hides the free-camera path and remembers it", async () => {
+    const user = userEvent.setup();
+    render(<ReplayPage apiClient={apiReturning(Promise.resolve(hudSamples))} runId="7001" />);
+
+    const hud = await screen.findByRole("group", { name: "HUD" });
+    const path = within(hud).getByRole("checkbox", { name: "Path" });
+    expect(path).toBeChecked();
+    expect(viewerProps.current?.showPath).toBe(true);
+    await user.click(path);
+    expect(viewerProps.current?.showPath).toBe(false);
+    expect(JSON.parse(storageValues.get("cjs.replay-hud") ?? "{}")).toMatchObject({ path: false });
+  });
+
   it("sets the map brightness from a remembered percentage slider", async () => {
     render(<ReplayPage apiClient={apiReturning(Promise.resolve(hudSamples))} runId="7001" />);
 
