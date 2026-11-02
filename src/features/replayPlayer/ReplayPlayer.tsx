@@ -55,7 +55,7 @@ import {
   type ReplayTimeline,
 } from "./replayPlayback";
 import { readReplayStartOffset } from "./replayShare";
-import { bodyAt, createBodyTrack } from "./replayBody";
+import { bodyAt, createBodyTrack, fillBodyTrack } from "./replayBody";
 import { createWeaponTrack, muzzleFlash, viewmodelAnims, weaponAt } from "./replayWeapon";
 import { ShareDialog } from "./ShareDialog";
 import { ShortcutsDialog } from "./ShortcutsDialog";
@@ -67,6 +67,12 @@ import { useReplaySound } from "./useReplaySound";
 import { useViewMode, type ViewMode } from "./useViewMode";
 
 const SEEK_STEP_MS = 5_000;
+/**
+ * Most body-track building per idle callback (ms), and per frame (samples stepped, about 6 ms):
+ * a pose further ahead waits for the idle fill, with the marker standing in.
+ */
+const BODY_FILL_SLICE_MS = 4;
+const BODY_FRAME_SAMPLES = 20_000;
 const JUMP_KINDS: readonly ReplayMarkerKind[] = ["save", "load"];
 type TimelineKind = Exclude<ReplayMarkerKind, "fps">;
 const MARKER_LABELS: Readonly<Record<TimelineKind, string>> = {
@@ -176,6 +182,20 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     followRef.current = follow;
   }, [follow]);
 
+  // While the free camera shows the body, build its checkpoints in idle time, so a seek across a
+  // long replay finds them ready instead of stepping every sample in one frame.
+  useEffect(() => {
+    if (follow) return undefined;
+    const idle = typeof requestIdleCallback === "function";
+    let handle = 0;
+    const fill = () => {
+      if (fillBodyTrack(bodyTrack, BODY_FILL_SLICE_MS)) return;
+      handle = idle ? requestIdleCallback(fill, { timeout: 250 }) : window.setTimeout(fill, 16);
+    };
+    handle = idle ? requestIdleCallback(fill, { timeout: 250 }) : window.setTimeout(fill, 16);
+    return () => (idle ? cancelIdleCallback(handle) : window.clearTimeout(handle));
+  }, [bodyTrack, follow]);
+
   const getFrame = useCallback((): ViewerFrame => {
     const time = getTime();
     const lean = leanAt(timeline, time);
@@ -190,7 +210,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
       pose: { ...pose, z: Math.max(pose.z, feet + 8) },
       follow,
       // The third-person body only shows from the free camera; it is not computed while following.
-      body: follow ? undefined : bodyAt(bodyTrack, time),
+      body: follow ? undefined : bodyAt(bodyTrack, time, BODY_FRAME_SAMPLES),
       weapon: {
         lean,
         ads: ads.frac,

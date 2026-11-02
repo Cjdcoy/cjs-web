@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ReplayMarker, ReplaySamples } from "../../lib/api";
-import { bodyAt, createBodyTrack } from "./replayBody";
+import { bodyAt, createBodyTrack, fillBodyTrack } from "./replayBody";
 import { createTimeline } from "./replayPlayback";
 
 /** One sample; position integrates the velocity unless `z` (or `x`) is given. */
@@ -27,7 +27,7 @@ const JUMP = 2;
 const ADS = 1024;
 const LEAN_RIGHT = 4096;
 
-function track(rows: Row[], markers: ReplayMarker[] = []) {
+function track(rows: Row[], markers: ReplayMarker[] = [], bare = false) {
   let x = 0;
   let y = 0;
   let z = 0;
@@ -62,6 +62,12 @@ function track(rows: Row[], markers: ReplayMarker[] = []) {
     aux: rows.map((row) => row.aux ?? 0),
     markers,
   };
+  if (bare) {
+    // Older payloads may have none of the recorder's flags, input or aux arrays.
+    delete samples.flags;
+    delete samples.input;
+    delete samples.aux;
+  }
   return createBodyTrack(createTimeline(samples));
 }
 
@@ -282,6 +288,39 @@ describe("body seeking", () => {
     expect(backward.reverse()).toEqual(forward);
   });
 
+  it("jumps straight to a late time on a cold track as stepping there does", () => {
+    const late = 290 * STEP_MS + 3;
+    const stepped = track(rows);
+    for (let time = 0; time < late; time += STEP_MS) bodyAt(stepped, time);
+    expect(bodyAt(track(rows), late)).toEqual(bodyAt(stepped, late));
+  });
+
+  it("hands back the same pose object while the time stands still", () => {
+    const body = track(rows);
+    expect(bodyAt(body, 500)).toBe(bodyAt(body, 500));
+    expect(bodyAt(body, 508)).not.toBe(bodyAt(body, 500));
+  });
+
+  it("leaves a pose beyond a frame's budget to the fill, then gives the same pose", () => {
+    const late = 290 * STEP_MS;
+    const budgeted = track(rows);
+    // Not prepared yet: a budgeted call leaves even that to the fill.
+    expect(bodyAt(budgeted, 0, 64)).toBeUndefined();
+    fillBodyTrack(budgeted, 0);
+    expect(bodyAt(budgeted, 0, 64)).toBeDefined();
+    expect(bodyAt(budgeted, late, 64)).toBeUndefined();
+    while (!fillBodyTrack(budgeted, 0));
+    expect(bodyAt(budgeted, late, 64)).toEqual(bodyAt(track(rows), late));
+  });
+
+  it("builds checkpoints ahead without changing a pose", () => {
+    const filled = track(rows);
+    let slices = 0;
+    while (!fillBodyTrack(filled, 0)) slices += 1;
+    expect(slices).toBeGreaterThan(1);
+    for (const time of times) expect(bodyAt(filled, time)).toEqual(bodyAt(track(rows), time));
+  });
+
   it("settles across a load teleport", () => {
     // The sample after the teleport starts over: its strafe anim at full weight at once.
     const teleport = 171 * STEP_MS;
@@ -305,5 +344,66 @@ describe("engine mantle and scripted climb", () => {
 
   it("idles through J4L's linked climb", () => {
     expect(main(mantle(2000, 45), 10 * STEP_MS + 600)).toBe("pb_stand_alert_pistol");
+  });
+});
+
+describe("body edge cases", () => {
+  it("handles replays of zero, one and two samples", () => {
+    expect(bodyAt(track([]), 0)).toBeUndefined();
+    expect(fillBodyTrack(track([]), 1)).toBe(true);
+    expect(weights([{}], 0)).toEqual({ pb_stand_alert_pistol: 1 });
+    expect(weights([{}], 500)).toEqual({ pb_stand_alert_pistol: 1 });
+    // The second sample starts running: the run fades in over 120 ms from the idle.
+    const two = weights([{}, RUN], 4 + STEP_MS);
+    expect(two.pb_pistol_run_fast).toBeCloseTo(4 / 120, 6);
+    expect(two.pb_stand_alert_pistol).toBeCloseTo(1 - 4 / 120, 6);
+  });
+
+  it("plays a replay without flags, input or aux from its velocity", () => {
+    const bare = (rows: Row[], time: number) => weightsOf(track(rows, [], true), time);
+    expect(bare(repeat(40, {}), 200)).toEqual({ pb_stand_alert_pistol: 1 });
+    expect(bare(repeat(100, { vx: 200, yaw: 30 }), 700)).toEqual({ pb_pistol_run_fast: 1 });
+    expect(bare(repeat(100, { vx: -170 }), 700)).toEqual({ pb_combatrun_back_loop_pistol: 1 });
+    expect(bodyAt(track(repeat(10, {}), [], true), 40)?.weapon).toBe(true);
+  });
+
+  it("widens the checkpoint stride on a very long replay and stays exact", () => {
+    // 330,000 frames (22 minutes at 250 fps): more than the checkpoint cap at the base stride.
+    const count = 330_000;
+    const t = new Float64Array(count);
+    const pos = new Float32Array(count * 3);
+    const ang = new Float32Array(count * 3);
+    const vel = new Float32Array(count * 3);
+    for (let index = 0; index < count; index += 1) {
+      t[index] = index * 4;
+      pos[index * 3] = index * 0.8;
+      ang[index * 3 + 1] = (index / 50) % 360;
+      vel[index * 3] = 200;
+    }
+    const samples: ReplaySamples = {
+      run_id: 1,
+      mapname: "jm_test",
+      player_id: 2,
+      playername: "Runner",
+      format_version: 12,
+      tick_ms: 4,
+      duration_ms: t[count - 1],
+      finished: true,
+      t,
+      pos,
+      ang,
+      vel,
+      stance: new Uint8Array(count),
+      input: new Uint16Array(count).fill(FORWARD),
+      markers: [],
+    };
+    const timeline = createTimeline(samples);
+    const cold = createBodyTrack(timeline);
+    const end = t[count - 1] - 1;
+    const pose = bodyAt(cold, end);
+    expect(cold.prepared?.stride).toBeGreaterThan(32);
+    const stepped = createBodyTrack(timeline);
+    for (const time of [0, end / 3, (2 * end) / 3]) bodyAt(stepped, time);
+    expect(bodyAt(stepped, end)).toEqual(pose);
   });
 });

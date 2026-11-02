@@ -11,17 +11,18 @@ const mapViewerEntryKey = "src/features/mapViewer/MapViewerCanvas.tsx";
 const budgets = {
   initialJavaScriptGzip: 75 * 1024,
   initialCssGzip: 8 * 1024,
-  // 40 KiB since the replay's third-person runner animation (CJS-082, replayBody.ts) made the replay
-  // route the largest; measured at 39.6 KiB (38.5 KiB, the J4L profile route, before it).
-  routeIncrementGzip: 40 * 1024,
-  // 171 KiB since the replay's third-person runner animation state machine (CJS-082); measured at
-  // 170.6 KiB (165.2 before it, after the J4L profile Weekly Cup tab and Skins section, CJS-079).
-  totalJavaScriptGzip: 171 * 1024,
+  // 40.5 KiB since the replay's third-person runner animation and its idle checkpoint fill (CJS-082,
+  // replayBody.ts) made the replay route the largest; measured at 40.0 KiB (38.5 KiB, the J4L
+  // profile route, before it).
+  routeIncrementGzip: 40.5 * 1024,
+  // 171.5 KiB since the replay's third-person runner animation state machine (CJS-082); measured
+  // at 170.9 KiB (165.2 before it, after the J4L profile Weekly Cup tab and Skins section, CJS-079).
+  totalJavaScriptGzip: 171.5 * 1024,
   // 23 KiB since PR #33 (3D replay viewer); measured at 22.7 KiB.
   totalCssGzip: 23 * 1024,
-  // 175 KiB since the third-person player rig and its floor lighting (CJS-082); measured at
-  // 174.5 KiB (172.8 before it, after the animated viewmodel and muzzle flash, CJS-075).
-  mapViewerGzip: 175 * 1024,
+  // 176 KiB since the third-person player rig and its floor lighting grid (CJS-082); measured at
+  // 175.4 KiB (172.8 before it, after the animated viewmodel and muzzle flash, CJS-075).
+  mapViewerGzip: 176 * 1024,
 };
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));

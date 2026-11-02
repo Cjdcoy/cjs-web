@@ -147,3 +147,58 @@ describe("createPlayerRig", () => {
     }
   });
 });
+
+describe("createPlayerRig clip weighting", () => {
+  // One bone, two one-key xanims a second apart on the "xanims" timeline: a puts it at x 1, b at x 3.
+  function rig() {
+    const scene = new Group();
+    const root = new Group();
+    root.name = "player";
+    const bone = new Bone();
+    bone.name = "bone_a";
+    root.add(bone);
+    scene.add(root);
+    const atlas = new AnimationClip("xanims", -1, [
+      new VectorKeyframeTrack("bone_a.position", [0, 1], [1, 0, 0, 3, 0, 0]),
+    ]);
+    const clips = [
+      { name: "a", start: 0, duration: 0 },
+      { name: "b", start: 1, duration: 0 },
+    ];
+    const gltf = {
+      scene,
+      animations: [atlas],
+      parser: { json: { animations: [{ name: "xanims", extras: { clips } }] } },
+    } as unknown as Parameters<typeof createPlayerRig>[0];
+    return { bone, player: createPlayerRig(gltf) };
+  }
+  const still: BodyPose = {
+    x: 0,
+    y: 0,
+    z: 0,
+    yaw: 0,
+    pitch: 0,
+    legsYaw: 0,
+    anims: [],
+    origin: { angles: [0, 0, 0], offset: [0, 0, 0] },
+    controllers: [],
+    weapon: true,
+  };
+
+  it("poses one clip at full weight, two by their weights, and none back to rest", () => {
+    const { bone, player } = rig();
+    player.pose({ ...still, anims: [{ clip: "a", time: 0, weight: 1 }] });
+    expect(bone.position.x).toBeCloseTo(1, 6);
+    player.pose({
+      ...still,
+      anims: [
+        { clip: "a", time: 0, weight: 1 },
+        { clip: "b", time: 0, weight: 3 },
+      ],
+    });
+    expect(bone.position.x).toBeCloseTo(2.5, 6);
+    player.pose(still);
+    expect(bone.position.x).toBeCloseTo(0, 6);
+    player.dispose();
+  });
+});

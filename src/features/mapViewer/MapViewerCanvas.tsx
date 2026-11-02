@@ -45,6 +45,7 @@ import {
   METRES_PER_COD_UNIT,
   sceneToCodPose,
   VIEW_FIELD_OF_VIEW,
+  type BodyPose,
   type CodPose,
   type ViewerFrame,
 } from "./codSpace";
@@ -86,8 +87,8 @@ export interface MapViewerProps {
   /** First-person weapon model, loaded on first show and drawn only while following. */
   viewmodel?: ViewmodelOptions;
   /**
-   * Third-person player model URL, loaded the first time a frame with a body is drawn from the
-   * detached camera; the marker stands in until it is ready or if it fails.
+   * Third-person player model URL, loaded the first time the camera is detached and drawn for a
+   * frame's body; the marker stands in until both are ready, or if the model fails.
    */
   playerModelUrl?: string;
   /** Receives a ground probe once the map's collision has loaded, and null on unmount. */
@@ -366,10 +367,13 @@ export default function MapViewerCanvas({
       gltf.scene.traverse((object) => {
         const mesh = object as Partial<Mesh>;
         if (!mesh.isMesh || !mesh.material || Array.isArray(mesh.material)) return;
-        mesh.material = modelSurfaces
-          ? modelSurfaces.material(object as Mesh)
-          : entityLight.material(mesh.material);
-        // A skinned mesh keeps its bind-pose bounds, which prone, jumps and mantles leave.
+        if (modelSurfaces) {
+          mesh.material = modelSurfaces.material(object as Mesh);
+          return;
+        }
+        mesh.material = entityLight.material(mesh.material);
+        // The player's skinned meshes keep their bind-pose bounds, which prone, jumps and mantles
+        // leave.
         object.frustumCulled = false;
       });
       return gltf;
@@ -380,7 +384,12 @@ export default function MapViewerCanvas({
       try {
         const gltf = await loadModel(url, true);
         if (!gltf) return;
-        player = createPlayerRig(gltf);
+        try {
+          player = createPlayerRig(gltf);
+        } catch (error) {
+          disposeObject(gltf.scene);
+          throw error;
+        }
         runner.add(gltf.scene);
         gltf.scene.updateMatrixWorld(true);
         playerState = "ready";
@@ -505,6 +514,7 @@ export default function MapViewerCanvas({
     const drawnWeaponPosition = new Vector3();
     const drawnWeaponQuaternion = new Quaternion();
     let drawnPoseKey = "";
+    let drawnBody: BodyPose | null = null;
     needsRenderRef.current = true;
     // What the free-camera readout last showed; it is rewritten at most every 100 ms on a change.
     const shownPosition = new Vector3(Number.NaN, 0, 0);
@@ -580,11 +590,11 @@ export default function MapViewerCanvas({
       }
       const body = isFree ? frame?.body : undefined;
       const playerUrl = playerModelRef.current;
-      if (body && playerUrl && playerState === "idle") void loadPlayer(playerUrl);
+      if (frame && isFree && playerUrl && playerState === "idle") void loadPlayer(playerUrl);
       const drawBody = body && playerState === "ready" ? body : null;
       marker.visible = !drawBody;
       if (player) player.root.visible = Boolean(drawBody);
-      if (drawBody && entityLight.update(drawBody.x, drawBody.y, drawBody.z, now)) {
+      if (drawBody && entityLight.update(drawBody.x, drawBody.y, drawBody.z)) {
         needsRenderRef.current = true;
       }
       if (isFree) {
@@ -600,8 +610,7 @@ export default function MapViewerCanvas({
       const flash = drawWeapon ? frame?.weapon?.flash : null;
       const poseKey =
         anims.map((anim) => `${anim.clip}@${anim.time}*${anim.weight}`).join() +
-        (flash ? JSON.stringify(flash) : "") +
-        (drawBody ? JSON.stringify(drawBody) : "");
+        (flash ? JSON.stringify(flash) : "");
       if (
         !needsRenderRef.current &&
         drawnPosition.equals(camera.position) &&
@@ -610,6 +619,8 @@ export default function MapViewerCanvas({
         drawnRunner === runner.visible &&
         drawnWeapon === drawWeapon &&
         drawnPoseKey === poseKey &&
+        // The frame getter hands back the same body object while the replay time stands still.
+        drawnBody === drawBody &&
         (!drawWeapon ||
           (drawnWeaponPosition.equals(weaponMotion.position) &&
             drawnWeaponQuaternion.equals(weaponMotion.quaternion)))
@@ -625,6 +636,7 @@ export default function MapViewerCanvas({
       drawnWeaponPosition.copy(weaponMotion.position);
       drawnWeaponQuaternion.copy(weaponMotion.quaternion);
       drawnPoseKey = poseKey;
+      drawnBody = drawBody;
       if (drawWeapon && weaponMixer) {
         // Set every clip's time and weight, then evaluate with no time step: a pure pose.
         for (const [clip, action] of weaponActions) {

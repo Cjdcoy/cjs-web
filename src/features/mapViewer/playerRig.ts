@@ -6,6 +6,7 @@ import {
   Vector3,
   type AnimationAction,
   type Object3D,
+  type Skeleton,
   type SkinnedMesh,
 } from "three";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
@@ -117,8 +118,12 @@ export function createPlayerRig(gltf: GLTF): PlayerRig {
   const tag = root.getObjectByName("tag_origin");
   const bones = BODY_CONTROLLERS.map((name) => root.getObjectByName(name));
   const weapon = root.getObjectByName("weapon_luger");
-  // The body, head and gun share one skeleton.
-  const skinned = root.getObjectByProperty("isSkinnedMesh", true) as SkinnedMesh | undefined;
+  // GLTFLoader may give each skinned mesh its own Skeleton over the same bones.
+  const skeletons = new Set<Skeleton>();
+  root.traverse((object) => {
+    if ((object as Partial<SkinnedMesh>).isSkinnedMesh)
+      skeletons.add((object as SkinnedMesh).skeleton);
+  });
   const weights = new Map<string, { time: number; weight: number }>();
   return {
     root,
@@ -145,7 +150,7 @@ export function createPlayerRig(gltf: GLTF): PlayerRig {
     dispose() {
       mixer.stopAllAction();
       mixer.uncacheRoot(gltf.scene);
-      skinned?.skeleton.dispose();
+      skeletons.forEach((skeleton) => skeleton.dispose());
     },
   };
 }

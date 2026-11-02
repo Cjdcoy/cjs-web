@@ -2708,18 +2708,28 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
     jump, land, fire, melee, weapon-change and prone events with their timer holds, blend times
     and the stance transition, torso-over-legs node weights, speed-scaled rates, start phases,
     the legs' 40° swing threshold, the torso yaw and pitch swings and the bone controllers.
-  - The state depends on history, so it is stepped one sample at a time and checkpointed every
-    16th sample (more for very long replays) as playback first reaches it; a pose restores the
-    checkpoint at or before its time and steps the rest. Seeking gives exactly the pose playing
-    gives, at a bounded cost per frame. Loads and teleports settle a fresh state.
+  - The state depends on history, so it is stepped one sample at a time (allocation-free) and
+    checkpointed every 32nd sample (more past 320,000 samples). A pose restores the checkpoint at
+    or before its time and steps the rest, so seeking gives exactly the pose playing gives; an
+    unchanged time returns the same pose object. Loads and teleports settle a fresh state.
+  - Once the free camera is on, idle callbacks read the samples (one slice, 8-22 ms on replay
+    30246's 146,704 samples) and build the checkpoints ahead in 4 ms slices. A frame steps at
+    most 20,000 samples (about 5 ms); a pose further ahead waits for the fill with the marker
+    standing in. A cold seek to the end used to cost 143 ms in one frame; once filled it costs
+    0.01 ms.
   - The model is depth-tested and lit like the game lights models: the light (and sun
     visibility) of the lightmapped surface below the feet, plus the map's sun, in gamma space like
-    the map's own shaders. The map GLB has no light grid, so the floor stands in for it.
+    the map's own shaders. The map GLB has no light grid, so the floor stands in for it: the
+    upward-facing lightmapped triangles are binned once into 128-unit columns (about 2.5 ms of
+    work per frame, 45 ms in all on jm_kuwehr2), and a lookup takes under 0.3 ms where a raycast
+    through the render meshes took 6-14 ms. Both agree on all 400 sampled positions of three maps.
 - **Validation:** `npm run verify`. Unit tests cover every movetype and its clip, walk versus run,
   the no-key coast, rate scaling and caps, jump takeoffs and the land blend, fire on the torso and
   aimed fire beside the legs, the 40° legs threshold, READY.md's `aim_down` controller pose,
-  mantle versus linked climb, a teleport, and seek determinism (cold starts and backward scrubs
-  equal stepped playback); the clip splitter has a synthetic glTF test. Checked in Chromium
+  mantle versus linked climb, a teleport, replays of 0-2 samples and without flags, input or aux,
+  and seek determinism (cold starts, a cold jump to a late time, backward scrubs, idle-built
+  checkpoints and a stride widened past 32 all equal stepped playback). The clip splitter, the
+  rig's placement, controllers and clip weighting, and the floor grid have synthetic tests. Checked in Chromium
   (Playwright, desktop and 390 px) on production replays 30259 (mp_12), 30246 (jm_cruise_hard)
   and 18241 (jm_kuwehr2, a 20 Hz v11 replay): standing, running, strafing, crouched, airborne
   and landing.
@@ -2727,11 +2737,11 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   merging (until then the sphere stays). Approximated from what a replay records (READY.md §10):
   the prone direction and ladder facing, the 64-unit ledge trace (a look-ahead to the landing),
   the mantle height, the melee pick (a per-sample hash), clientNum 0 for start phases, no
-  grenade, stumble or pain anims. The floor light is re-sampled at most every 250 ms (a ray
-  through the render geometry costs 5-17 ms on a large map) and is uniform over directions; a
+  grenade, stumble or pain anims. The floor light is uniform over directions and its grid holds
+  every up-facing lightmapped triangle in memory (about 9 × 4096 triangles on jm_kuwehr2); a
   light grid exported by the map converter would match the game more closely. Budgets raised:
-  the map viewer chunk from 173 to 175 KiB (174.5 measured), the route increment from 39 to 40 KiB
-  (39.6) and total JavaScript from 165.5 to 171 KiB (170.6).
+  the map viewer chunk from 173 to 176 KiB (175.4 measured), the route increment from 39 to
+  40.5 KiB (40.0) and total JavaScript from 165.5 to 171.5 KiB (170.9).
 
 ## Agent handoff template
 

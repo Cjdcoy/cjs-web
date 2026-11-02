@@ -158,8 +158,10 @@ const RUNCRBK = 12;
 const CLIMBUP = 13;
 const CLIMBDOWN = 14;
 const MANTLE = 15;
-const CROUCH_MOVETYPES = [IDLECR, WALKCR, WALKCRBK, RUNCR, RUNCRBK];
-const PRONE_MOVETYPES = [IDLEPRONE, WALKPRONE, WALKPRONEBK];
+/** Each movetype's stance class: 1 crouching, 2 prone, 0 anything else. */
+const STANCE_CLASS = new Int8Array(MANTLE + 1);
+for (const movetype of [IDLECR, WALKCR, WALKCRBK, RUNCR, RUNCRBK]) STANCE_CLASS[movetype] = 1;
+for (const movetype of [IDLEPRONE, WALKPRONE, WALKPRONEBK]) STANCE_CLASS[movetype] = 2;
 
 /**
  * Each locomotion movetype's clip for luger_mp2 (READY.md §5): idles by weapon position (hip, ADS),
@@ -252,8 +254,8 @@ const CONTROL_INCH_PER_MS = 0.1;
 /** The most clips fading at once; the faintest goes first. */
 const MAX_LAYERS = 8;
 /** Checkpoints kept at most; the stride grows past it. */
-const MAX_CHECKPOINTS = 20_000;
-const MIN_STRIDE = 16;
+const MAX_CHECKPOINTS = 10_000;
+const MIN_STRIDE = 32;
 
 /** Per-sample event bits. */
 const EV_AIR = 1;
@@ -318,12 +320,15 @@ interface BodyState {
   legsYaw: Swing;
   torsoPitch: Swing;
   /** Lerped controller angles (6 × 3), then tag_origin's angles (3) and offset (3). */
-  control: number[];
+  control: Float64Array;
 }
 
 /** Per-sample inputs read once from the samples. */
 interface Prepared {
   events: Uint16Array;
+  /** forwardmove and rightmove signs (moveKeys). */
+  forward: Int8Array;
+  right: Int8Array;
   /** The engine mantle clip playing at each sample, or -1. */
   mantle: Int16Array;
   /** PM_SetMovementDir, whole degrees. */
@@ -337,28 +342,79 @@ export interface BodyTrack {
   timeline: ReplayTimeline;
   /** Built on the first pose, so a replay watched only in first person pays nothing. */
   prepared: Prepared | null;
+  /** The last pose, returned again for the same time (a paused frame). */
+  last: { time: number; pose: BodyPose | undefined } | null;
 }
 
 export function createBodyTrack(timeline: ReplayTimeline): BodyTrack {
-  return { timeline, prepared: null };
+  return { timeline, prepared: null, last: null };
 }
 
-/** The body at `time` (ms); none for a replay without samples. */
-export function bodyAt(track: BodyTrack, time: number): BodyPose | undefined {
+/**
+ * Builds the track's missing checkpoints for up to `budgetMs`, for idle time once the body shows,
+ * so a later seek finds them ready. True once every checkpoint is built.
+ */
+export function fillBodyTrack(track: BodyTrack, budgetMs: number): boolean {
+  const { t } = track.timeline.samples;
+  if (t.length === 0) return true;
+  if (!track.prepared) {
+    // Reading the samples is one slice of its own.
+    track.prepared = prepare(track.timeline);
+    return false;
+  }
+  const { prepared } = track;
+  const total = Math.floor((t.length - 1) / prepared.stride) + 1;
+  const deadline = performance.now() + budgetMs;
+  while (prepared.checkpoints.length < total) {
+    extend(track.timeline, prepared);
+    if (performance.now() >= deadline) break;
+  }
+  return prepared.checkpoints.length >= total;
+}
+
+/** Steps the last checkpoint on by one stride and keeps the result as the next checkpoint. */
+function extend(timeline: ReplayTimeline, prepared: Prepared): void {
+  const last = prepared.checkpoints.length - 1;
+  const state = cloneState(prepared.checkpoints[last]);
+  for (let from = last * prepared.stride; from < (last + 1) * prepared.stride; from += 1) {
+    step(timeline, prepared, from, state);
+  }
+  prepared.checkpoints.push(state);
+}
+
+/**
+ * The body at `time` (ms); none for a replay without samples. With a `budget` (samples), a pose
+ * that would first need the track prepared or more than `budget` samples of new checkpoints is not
+ * computed (none until fillBodyTrack gets there), which bounds the work of one frame.
+ */
+export function bodyAt(
+  track: BodyTrack,
+  time: number,
+  budget = Number.POSITIVE_INFINITY,
+): BodyPose | undefined {
+  if (track.last?.time === time) return track.last.pose;
   const { timeline } = track;
   const { t } = timeline.samples;
   if (t.length === 0) return undefined;
+  if (!track.prepared && budget !== Number.POSITIVE_INFINITY) return undefined;
   const prepared = (track.prepared ??= prepare(timeline));
   const index = findSampleIndex(t, time);
   const stored = Math.floor(index / prepared.stride);
-  while (prepared.checkpoints.length <= stored) {
-    const last = prepared.checkpoints.length - 1;
-    const state = cloneState(prepared.checkpoints[last]);
-    for (let from = last * prepared.stride; from < (last + 1) * prepared.stride; from += 1) {
-      step(timeline, prepared, from, state);
-    }
-    prepared.checkpoints.push(state);
-  }
+  if ((stored + 1 - prepared.checkpoints.length) * prepared.stride > budget) return undefined;
+  const pose = computeBody(timeline, prepared, index, time);
+  track.last = { time, pose };
+  return pose;
+}
+
+function computeBody(
+  timeline: ReplayTimeline,
+  prepared: Prepared,
+  index: number,
+  time: number,
+): BodyPose {
+  const { t } = timeline.samples;
+  const stored = Math.floor(index / prepared.stride);
+  while (prepared.checkpoints.length <= stored) extend(timeline, prepared);
   const state = cloneState(prepared.checkpoints[stored]);
   for (let from = stored * prepared.stride; from < index; from += 1) {
     step(timeline, prepared, from, state);
@@ -400,6 +456,9 @@ function prepare(timeline: ReplayTimeline): Prepared {
   const events = new Uint16Array(count);
   const mantle = new Int16Array(count).fill(-1);
   const moveDir = new Int16Array(count);
+  const forward = new Int8Array(count);
+  const right = new Int8Array(count);
+  for (let index = 0; index < count; index += 1) moveKeys(timeline, index, forward, right);
   const air = (index: number) =>
     flags ? (flags[index] & FLAG_IN_AIR) !== 0 : ((input?.[index] ?? 0) & INPUT_IN_AIR) !== 0;
   const auxAt = (index: number) => aux?.[index] ?? 0;
@@ -458,7 +517,6 @@ function prepare(timeline: ReplayTimeline): Prepared {
   let ladderYaw = 0;
   for (let index = 0; index < count; index += 1) {
     const yaw = ang[index * 3 + 1];
-    const { forward, right } = moveKeys(timeline, index);
     const ladder = (auxAt(index) & AUX_LADDER) !== 0;
     const grounded = !air(index) || (events[index] & EV_LINKED) !== 0;
     if (!broken(index)) {
@@ -492,43 +550,51 @@ function prepare(timeline: ReplayTimeline): Prepared {
       direction = angleSub(ladderYaw, yaw);
     } else if (
       grounded &&
-      (forward !== 0 || right !== 0) &&
+      (forward[index] !== 0 || right[index] !== 0) &&
       Math.hypot(vel[index * 3], vel[index * 3 + 1]) > MOVE_DIR_SPEED
     ) {
       const heading = (Math.atan2(vel[index * 3 + 1], vel[index * 3]) * 180) / Math.PI;
-      direction = angleSub(heading + (forward < 0 ? 180 : 0), yaw);
+      direction = angleSub(heading + (forward[index] < 0 ? 180 : 0), yaw);
     }
     moveDir[index] = Math.max(-90, Math.min(90, Math.round(direction)));
   }
 
   const stride = Math.max(MIN_STRIDE, Math.ceil(count / MAX_CHECKPOINTS));
-  const prepared: Prepared = { events, mantle, moveDir, stride, checkpoints: [] };
+  const prepared: Prepared = {
+    events,
+    forward,
+    right,
+    mantle,
+    moveDir,
+    stride,
+    checkpoints: [],
+  };
   prepared.checkpoints.push(settle(timeline, prepared, 0));
   return prepared;
 }
 
 /**
- * The move keys' signs: forwardmove and rightmove of the recorded full presses, or for a replay
- * without input bits the side of the view the velocity points to.
+ * The move keys' signs into `forward` and `right`: forwardmove and rightmove of the recorded full
+ * presses, or for a replay without input bits the side of the view the velocity points to.
  */
-function moveKeys(timeline: ReplayTimeline, index: number): { forward: number; right: number } {
+function moveKeys(timeline: ReplayTimeline, index: number, forward: Int8Array, right: Int8Array) {
   const { ang, input, vel } = timeline.samples;
   if (input) {
     const keys = input[index];
-    return {
-      forward: Number((keys & INPUT_FORWARD) !== 0) - Number((keys & INPUT_BACK) !== 0),
-      right: Number((keys & INPUT_RIGHT) !== 0) - Number((keys & INPUT_LEFT) !== 0),
-    };
+    forward[index] = Number((keys & INPUT_FORWARD) !== 0) - Number((keys & INPUT_BACK) !== 0);
+    right[index] = Number((keys & INPUT_RIGHT) !== 0) - Number((keys & INPUT_LEFT) !== 0);
+    return;
   }
-  const [vx, vy] = [vel[index * 3], vel[index * 3 + 1]];
+  const vx = vel[index * 3];
+  const vy = vel[index * 3 + 1];
   const speed = Math.hypot(vx, vy);
-  if (speed < MOVE_THRESHOLD) return { forward: 0, right: 0 };
+  if (speed < MOVE_THRESHOLD) return;
   const yaw = (ang[index * 3 + 1] * Math.PI) / 180;
   const along = (vx * Math.cos(yaw) + vy * Math.sin(yaw)) / speed;
   const side = (vx * Math.sin(yaw) - vy * Math.cos(yaw)) / speed;
   // Outside ±67.5° of an axis the key is held (a diagonal holds both).
-  const key = (value: number) => (value > 0.38 ? 1 : value < -0.38 ? -1 : 0);
-  return { forward: key(along), right: key(side) };
+  forward[index] = along > 0.38 ? 1 : along < -0.38 ? -1 : 0;
+  right[index] = side > 0.38 ? 1 : side < -0.38 ? -1 : 0;
 }
 
 /** A fresh state at sample `index`: the anims set without blends, angles at their targets. */
@@ -551,7 +617,7 @@ function settle(timeline: ReplayTimeline, prepared: Prepared, index: number): Bo
     torsoYaw: { angle: 0, swinging: false },
     legsYaw: { angle: 0, swinging: false },
     torsoPitch: { angle: 0, swinging: false },
-    control: new Array<number>(24).fill(0),
+    control: new Float64Array(24),
   };
   decide(timeline, prepared, index, state, true);
   const { ang } = timeline.samples;
@@ -561,11 +627,11 @@ function settle(timeline: ReplayTimeline, prepared: Prepared, index: number): Bo
     moveDir: prepared.moveDir[index],
     lean: timeline.lean[index],
   };
-  const targets = angles(timeline, prepared, index, state, view);
-  state.legsYaw.angle = targets.legs;
-  state.torsoYaw.angle = targets.torso;
-  state.torsoPitch.angle = targets.pitch;
-  state.control = controls(timeline, index, state, view);
+  angles(timeline, prepared, index, state, view);
+  state.legsYaw.angle = target.legs;
+  state.torsoYaw.angle = target.torso;
+  state.torsoPitch.angle = target.pitch;
+  controls(timeline, index, state, view, state.control);
   return state;
 }
 
@@ -577,12 +643,11 @@ function step(timeline: ReplayTimeline, prepared: Prepared, index: number, state
     return;
   }
   const { ang, t } = timeline.samples;
-  advance(timeline, prepared, index, state, t[next] - state.time, {
-    yaw: ang[next * 3 + 1],
-    pitch: ang[next * 3],
-    moveDir: prepared.moveDir[next],
-    lean: timeline.lean[next],
-  });
+  stepView.yaw = ang[next * 3 + 1];
+  stepView.pitch = ang[next * 3];
+  stepView.moveDir = prepared.moveDir[next];
+  stepView.lean = timeline.lean[next];
+  advance(timeline, prepared, index, state, t[next] - state.time, stepView);
   decide(timeline, prepared, next, state, false);
 }
 
@@ -592,6 +657,13 @@ interface View {
   moveDir: number;
   lean: number;
 }
+
+// Scratch reused by every step, so stepping through a replay allocates nothing per sample.
+const stepView: View = { yaw: 0, pitch: 0, moveDir: 0, lean: 0 };
+/** angles()' result: where the torso yaw, legs yaw and torso pitch head, and climbing. */
+const target = { torso: 0, legs: 0, pitch: 0, climbing: false };
+/** controls()' goals during an advance. */
+const goal = new Float64Array(24);
 
 /** The client's lerped move direction between sample `index` and the next. */
 function moveDirAt(timeline: ReplayTimeline, prepared: Prepared, index: number, time: number) {
@@ -619,19 +691,20 @@ function decide(
   const now = samples.t[index];
   state.time = now;
   const events = prepared.events[index];
-  const { forward, right } = moveKeys(timeline, index);
+  const forward = prepared.forward[index];
+  const right = prepared.right[index];
   // PmoveSingle's PMF_BACKWARDS_RUN.
   if (forward < 0) state.backwards = true;
   else if (forward > 0 || right !== 0) state.backwards = false;
-  const play = (part: "both" | "torso", clip: number, force: boolean, hold?: number) =>
-    playAnim(state, now, cold, part, clip, force, hold);
 
   // PM_CheckDuck: to or from prone clears the torso; prone to crouch has its own anim.
   const from = index > 0 ? stance[index - 1] : stance[index];
   const to = stance[index];
   if (!cold && from !== to) {
-    if (from === 2 || to === 2) play("torso", -1, true);
-    if (from === 2 && to === 1) play("both", PRONE_TO_CROUCH, false, CLIPS[PRONE_TO_CROUCH].hold);
+    if (from === 2 || to === 2) playAnim(state, now, cold, "torso", -1, true);
+    if (from === 2 && to === 1) {
+      playAnim(state, now, cold, "both", PRONE_TO_CROUCH, false, CLIPS[PRONE_TO_CROUCH].hold);
+    }
   }
 
   if (events & EV_JUMP) {
@@ -645,10 +718,11 @@ function decide(
         : state.movetype === RUN
           ? RUN_TAKEOFF
           : STAND_TAKEOFF;
-    play("both", clip, (events & EV_JUMP_FORCED) !== 0, JUMP_DURATION);
+    playAnim(state, now, cold, "both", clip, (events & EV_JUMP_FORCED) !== 0, JUMP_DURATION);
   }
   if (events & EV_LAND) {
-    play("both", state.movetype === RUN ? RUN_LAND : STAND_LAND, true, JUMP_DURATION);
+    const land = state.movetype === RUN ? RUN_LAND : STAND_LAND;
+    playAnim(state, now, cold, "both", land, true, JUMP_DURATION);
   }
 
   const ads = timeline.aim[index] === AIM_IN;
@@ -703,12 +777,12 @@ function decide(
       const pick = movetype === IDLE || movetype === IDLECR ? Number(ads) : state.strafe;
       clip = clips[clips.length > 1 ? pick : 0];
     }
-    play("both", clip, false);
+    playAnim(state, now, cold, "both", clip, false);
   }
 
   // PM_Weapon: shots, melee swings and weapon changes (READY.md §6.3), by the movetype condition.
   const mt = state.movetype;
-  const prone = PRONE_MOVETYPES.includes(mt);
+  const prone = stanceClass(mt) === 2;
   if (events & EV_FIRE) {
     const shot =
       mt === IDLE || mt === CLIMBUP || mt === CLIMBDOWN
@@ -722,25 +796,25 @@ function decide(
           : prone
             ? FIRE_PRONE
             : -1;
-    if (shot >= 0) play("torso", shot, true, CLIPS[shot].hold);
+    if (shot >= 0) playAnim(state, now, cold, "torso", shot, true, CLIPS[shot].hold);
   }
   if (events & EV_MELEE) {
     const swing = MELEES[hash(index) % 4];
-    if (prone) play("torso", MELEE_PRONE, true, CLIPS[MELEE_PRONE].hold);
-    else play("torso", swing.clip, true, swing.ms);
+    if (prone) playAnim(state, now, cold, "torso", MELEE_PRONE, true, CLIPS[MELEE_PRONE].hold);
+    else playAnim(state, now, cold, "torso", swing.clip, true, swing.ms);
   }
   if (events & EV_DROP) {
     const pose = PULLOUT[stanceClass(mt)];
-    play("torso", pose, false, CLIPS[pose].hold);
+    playAnim(state, now, cold, "torso", pose, false, CLIPS[pose].hold);
   }
 
   // BG_RunLerpFrameRate for the legs' and the torso's current anim.
   const speed3d = Math.hypot(vel[index * 3], vel[index * 3 + 1], vel[index * 3 + 2]);
   const vertical = Math.abs(vel[index * 3 + 2]);
-  for (const current of [state.legs, state.torso]) {
-    const layer = state.layers.find((entry) => entry.clip === current);
-    if (layer) layer.rate = playbackRate(CLIPS[current], speed3d, vertical);
-  }
+  const legs = findLayer(state, state.legs);
+  if (legs) legs.rate = playbackRate(CLIPS[state.legs], speed3d, vertical);
+  const torso = findLayer(state, state.torso);
+  if (torso) torso.rate = playbackRate(CLIPS[state.torso], speed3d, vertical);
   if (cold) state.stanceUntil = Number.NEGATIVE_INFINITY;
 }
 
@@ -793,8 +867,8 @@ function setLegs(state: BodyState, now: number, cold: boolean, id: number): void
     state.stanceUntil = now + 400;
   // The first legs anim snaps.
   const time = cold || !old ? 0 : blendTime(state, now, clip, old);
-  const oldLayer = state.layers.find((layer) => layer.clip === state.legs);
-  let layer = state.layers.find((entry) => entry.clip === id);
+  const oldLayer = findLayer(state, state.legs);
+  let layer = findLayer(state, id);
   if (oldLayer) fade(oldLayer, 0, time);
   if (!layer || layer.weight === 0) {
     // A moving loop with no weight keeps the step phase of the moving loop before it, or starts
@@ -818,11 +892,11 @@ function setTorso(state: BodyState, now: number, cold: boolean, id: number): voi
   const clip = id >= 0 ? CLIPS[id] : null;
   const old = state.torso >= 0 ? CLIPS[state.torso] : null;
   const time = cold ? 0 : blendTime(state, now, clip, old);
-  const oldLayer = state.layers.find((layer) => layer.clip === state.torso);
+  const oldLayer = findLayer(state, state.torso);
   if (oldLayer) fade(oldLayer, 0, time);
   if (id >= 0) {
     // Torso anims restart every time they are set.
-    const layer = state.layers.find((entry) => entry.clip === id) ?? addLayer(state, id, 0);
+    const layer = findLayer(state, id) ?? addLayer(state, id, 0);
     layer.phase = 0;
     layer.rate = 1;
     fade(layer, 1, time);
@@ -830,6 +904,12 @@ function setTorso(state: BodyState, now: number, cold: boolean, id: number): voi
   fade(state.torsoNode, id >= 0 ? 1 : 0, time);
   fade(state.legsNode, id >= 0 ? 0.01 : 1, time);
   state.torso = id;
+}
+
+function findLayer(state: BodyState, clip: number): Layer | undefined {
+  if (clip < 0) return undefined;
+  for (const layer of state.layers) if (layer.clip === clip) return layer;
+  return undefined;
 }
 
 function addLayer(state: BodyState, clip: number, phase: number): Layer {
@@ -891,39 +971,47 @@ function advance(
   state.time += ms;
   state.legsTimer = Math.max(0, state.legsTimer - ms);
   state.torsoTimer = Math.max(0, state.torsoTimer - ms);
-  for (const layer of state.layers) {
+  const { layers } = state;
+  let kept = 0;
+  for (const layer of layers) {
     fadeStep(layer, ms);
     const clip = CLIPS[layer.clip];
     if (clip.ms > 0) {
       const phase = layer.phase + (layer.rate * ms) / clip.ms;
       layer.phase = clip.loop ? phase % 1 : Math.min(1, phase);
     }
+    // A clip faded out for good leaves the tree.
+    if (layer.weight > 0 || layer.goal > 0) layers[kept++] = layer;
   }
-  state.layers = state.layers.filter((layer) => layer.weight > 0 || layer.goal > 0);
+  layers.length = kept;
   fadeStep(state.torsoNode, ms);
   fadeStep(state.legsNode, ms);
 
-  const targets = angles(timeline, prepared, index, state, view, ms);
-  if (targets.climbing) {
-    state.torsoYaw.angle = targets.legs;
-    state.legsYaw.angle = targets.legs;
+  angles(timeline, prepared, index, state, view, ms);
+  if (target.climbing) {
+    state.torsoYaw.angle = target.legs;
+    state.legsYaw.angle = target.legs;
   }
-  const goal = controls(timeline, index, state, view);
+  controls(timeline, index, state, view, goal);
+  const { control } = state;
   const maxAngle = CONTROL_DEG_PER_MS * ms;
   for (let k = 0; k < 21; k += 1) {
-    const diff = goal[k] - state.control[k];
-    state.control[k] += Math.max(-maxAngle, Math.min(maxAngle, diff));
+    control[k] += Math.max(-maxAngle, Math.min(maxAngle, goal[k] - control[k]));
   }
   // BG_LerpOffset: along the offset's difference, at most 0.1 in per ms.
-  const diff = [21, 22, 23].map((k) => goal[k] - state.control[k]);
-  const length = Math.hypot(...diff);
+  const dx = goal[21] - control[21];
+  const dy = goal[22] - control[22];
+  const dz = goal[23] - control[23];
+  const length = Math.sqrt(dx * dx + dy * dy + dz * dz);
   const scale = length > 0 ? Math.min(1, (CONTROL_INCH_PER_MS * ms) / length) : 0;
-  for (let k = 0; k < 3; k += 1) state.control[21 + k] += diff[k] * scale;
+  control[21] += dx * scale;
+  control[22] += dy * scale;
+  control[23] += dz * scale;
 }
 
 /**
- * BG_PlayerAngles (READY.md §8.3): swings the torso yaw, legs yaw and torso pitch over `ms`, or,
- * with no `ms`, returns where they head (the settled angles).
+ * BG_PlayerAngles (READY.md §8.3): swings the torso yaw, legs yaw and torso pitch over `ms`, and
+ * puts where they head (the settled angles) in `target`.
  */
 function angles(
   timeline: ReplayTimeline,
@@ -932,7 +1020,7 @@ function angles(
   state: BodyState,
   view: View,
   ms?: number,
-): { torso: number; legs: number; pitch: number; climbing: boolean } {
+): void {
   const events = prepared.events[index];
   const mt = state.clientMovetype;
   const climbing = mt === CLIMBUP || mt === CLIMBDOWN;
@@ -979,7 +1067,10 @@ function angles(
     }
     swing(state.torsoPitch, pitch, 0, 45, PITCH_SWING, ms);
   }
-  return { torso, legs: strafe && !prone ? yaw : legs, pitch, climbing };
+  target.torso = torso;
+  target.legs = strafe && !prone ? yaw : legs;
+  target.pitch = pitch;
+  target.climbing = climbing;
 }
 
 /** BG_SwingAngles (READY.md §8.2). */
@@ -1012,7 +1103,13 @@ function swing(
  * BG_Player_DoControllersInternal (READY.md §8.5): the six controllers' angles, then tag_origin's
  * angles and offset, for the current yaws and pitch.
  */
-function controls(timeline: ReplayTimeline, index: number, state: BodyState, view: View): number[] {
+function controls(
+  timeline: ReplayTimeline,
+  index: number,
+  state: BodyState,
+  view: View,
+  out: Float64Array,
+): void {
   const stance = timeline.stance[index];
   const climbing = state.clientMovetype === CLIMBUP || state.clientMovetype === CLIMBDOWN;
   const legsYaw = state.legsYaw.angle;
@@ -1025,35 +1122,46 @@ function controls(timeline: ReplayTimeline, index: number, state: BodyState, vie
   const lean = leanFraction(view.lean);
   let roll = lean * 50 * 0.925;
   let headRoll = roll;
-  const offset = [0, 0, 0];
-  if (lean !== 0) offset[1] = lean > 0 ? -2.5 * lean : (stance === 1 ? -12.5 : -5) * lean;
-  const origin = [0, angleSub(legsYaw, view.yaw), 0];
-  let low: number[];
-  let mid: number[];
-  let up: number[];
+  // pelvis, back_low, back_mid, back_up, neck, head, then tag_origin's angles and offset.
+  out.fill(0);
+  out[19] = angleSub(legsYaw, view.yaw);
+  if (lean !== 0) out[22] = lean > 0 ? -2.5 * lean : (stance === 1 ? -12.5 : -5) * lean;
   if (stance === 2) {
     if (lean !== 0) headRoll *= 0.5;
     const radians = (ty * Math.PI) / 180;
-    const [s, c] = [Math.sin(radians), Math.cos(radians)];
-    offset[0] += -24 * (1 - c);
-    offset[1] += -12 * s;
-    if (lean * s > 0) offset[1] += -lean * (1 - c) * 16;
-    low = [0, -1.2 * roll, 0.3 * roll];
-    mid = [0, 0.1 * ty - 0.2 * roll, 0.2 * roll];
-    up = [tp, 0.8 * ty + roll, -0.2 * roll];
+    const s = Math.sin(radians);
+    const c = Math.cos(radians);
+    out[21] = -24 * (1 - c);
+    out[22] += -12 * s;
+    if (lean * s > 0) out[22] += -lean * (1 - c) * 16;
+    out[4] = -1.2 * roll;
+    out[5] = 0.3 * roll;
+    out[7] = 0.1 * ty - 0.2 * roll;
+    out[8] = 0.2 * roll;
+    out[9] = tp;
+    out[10] = 0.8 * ty + roll;
+    out[11] = -0.2 * roll;
   } else {
     if (lean !== 0 && (stance !== 1 || lean <= 0)) {
       roll *= 1.25;
       headRoll *= 1.25;
     }
-    origin[2] = lean * 50 * 0.075;
-    low = [0.2 * tp, 0.4 * ty, 0.5 * roll];
-    mid = [0.3 * tp, 0.4 * ty, 0.5 * roll];
-    up = [0.5 * tp, 0.2 * ty, -0.6 * roll];
+    out[20] = lean * 50 * 0.075;
+    out[3] = 0.2 * tp;
+    out[4] = 0.4 * ty;
+    out[5] = 0.5 * roll;
+    out[6] = 0.3 * tp;
+    out[7] = 0.4 * ty;
+    out[8] = 0.5 * roll;
+    out[9] = 0.5 * tp;
+    out[10] = 0.2 * ty;
+    out[11] = -0.6 * roll;
   }
-  const neck = [0.3 * hp, 0.3 * hy, 0];
-  const head = [0.7 * hp, 0.7 * hy, -0.3 * headRoll];
-  return [0, 0, 0, ...low, ...mid, ...up, ...neck, ...head, ...origin, ...offset];
+  out[12] = 0.3 * hp;
+  out[13] = 0.3 * hy;
+  out[15] = 0.7 * hp;
+  out[16] = 0.7 * hy;
+  out[17] = -0.3 * headRoll;
 }
 
 /**
@@ -1098,12 +1206,15 @@ function cloneState(state: BodyState): BodyState {
 
 /** 0 standing, 1 crouching, 2 prone movetypes (BG_IsCrouchingAnim, BG_IsProneAnim). */
 function stanceClass(movetype: number): number {
-  return CROUCH_MOVETYPES.includes(movetype) ? 1 : PRONE_MOVETYPES.includes(movetype) ? 2 : 0;
+  return movetype < 0 ? 0 : STANCE_CLASS[movetype];
 }
 
 /** AngleSubtract: a - b wrapped to [-180, 180). */
 function angleSub(a: number, b: number): number {
-  return ((((a - b + 180) % 360) + 360) % 360) - 180;
+  const delta = a - b;
+  // The common case needs no division: stepping calls this a dozen times per sample.
+  if (delta >= -180 && delta < 180) return delta;
+  return delta - 360 * Math.floor((delta + 180) / 360);
 }
 
 function wrap(angle: number): number {

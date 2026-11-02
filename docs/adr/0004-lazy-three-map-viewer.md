@@ -19,7 +19,7 @@ glTF loader, and a meshopt decoder. Models are tens of megabytes and most visito
   the `/maps/:mapId/3d` and `/replays/:runId` routes. `scripts/check-performance.mjs` fails if that
   module stops being a dynamic entry or is imported statically, and gives it its own gzip budget,
   excluded from the route and total budgets: 170 KiB (164.1 KiB measured after CJS-072), 173 KiB
-  with the animated viewmodel (CJS-075), 175 KiB with the third-person player (174.5 KiB, CJS-082).
+  with the animated viewmodel (CJS-075), 176 KiB with the third-person player (175.4 KiB, CJS-082).
 - Gate every 3D entry point on the build-time `VITE_MAP_MODEL_BASE_URL`; models load from
   `${base}/${encodeURIComponent(mapname)}.glb`. Unset hides the map 3D link and every replay link.
   CI and deployment builds read the repository variable of the same name.
