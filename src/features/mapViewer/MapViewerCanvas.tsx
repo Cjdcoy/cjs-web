@@ -58,6 +58,7 @@ import {
 } from "./legacySurface";
 import { createEntityLight } from "./entityLight";
 import { instanceMeshes } from "./instancing";
+import { prepareModelMeshes } from "./modelMeshes";
 import { createPlayerRig, type PlayerRig } from "./playerRig";
 import { viewmodelMotion } from "./viewmodelMotion";
 import "./displayGamma";
@@ -367,18 +368,9 @@ export default function MapViewerCanvas({
         return null;
       }
       if (modelSurfaces) surfaces.push(modelSurfaces);
-      gltf.scene.traverse((object) => {
-        const mesh = object as Partial<Mesh>;
-        if (!mesh.isMesh || !mesh.material || Array.isArray(mesh.material)) return;
-        if (modelSurfaces) {
-          mesh.material = modelSurfaces.material(object as Mesh);
-          return;
-        }
-        mesh.material = entityLight.material(mesh.material);
-        // The player's skinned meshes keep their bind-pose bounds, which prone, jumps and mantles
-        // leave.
-        object.frustumCulled = false;
-      });
+      prepareModelMeshes(gltf.scene, (mesh, current) =>
+        modelSurfaces ? modelSurfaces.material(mesh) : entityLight.material(current),
+      );
       return gltf;
     };
 

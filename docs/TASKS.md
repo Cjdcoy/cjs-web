@@ -2566,6 +2566,11 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
   - Not drawn: the camera view kick (the recorded usercmd angles already carry it), an ADS FOV
     change (adsZoomFov equals cg_fov 80), the world-space smoke puff, shell ejects, lastfire and
     reloads (ammo is not recorded), and the hip idle sway and bob (the viewer draws neither).
+  - Fix (missing pistol): three.js bounds a skinned mesh once, in the pose it is first drawn in.
+    A first draw during the raise (a share link inside it, or the model arriving while the gun
+    is holstered) left the gun's bounds below the view, so the hip-pose gun was culled while the
+    hand stayed. Viewmodel meshes, like the player's, are no longer frustum-culled
+    (`modelMeshes.ts`).
 - **Validation:** `npm run verify`. Unit tests cover shot gating (press vs hold, fireTime, the
   expiry-frame lock, raise, melee, no weapon), fWeaponPosFrac by hand-computed frames, the prone
   rule, the gun kick integrator, ADS move and sway, the anim tree times and weights, the flash, and
