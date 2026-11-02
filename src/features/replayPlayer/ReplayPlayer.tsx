@@ -19,7 +19,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button, IconButton, Select, VisuallyHidden } from "../../components/ui";
 import type { ReplayMarkerKind, ReplaySamples } from "../../lib/api";
-import { getViewmodelUrl, modelAssetUrl } from "../../lib/mapModels";
+import { getPlayerModelUrl, getViewmodelUrl, modelAssetUrl } from "../../lib/mapModels";
 import { useBrowserLocation } from "../../lib/routing";
 import { MapViewer, type CodPose, type ViewerFrame, type ViewmodelOptions } from "../mapViewer";
 import {
@@ -55,6 +55,7 @@ import {
   type ReplayTimeline,
 } from "./replayPlayback";
 import { readReplayStartOffset } from "./replayShare";
+import { bodyAt, createBodyTrack } from "./replayBody";
 import { createWeaponTrack, muzzleFlash, viewmodelAnims, weaponAt } from "./replayWeapon";
 import { ShareDialog } from "./ShareDialog";
 import { ShortcutsDialog } from "./ShortcutsDialog";
@@ -78,6 +79,7 @@ const MARKER_LABELS: Readonly<Record<TimelineKind, string>> = {
 export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples: ReplaySamples }) {
   const timeline = useMemo(() => createTimeline(samples), [samples]);
   const weaponTrack = useMemo(() => createWeaponTrack(timeline), [timeline]);
+  const bodyTrack = useMemo(() => createBodyTrack(timeline), [timeline]);
   const path = useMemo(() => pathSegments(timeline), [timeline]);
   const { start, end } = timeline;
   const [preferences, setPreference] = useHudPreferences();
@@ -183,9 +185,12 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     const pose = addLean({ ...eye, z: eye.z + gun.dip }, lean);
     // CG_CalcViewValues keeps the eye at least 8 units above the feet (mac:349292-349294).
     const feet = eye.z - eyeHeight(timeline, time);
+    const follow = followRef.current;
     return {
       pose: { ...pose, z: Math.max(pose.z, feet + 8) },
-      follow: followRef.current,
+      follow,
+      // The third-person body only shows from the free camera; it is not computed while following.
+      body: follow ? undefined : bodyAt(bodyTrack, time),
       weapon: {
         lean,
         ads: ads.frac,
@@ -195,7 +200,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
         flash: muzzleFlash(timeline, time),
       },
     };
-  }, [getTime, timeline, weaponTrack]);
+  }, [bodyTrack, getTime, timeline, weaponTrack]);
 
   const timelineMarkers = useMemo(
     () => samples.markers.filter((marker) => marker.kind !== "fps"),
@@ -247,7 +252,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
     setFollow((current) => !current);
     setAnnouncement(
       follow
-        ? "Free camera on. Focus the 3D view to fly; the runner is shown as a marker."
+        ? "Free camera on. Focus the 3D view to fly around the runner."
         : "Following the runner",
     );
   }, [follow]);
@@ -390,6 +395,7 @@ export function ReplayPlayer({ modelUrl, samples }: { modelUrl: string; samples:
         mapName={samples.mapname}
         modelUrl={modelUrl}
         path={path}
+        playerModelUrl={getPlayerModelUrl() ?? undefined}
         showPath={preferences.path}
         viewmodel={viewmodel}
         onCollision={sound.setProbe}

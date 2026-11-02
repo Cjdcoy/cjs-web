@@ -17,8 +17,9 @@ glTF loader, and a meshopt decoder. Models are tens of megabytes and most visito
   packages.
 - Keep three.js behind one dynamic import (`src/features/mapViewer/MapViewerCanvas.tsx`) shared by
   the `/maps/:mapId/3d` and `/replays/:runId` routes. `scripts/check-performance.mjs` fails if that
-  module stops being a dynamic entry or is imported statically, and gives it its own 170 KiB gzip
-  budget, excluded from the route and total budgets (measured at 164.1 KiB after CJS-072).
+  module stops being a dynamic entry or is imported statically, and gives it its own gzip budget,
+  excluded from the route and total budgets: 170 KiB (164.1 KiB measured after CJS-072), 173 KiB
+  with the animated viewmodel (CJS-075), 175 KiB with the third-person player (174.5 KiB, CJS-082).
 - Gate every 3D entry point on the build-time `VITE_MAP_MODEL_BASE_URL`; models load from
   `${base}/${encodeURIComponent(mapname)}.glb`. Unset hides the map 3D link and every replay link.
   CI and deployment builds read the repository variable of the same name.
@@ -29,6 +30,11 @@ glTF loader, and a meshopt decoder. Models are tens of megabytes and most visito
   renderer, and its WebGL context on unmount.
 - Interpolate replay playback on the client (cubic Hermite on position with velocity tangents,
   shortest-arc angles, snapping across loads and teleports) in a pure, unit-tested module.
+- From the free camera, draw the runner as the CoD2 third-person player
+  (`player/j4l_body_gunpyeong.glb`, loaded on first use), posed by a pure per-sample state machine
+  in the replay feature (`replayBody.ts`, checkpointed so seeking equals playing) and lit from the
+  lightmap below its feet plus the map's sun, like the game lights models from its light grid
+  (CJS-082).
 - Shade render materials from the converter's `MAPCONV_legacy_surface` extension (lightmaps, model
   light probes, detail maps, add and multiply blends, alpha tests) by patching three.js's unlit
   material, and draw the `MAPCONV_legacy_sky` cube as the scene background (CJS-072). Fallback
@@ -42,8 +48,11 @@ glTF loader, and a meshopt decoder. Models are tens of megabytes and most visito
 Pages that never open a 3D view keep their existing initial bundle; the new routes, links, and
 replay HUD, view modes (16:9, cinema, full screen), shortcut dialog, and the Web Audio replay sound
 engine raise the route budget from 35 to 36 KiB, the total JavaScript budget from 136 to 151 KiB, and
-total CSS from 20 to 22 KiB. Replay sounds load on demand from the model host (`sounds/sounds.json`
-plus WAV files), so the host also needs CORS for them; `connect-src https:` already allows the fetch. The replay HUD (angle helper, speed meter, FPS) is plain
+total CSS from 20 to 22 KiB. Besides `<mapname>.glb`, the model host serves what replays load on
+demand: `sounds/sounds.json` plus WAV files, the viewmodel `viewmodel/luger_mp2_anims.glb` and its
+flash atlas `fx/exp_fireball_atlas.webp`, and the third-person player
+`player/j4l_body_gunpyeong.glb`; it needs CORS for all of them, and `connect-src https:` already
+allows the fetches. The replay HUD (angle helper, speed meter, FPS) is plain
 DOM over the canvas; only the optional first-person weapon model adds a second WebGL pass. The model host must serve CORS headers and, in production, HTTPS. WebGL is
 required; browsers without it get an explicit error state. Replay playback and the map view share
 one renderer implementation, so lighting or material changes apply to both.

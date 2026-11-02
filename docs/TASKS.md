@@ -2686,6 +2686,53 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
 - **Remaining work/risks:** WebKit e2e was not run locally. Until cjs-backend PR #12 deploys, J4L
   profiles show no Skins section and the Weekly Cup tab shows its notice.
 
+### CJS-082 — Third-person runner in the replay free camera
+
+- **Status:** done (needs the player asset on the model host before merge)
+- **Owner/handoff:** Claude (Fable supervisor, Opus 3D worker) / replay player model
+- **Dependencies:** the 3D replay viewer, CJS-075, the HUD path toggle
+  (`feat/replay-path-toggle`), the model host asset `player/j4l_body_gunpyeong.glb` (built in
+  `model-src/player-anims`, contract `out/READY.md`)
+- **Primary boundary:** `src/features/replayPlayer` (`replayBody.ts`, `ReplayPlayer.tsx`, exported
+  recorder bits in `replayPlayback.ts` and `replayHudModel.ts`), `src/features/mapViewer`
+  (`codSpace.ts` `BodyPose`, `playerRig.ts`, `entityLight.ts`, `legacySurface.ts`,
+  `MapViewerCanvas.tsx`), `src/lib/mapModels.ts`, `scripts/check-performance.mjs`
+- **Outcome:**
+  - From the free camera the runner is the CoD2 third-person player (the J4L body, head and
+    Luger on one skeleton, 57 xanims) instead of the blue sphere. It loads the first time the free
+    camera shows a frame; the sphere stays until it is ready or if it fails. Replays do not record
+    the outfit, so every runner wears the free default, gunpyeong.
+  - `replayBody.ts` drives it as the game drives a player entity (READY.md): playeranim.script's
+    luger_mp2 table, PM_Footsteps movetypes (walk from ADS or lean, not speed; backpedal; strafe;
+    crouch and prone; ladders; engine mantles told apart from J4L's linked climb by length),
+    jump, land, fire, melee, weapon-change and prone events with their timer holds, blend times
+    and the stance transition, torso-over-legs node weights, speed-scaled rates, start phases,
+    the legs' 40° swing threshold, the torso yaw and pitch swings and the bone controllers.
+  - The state depends on history, so it is stepped one sample at a time and checkpointed every
+    16th sample (more for very long replays) as playback first reaches it; a pose restores the
+    checkpoint at or before its time and steps the rest. Seeking gives exactly the pose playing
+    gives, at a bounded cost per frame. Loads and teleports settle a fresh state.
+  - The model is depth-tested and lit like the game lights models: the light (and sun
+    visibility) of the lightmapped surface below the feet, plus the map's sun, in gamma space like
+    the map's own shaders. The map GLB has no light grid, so the floor stands in for it.
+- **Validation:** `npm run verify`. Unit tests cover every movetype and its clip, walk versus run,
+  the no-key coast, rate scaling and caps, jump takeoffs and the land blend, fire on the torso and
+  aimed fire beside the legs, the 40° legs threshold, READY.md's `aim_down` controller pose,
+  mantle versus linked climb, a teleport, and seek determinism (cold starts and backward scrubs
+  equal stepped playback); the clip splitter has a synthetic glTF test. Checked in Chromium
+  (Playwright, desktop and 390 px) on production replays 30259 (mp_12), 30246 (jm_cruise_hard)
+  and 18241 (jm_kuwehr2, a 20 Hz v11 replay): standing, running, strafing, crouched, airborne
+  and landing.
+- **Remaining work/risks:** upload `player/j4l_body_gunpyeong.glb` to the model host before
+  merging (until then the sphere stays). Approximated from what a replay records (READY.md §10):
+  the prone direction and ladder facing, the 64-unit ledge trace (a look-ahead to the landing),
+  the mantle height, the melee pick (a per-sample hash), clientNum 0 for start phases, no
+  grenade, stumble or pain anims. The floor light is re-sampled at most every 250 ms (a ray
+  through the render geometry costs 5-17 ms on a large map) and is uniform over directions; a
+  light grid exported by the map converter would match the game more closely. Budgets raised:
+  the map viewer chunk from 173 to 175 KiB (174.5 measured), the route increment from 39 to 40 KiB
+  (39.6) and total JavaScript from 165.5 to 171 KiB (170.6).
+
 ## Agent handoff template
 
 ```md

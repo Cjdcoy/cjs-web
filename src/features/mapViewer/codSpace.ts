@@ -19,6 +19,39 @@ export interface ViewerFrame {
   follow: boolean;
   /** First-person weapon state; the weapon rests at its idle pose without it. */
   weapon?: WeaponMotion;
+  /** Third-person body, drawn instead of the marker while the camera is detached. */
+  body?: BodyPose;
+}
+
+/** The player model's bone controllers (BG_Player_DoControllersInternal), parents first. */
+export const BODY_CONTROLLERS = [
+  "pelvis",
+  "back_low",
+  "back_mid",
+  "back_up",
+  "neck",
+  "head",
+] as const;
+
+/** The third-person player at one moment: CoD units and degrees (pitch down positive). */
+export interface BodyPose {
+  /** Feet origin. */
+  x: number;
+  y: number;
+  z: number;
+  /** View angles; the model turns by the yaw. */
+  yaw: number;
+  pitch: number;
+  /** Legs yaw (world); tag_origin turns by legsYaw - yaw. */
+  legsYaw: number;
+  /** Clips to pose with their final mixer weights; clips left out get weight 0. */
+  anims: readonly ViewmodelAnim[];
+  /** tag_origin's local tag relative to the model root: [pitch, yaw, roll] and [x, y, z]. */
+  origin: { angles: readonly [number, number, number]; offset: readonly [number, number, number] };
+  /** Model-space [pitch, yaw, roll] of each BODY_CONTROLLERS bone, in that order. */
+  controllers: readonly (readonly [number, number, number])[];
+  /** Whether the runner holds a weapon (none on ladders and while mantling). */
+  weapon: boolean;
 }
 
 export interface WeaponMotion {
@@ -44,7 +77,7 @@ export interface ViewmodelFlash {
   light: { offset: number; radius: number; color: readonly [number, number, number] };
 }
 
-/** One clip of the viewmodel GLB at a time (seconds into the clip) and blend weight. */
+/** One clip of a model GLB (viewmodel or body) at a time (seconds into the clip) and weight. */
 export interface ViewmodelAnim {
   clip: string;
   time: number;
