@@ -2492,13 +2492,22 @@ verify` passed with 35 files / 211 tests, formatting, lint, coverage, strict
     blends). Light is applied as linear colour × pow(light, 2.2).
   - Fallback colours for missing game materials take their placement's probe light, or Lambert
     under the scene lights, instead of glowing.
-  - `MAPCONV_legacy_sky` becomes the scene background as an unrotated sRGB cube texture.
+  - `MAPCONV_legacy_sky` becomes the scene background as an unrotated sRGB cube texture. Maps
+    that mix skies (mp_12) carry it on each sky material instead: those surfaces draw their own
+    cube (one per distinct face set) along the per-pixel view direction, unlit and unfogged, with
+    the background's x mirror, so a sky surface and the background are seamless. Materials
+    without a valid extension keep the surface path.
+  - Map colour and detail textures get 8× anisotropic filtering (three.js clamps it to the GPU
+    maximum and skips non-mipmapped lightmaps); glTF colour textures are already trilinear.
   - The material-extras code path (lightmap, detail, blend) is removed. Collision, layers, the
     brightness filter, and the weapon pass are unchanged.
 - **Validation:** `npm run verify` on a case-sensitive copy. Unit tests cover extension parsing,
   the CoD → scene direction, probe and ambient math, the lighting table, and the shader patches.
   Real Chrome rendered raw and optimized (meshopt, quantized, WebP) jm_pier_250, mp_toujane, and
   jm_pier_2_pro with lighting and sky, and run 28591 with the weapon. Viewer chunk 164.1/170 KiB.
+  Material-level skies: with mp_jump_hard's scene cube copied onto every material, Chrome drew
+  the same frame as with the map hidden (within 1/255), and a patched mp_12 shows each zone's
+  nebula cube. Viewer chunk 175.8/176 KiB.
 - **Remaining work/risks:** normal maps and specular are not applied (as in the converter's
   preview). Back faces reuse the front normal.
 
